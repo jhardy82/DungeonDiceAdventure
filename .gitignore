@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Battle Dice runtime output
+logs/
+*.jsonl
+sim_results/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
