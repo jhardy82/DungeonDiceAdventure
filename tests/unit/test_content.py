@@ -34,14 +34,37 @@ EXPECTED_CLASSES = {
     "scout": (10, 10, 13, 6, 4, 2, 6, 0, 2, ["striker_d8", "tools_d4"], "back", 2),
 }
 
-# party size -> (battle 1 archetypes, battle 2 archetypes, battle 2 captain hp, battle 2 strike power)
+# Shipped encounter table (content 1.2.0, owner-approved per-party-size balance of 2026-11-09).
+# party size -> battle -> [(archetype, max HP, speed, damaging action, its power)] in spawn-ID order.
+# Base stats in enemies.json: goblin 6 HP / speed 10 / Slash 2; hex adept 7 / 8 / Shadow Bolt 3;
+# captain 12 / 9 / Strike 3. Every size gets damage +1; HP is +50% for sizes 1 and 5 and +33% for
+# sizes 2-4 (applied to the 1.1.0 per-size captain HP of 9 / 10 / 12 / 14 / 16); speed is +2 for
+# sizes 3-5.
+G, H, C = "goblin", "hex_adept", "captain"
 EXPECTED_ENCOUNTERS = {
-    1: (["goblin"], ["captain"], 9, 2),
-    2: (["goblin", "hex_adept"], ["captain", "goblin"], 10, 3),
-    3: (["goblin", "goblin", "hex_adept"], ["captain", "goblin", "hex_adept"], 12, 3),
-    4: (["goblin", "goblin", "hex_adept", "hex_adept"], ["captain", "goblin", "goblin", "hex_adept"], 14, 3),
-    5: (["goblin"] * 3 + ["hex_adept"] * 2, ["captain", "goblin", "goblin", "hex_adept", "hex_adept"], 16, 3),
+    1: {1: [(G, 9, 10, "slash", 3)],
+        2: [(C, 14, 9, "strike", 3)]},
+    2: {1: [(G, 8, 10, "slash", 3), (H, 10, 8, "shadow_bolt", 4)],
+        2: [(C, 14, 9, "strike", 4), (G, 8, 10, "slash", 3)]},
+    3: {1: [(G, 8, 12, "slash", 3), (G, 8, 12, "slash", 3), (H, 10, 10, "shadow_bolt", 4)],
+        2: [(C, 16, 11, "strike", 4), (G, 8, 12, "slash", 3), (H, 10, 10, "shadow_bolt", 4)]},
+    4: {1: [(G, 8, 12, "slash", 3), (G, 8, 12, "slash", 3), (H, 10, 10, "shadow_bolt", 4), (H, 10, 10, "shadow_bolt", 4)],
+        2: [(C, 19, 11, "strike", 4), (G, 8, 12, "slash", 3), (G, 8, 12, "slash", 3), (H, 10, 10, "shadow_bolt", 4)]},
+    5: {1: [(G, 9, 12, "slash", 3)] * 3 + [(H, 11, 10, "shadow_bolt", 4)] * 2,
+        2: [(C, 24, 11, "strike", 4), (G, 9, 12, "slash", 3), (G, 9, 12, "slash", 3), (H, 11, 10, "shadow_bolt", 4),
+            (H, 11, 10, "shadow_bolt", 4)]},
 }
+
+
+def shipped_roster(content, size, battle):
+    """(archetype, max HP, speed, damaging action, power) for each enemy the shipped content spawns."""
+    rows = []
+    for enemy in progression.make_enemies(content, size, battle):
+        action_id = {"goblin": "slash", "hex_adept": "shadow_bolt", "captain": "strike"}[enemy.archetype_id]
+        base = content.enemy_action(enemy.archetype_id, action_id)
+        power = enemy.action_overrides.get(action_id, {}).get("power", base.power)
+        rows.append((enemy.archetype_id, enemy.max_hp, enemy.speed, action_id, power))
+    return rows
 
 
 @pytest.mark.parametrize("die_id", sorted(EXPECTED_DICE))
@@ -126,20 +149,25 @@ def test_enemy_archetypes(content):
 
 @pytest.mark.parametrize("size", sorted(EXPECTED_ENCOUNTERS))
 def test_encounter_scaling_table(content, size):
-    battle1, battle2, captain_hp, strike = EXPECTED_ENCOUNTERS[size]
-    first = progression.make_enemies(content, size, 1)
-    second = progression.make_enemies(content, size, 2)
-    assert [e.archetype_id for e in first] == battle1
-    assert [e.archetype_id for e in second] == battle2
-    assert [e.id for e in first] == [f"b1_e{n:02d}" for n in range(1, len(first) + 1)]
-    assert [e.id for e in second] == [f"b2_e{n:02d}" for n in range(1, len(second) + 1)]
-    captain = second[0]
-    assert (captain.hp, captain.max_hp) == (captain_hp, captain_hp)
-    strike_power = captain.action_overrides.get("strike", {}).get("power", content.enemy_action("captain", "strike").power)
-    assert strike_power == strike
-    for enemy in first + second:
-        if enemy.archetype_id != "captain":
-            assert enemy.max_hp == content.enemies[enemy.archetype_id]["max_hp"]
+    for battle in (1, 2):
+        enemies = progression.make_enemies(content, size, battle)
+        assert shipped_roster(content, size, battle) == EXPECTED_ENCOUNTERS[size][battle]
+        assert [e.id for e in enemies] == [f"b{battle}_e{n:02d}" for n in range(1, len(enemies) + 1)]
+        assert all(e.hp == e.max_hp and e.gauge == 0 and e.shields == 0 for e in enemies)
+        assert all(e.row == content.enemies[e.archetype_id]["row"] for e in enemies)
+
+
+def test_balance_changes_live_only_in_the_encounter_table(content):
+    # Base archetype stats stay as authored in the PRD; the per-size table carries every adjustment.
+    base = {k: (v["max_hp"], v["speed"]) for k, v in content.enemies.items()}
+    assert base == {"goblin": (6, 10), "hex_adept": (7, 8), "captain": (12, 9)}
+    assert content.balance["ai"] == {"priority_lethal": 100, "priority_setup": 20, "priority_default": 10}
+    assert content.reactions["disrupt"]["mana_cost"] == 1
+    # Only damaging actions are raised; setup and area actions keep their authored power.
+    for size in EXPECTED_ENCOUNTERS:
+        for battle in (1, 2):
+            for enemy in progression.make_enemies(content, size, battle):
+                assert set(enemy.action_overrides) <= {"slash", "shadow_bolt", "strike"}
 
 
 def test_die_view_shows_every_face_frequency_and_probability(content):
@@ -198,8 +226,8 @@ def test_missing_document_is_reported():
 def test_versions_and_owner_rule_changes_of_1_1_0(content):
     from battle_dice import RULES_VERSION
 
-    assert RULES_VERSION == "1.1.0" and content.content_version == "1.1.0"
-    assert {doc["content_version"] for doc in content.documents.values()} == {"1.1.0"}
+    assert RULES_VERSION == "1.1.0" and content.content_version == "1.2.0"  # 1.2.0: balance table only
+    assert {doc["content_version"] for doc in content.documents.values()} == {"1.2.0"}
     assert content.classes["squire"]["passive"]["type"] == "defense_die_bonus"
     assert content.balance["upgrades"]["max_swaps_per_hero"] == 1
     assert "max_swaps_per_run" not in content.balance["upgrades"]

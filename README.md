@@ -118,7 +118,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 294 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
+python -m pytest                 # 295 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
 python -m ruff check src tests
 python -m mypy src/battle_dice/core src/battle_dice/rng.py src/battle_dice/content src/battle_dice/sim src/battle_dice/app
 ```
@@ -136,13 +136,15 @@ commands on Linux and Windows.
 ## Headless simulation and replay
 
 ```bash
-battle-dice-sim --seeds 20 --policy heuristic --out sim_results/heuristic.json
+battle-dice-sim --seeds 40 --policy heuristic --jobs 4 --out sim_results/heuristic.json
 battle-dice-sim --seeds 20 --policy random
 ```
 
 The simulator plays complete runs for every class composition of the requested party sizes and
 reports wins and losses by party size and composition plus engine transition latency. Its output
-is a measurement, not a balance claim. See `docs/DECISION_LOG.md` for recorded results.
+is a measurement, not a balance claim. `--content-dir PATH` measures a candidate fixture set
+from a folder without touching the shipped content. See `docs/DECISION_LOG.md` section 7 for the
+recorded results and the per-party-size table chosen from them.
 
 Every finished run writes a JSONL event log (header line, then one event per line with sequence
 number, tick, actor, before/delta/after, RNG stream and draw index). A run is fully reproducible

@@ -1,12 +1,13 @@
 # Battle Dice MVP: Decision Log
 
-Contract: **BD-PRD-MVP-001 v1.0.0** (2026-11-09). Rules version `1.1.0`, content version `1.1.0`,
+Contract: **BD-PRD-MVP-001 v1.0.0** (2026-11-09). Rules version `1.1.0`, content version `1.2.0`,
 RNG `BD-PCG32-v1`.
 
 This log records (1) how gaps and contradictions between *delegated default* (DD) statements in
 the PRD were resolved, (2) implementation choices the PRD left open, and (3) measured evidence.
-No **approved (A)** requirement was altered. Every DD numeric value is implemented exactly as
-authored and lives in `src/battle_dice/content/data/*.json`, not in engine code.
+No **approved (A)** requirement was altered. Every numeric value lives in
+`src/battle_dice/content/data/*.json`, not in engine code. DD values are as authored in the PRD
+except where an owner decision below says otherwise (D-01, D-08, D-10, D-18, D-19).
 
 Changing any entry below is a content/rules change: bump the version, rerun the acceptance
 tests, and add an entry here.
@@ -33,6 +34,7 @@ tests, and add an entry here.
 | D-16 | 7.2 cooldowns | No enemy ability cooldowns are authored, so none are implemented. | The PRD mentions cooldowns only as a general possibility. Deferred (F). |
 | D-17 | 9.4 enemy mana | Mana costs are charged to heroes only. Enemies have no mana pool. | 9.4: "Enemies in the initial fixtures do not use player mana pools". |
 | D-18 | 13 runtime | **Python 3.15 or newer is required** (`requires-python = ">=3.15"`), replacing the PRD's delegated default of "Python 3.12+". CI, the lint target and the type-check target are pinned to the 3.15 line, so new 3.15.x patches are picked up but 3.16 is not adopted automatically. | Owner direction (2026-11-09): use the newest stable Python. 3.15.2 was the newest stable build in GitHub's `actions/python-versions` manifest on that date; 3.16 was alpha only. |
+| D-19 | 12.2 encounter scaling | **Owner decision, 2026-11-09 (content 1.2.0):** the per-party-size encounter table is retuned so the scripted informed player wins 70-85% of runs at every party size. See section 7.1 for the exact changes and measurements. | The PRD calls the 12.2 tables "initial balance fixtures" to be adjusted after simulation. Informed play won 95-100% before the change. |
 
 ## 2. Content authored under delegation
 
@@ -62,6 +64,7 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 | E-08 | `Engine.force_draws()` queues forced bounded results for a stream. It exists only for fixtures (11.2: "fixture tests can force a known catalog order"); forced draws are logged as `<stream>:forced` and do not advance the PCG stream. |
 | E-09 | Rules text shown to the player is generated from face data (`view.describe_face`), so it cannot drift from behaviour. |
 | E-10 | The golden RNG vectors in `tests/golden/rng_vectors.json` are locked to the current rules version (label updated to 1.1.0; the vectors are unchanged because the RNG algorithm is unchanged). The raw generator is also checked against the published PCG32 reference output (seed 42, sequence 54). |
+| E-11 | Rule fixtures (T01-T13, T15 and the engine unit tests) run on the shipped rules data with the encounter table frozen at its rules-1.1.0 values (`tests/golden/encounters_mechanics.json`), so a balance retune does not rewrite tests about rules. The shipped table itself is asserted exactly in `unit/test_content.py` and `fixtures/test_t14_party_scaling.py`, and full-run, replay, simulator and UI tests use the shipped content. |
 
 ## 4. Deviations from the plan
 
@@ -92,8 +95,8 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 
 ## 6. Acceptance evidence
 
-294 automated tests pass on the reference environment (Linux container, Python 3.15.2,
-pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 147 unit, 78 fixture, 37 integration,
+295 automated tests pass on the reference environment (Linux container, Python 3.15.2,
+pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 148 unit, 78 fixture, 37 integration,
 32 headless UI and graphics. `ruff` 0.17.4 and `mypy` 2.4.1 are clean with their 3.15 targets.
 
 Before the move to 3.15 the same suite also passed on Python 3.12.3 and 3.13; those versions are
@@ -131,39 +134,75 @@ window behaviour on Windows remain to be confirmed by the owner.
 
 ## 7. Measured balance and latency (not balance claims)
 
-Command: `battle-dice-sim --seeds 20 --policy <policy>`. Seeds 0-19, every class composition for
-each party size (55 compositions, 1,100 runs per policy), heroes in their suggested rows,
-content 1.0.0.
+Command: `battle-dice-sim --seeds 40 --policy <policy> --jobs 4`. Seeds 0-39, every class
+composition for each party size (55 compositions, 2,200 runs per policy), heroes in their
+suggested rows. **Heuristic policy:** keeps the dice in its best-scoring plan, rerolls the rest,
+always reacts when it can. **Random policy:** uniformly random legal decisions. Both are scripted
+players, not human playtesting.
 
-| Party size | Runs | Heuristic policy wins | Random policy wins |
-|-----------:|-----:|----------------------:|-------------------:|
-| 1 | 60 | 60 (100.0%) | 41 (68.3%) |
-| 2 | 120 | 119 (99.2%) | 58 (48.3%) |
-| 3 | 200 | 187 (93.5%) | 103 (51.5%) |
-| 4 | 300 | 293 (97.7%) | 159 (53.0%) |
-| 5 | 420 | 407 (96.9%) | 212 (50.5%) |
+### 7.1 Owner decision D-19: per-party-size encounter table (content 1.2.0, 2026-11-09)
 
-- **Heuristic policy:** keeps the dice in its best-scoring plan, rerolls the rest, always reacts
-  when it can. **Random policy:** uniformly random legal decisions.
-- **Reading:** legal parties of every size can win under informed play, and uninformed play loses
-  about half the time, so losses are possible. This is two scripted policies over 20 seeds, not
-  human playtesting.
-- **Latency:** 791,204 engine transitions, median 0.25 ms, p95 0.45 ms on the reference
-  container, against the proposed target of under 100 ms. The figure includes the policy's own
-  decision time averaged over the commands it sent, so the engine alone is faster. It was not
-  measured on the Windows target machine.
+- **Target set by the owner:** an informed player wins 70-85% of full runs, judged per party size.
+- **Change:** only the per-size overrides in `encounters.json`. Base enemy stats, the AI priority
+  rule and every hero number stay as authored. Rules version stays 1.1.0.
+  - All sizes: Slash, Shadow Bolt and Strike +1 damage.
+  - Enemy HP: +50% for sizes 1 and 5, +33% for sizes 2-4 (rounded up).
+  - Enemy speed: +2 for sizes 3-5.
 
-### Observations for the owner (no fixture was changed)
+| Party size | Runs | Rules 1.1.0, heuristic | Content 1.2.0, heuristic | Content 1.2.0, random |
+|-----------:|-----:|-----------------------:|-------------------------:|----------------------:|
+| 1 | 120 | 100.0% | 75.8% | 31.7% |
+| 2 | 240 | 99.2% | 82.9% | 20.4% |
+| 3 | 400 | 94.8% | 74.5% | 6.0% |
+| 4 | 600 | 97.3% | 74.7% | 8.8% |
+| 5 | 840 | 96.4% | 74.8% | 4.3% |
+| All | 2,200 | 96.9% | 75.6% | 9.1% |
 
-1. **Solo runs never lost to the heuristic in this sample (60 of 60).** A lone hero faces one
-   Goblin and then a reduced Captain, and can out-shield or out-pace their damage.
-2. **The exact AI policy in 14.4 front-loads setup actions.** Priority 20 beats priority 10, so a
-   Goblin uses Dirty Trick whenever a reachable hero has no Weaken, a Hex Adept uses Poison Dart
-   whenever a hero has no Poison, and the Captain opens with War Cry. Enemy damage in the first
-   activations is therefore low. This is implemented exactly as specified.
-3. **Disrupt cancels a basic action outright for 1 mana once per Scout activation**, and the
-   Scout is the fastest unit, which removes a large share of Battle 1 enemy actions.
+The 1.2.0 figures were re-measured on the shipped content and match the approved proposal for
+every composition.
 
-If a tighter challenge is wanted, candidates to evaluate with the simulator are the priority-20
-rule, Disrupt's cost, and the solo encounter stats. Each would be a versioned content or rules
-change with the acceptance tests rerun.
+### 7.2 What the average hides
+
+Win rate depends far more on party make-up than on party size. On content 1.2.0:
+
+| Party size | Weakest composition | Strongest | Compositions under 50% | Compositions at 100% |
+|-----------:|---------------------|-----------|-----------------------:|---------------------:|
+| 1 | Apprentice, 45% | Scout, 100% | 1 of 3 | 1 |
+| 2 | Squire + Squire, 35% | Scout + Squire, 100% | 1 of 6 | 4 |
+| 3 | three Squires, 0% | Scout + Scout + Squire, 100% | 3 of 10 | 4 |
+| 4 | four Squires, 0% | two Scouts + two Squires, 100% | 3 of 15 | 7 |
+| 5 | Apprentice + four Squires, 0% | three Scouts + two Squires, 100% | 5 of 21 | 8 |
+
+- All-Squire parties lose because they have little damage and cannot reach the back row until
+  the front row falls. Parties with Scouts stay near 100%.
+- Uninformed (random) play now wins about 9% overall, down from about 50% on rules 1.0.0.
+- Closing the gap between compositions needs class-level changes (Squire damage, Apprentice
+  durability, Scout strength). The owner chose not to do that in this pass.
+
+### 7.3 Candidates measured before the proposal (rules 1.1.0, global changes, heuristic, 20 seeds)
+
+| Candidate | Overall | Size 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| Enemy setup priority 20 -> 10 (40 seeds) | 97.4% | 100.0 | 95.0 | 97.2 | 97.2 | 97.9 |
+| Disrupt cost 1 -> 2 (40 seeds) | 96.9% | no outcome changed in any composition |  |  |  |  |
+| HP +33% | 93.8% | 100.0 | 95.0 | 90.0 | 93.0 | 95.0 |
+| HP +50% | 92.3% | 100.0 | 89.2 | 89.5 | 92.3 | 93.3 |
+| Damage +1 | 95.2% | 95.0 | 96.7 | 92.0 | 95.0 | 96.4 |
+| Speed +2 | 93.2% | 100.0 | 92.5 | 89.5 | 93.0 | 94.3 |
+| Damage +1, speed +2 | 86.6% | 70.0 | 72.5 | 85.0 | 88.0 | 92.9 |
+| HP +33%, damage +1, speed +2 | 74.9% | 51.7 | 57.5 | 73.0 | 74.3 | 84.5 |
+| HP +33%, damage +1, setup priority 10 | 57.5% | 56.7 | 53.3 | 56.0 | 59.0 | 58.3 |
+
+No single global change put every party size in the band, which is why the table is per size.
+
+### 7.4 Latency
+
+2,298,146 engine transitions in the 1.2.0 heuristic run: median 0.14 ms, p95 0.29 ms on the
+reference container, against the proposed target of under 100 ms. The figure includes the
+policy's own decision time averaged over the commands it sent. It was not measured on the
+Windows target machine.
+
+### 7.5 History
+
+On rules 1.0.0 (20 seeds) the heuristic won 60/60, 119/120, 187/200, 293/300 and 407/420 for
+sizes 1-5 and the random policy won 41/60, 58/120, 103/200, 159/300 and 212/420.

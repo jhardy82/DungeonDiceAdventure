@@ -80,8 +80,8 @@ def test_t13_upgrade_creates_a_versioned_die_for_that_hero_only(content):
     assert upgraded.faces[offer["face_index"]].id == offer["after"]["id"]
     changed = [i for i in range(6) if upgraded.faces[i].signature() != content.die("iron_d6").faces[i].signature()]
     assert changed == [offer["face_index"]]
-    assert engine.die_for("h02", "iron_d6") is content.die("iron_d6")  # the other Squire is untouched
-    assert content.die("iron_d6").definition_version == 1  # the catalog definition is never mutated
+    assert engine.die_for("h02", "iron_d6") is engine.content.die("iron_d6")  # the other Squire is untouched
+    assert engine.content.die("iron_d6").definition_version == 1  # the catalog definition is never mutated
     applied = last_event(engine, "upgrade_applied").delta
     assert (applied["from_version"], applied["to_version"]) == (1, 2)
     rejected(engine.do(cmd.CHOOSE_UPGRADE, hero_id="h02", die_id="iron_d6", offer_id="h02:iron_d6:1"), "only be chosen once")

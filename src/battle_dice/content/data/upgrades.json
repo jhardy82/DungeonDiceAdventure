@@ -1,5 +1,5 @@
 {
-  "content_version": "1.1.0",
+  "content_version": "1.2.0",
   "kinds": {
     "sharpen": {"name": "Sharpen", "summary": "+1 power to one non-blank face (cap applies). Poison and Weaken gain +1 duration instead."},
     "reforge": {"name": "Reforge", "summary": "Replace one Blank face with a low-power class face."},

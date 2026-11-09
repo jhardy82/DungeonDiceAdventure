@@ -1,5 +1,5 @@
 {
-  "content_version": "1.1.0",
+  "content_version": "1.2.0",
   "face_library": {
     "blank": {"name": "Blank", "category": "blank", "power": 0, "target_scope": "none", "range_type": "none", "action_speed": null, "mana_cost": 0, "effects": [], "can_revive": false, "tags": []},
 

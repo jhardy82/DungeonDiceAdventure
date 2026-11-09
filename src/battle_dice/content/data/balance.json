@@ -1,5 +1,5 @@
 {
-  "content_version": "1.1.0",
+  "content_version": "1.2.0",
   "party": {"min_size": 1, "max_size": 5},
   "timeline": {"ready_threshold": 100, "min_speed": 1, "max_speed": 30, "start_gauge": 0, "revive_gauge": 0},
   "shield": {"cap": 12},

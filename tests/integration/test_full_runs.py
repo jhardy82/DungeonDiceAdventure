@@ -10,7 +10,7 @@ from battle_dice.core.models import CombatPhase, RunPhase
 from battle_dice.core.view import combat_log, snapshot
 from battle_dice.sim.policies import HeuristicPolicy, RandomPolicy
 from battle_dice.sim.runner import compositions, simulate
-from tests.conftest import ok, party_spec, start
+from tests.conftest import ok, packaged_content, party_spec, start
 
 CLASSES = ["squire", "apprentice", "scout"]
 
@@ -56,7 +56,7 @@ def play_checked(engine: Engine, policy, limit: int = 20000) -> str:
 def test_random_play_never_corrupts_state_or_soft_locks(seed):
     size = seed % 5 + 1
     party = [f"{CLASSES[(seed + i) % 3]}:{'front' if (seed + i) % 2 else 'back'}" for i in range(size)]
-    engine = start(*party, seed=seed)
+    engine = start(*party, seed=seed, content=packaged_content())
     outcome = play_checked(engine, RandomPolicy(seed))
     assert outcome in ("victory", "defeat")
     assert snapshot(engine)["run_outcome"] == outcome
@@ -93,16 +93,21 @@ class PassPolicy:
 
 @pytest.mark.parametrize("size", [1, 3, 5])
 def test_a_full_run_can_end_in_defeat_without_undefined_states(size):
-    engine = start(*[CLASSES[i % 3] for i in range(size)], seed=size)
+    engine = start(*[CLASSES[i % 3] for i in range(size)], seed=size, content=packaged_content())
     assert play_checked(engine, PassPolicy()) == "defeat"
     assert engine.state.phase == RunPhase.DEFEAT and engine.state.encounter_index == 0
     assert all(not h.standing for h in engine.combat.side("hero"))
 
 
-def test_a_full_run_can_end_in_victory(content):
-    result = simulate(content, 3, ["squire", "apprentice", "scout"], HeuristicPolicy())
-    assert result["outcome"] == "victory" and result["battle_reached"] == 2
-    assert result["stats"]["enemies_defeated"] == 6  # 3 in each battle
+def test_a_full_run_can_end_in_victory_and_informed_play_can_also_lose(content):
+    results = [simulate(content, seed, ["squire", "apprentice", "scout"], HeuristicPolicy()) for seed in range(12)]
+    outcomes = [r["outcome"] for r in results]
+    assert "victory" in outcomes  # reasonable parties can win under informed play
+    won = next(r for r in results if r["outcome"] == "victory")
+    assert won["battle_reached"] == 2 and won["stats"]["enemies_defeated"] == 6  # 3 in each battle
+    # With the 1.2.0 table the same informed policy does not win every seed across party sizes.
+    solo = [simulate(content, seed, ["apprentice"], HeuristicPolicy())["outcome"] for seed in range(12)]
+    assert "defeat" in outcomes + solo
 
 
 def test_every_composition_is_enumerated_for_the_seed_matrix(content):

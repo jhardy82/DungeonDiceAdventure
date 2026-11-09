@@ -9,13 +9,13 @@ from battle_dice.core.commands import Command
 from battle_dice.core.events import events_hash, state_hash, write_jsonl
 from battle_dice.core.replay import ReplayError, export_run, replay, verify
 from battle_dice.sim.policies import HeuristicPolicy, RandomPolicy, play_run
-from tests.conftest import start
+from tests.conftest import packaged_content, start
 
 PARTY = ("squire", "apprentice", "scout")
 
 
 def _played(seed, policy=None):
-    engine = start(*PARTY, seed=seed)
+    engine = start(*PARTY, seed=seed, content=packaged_content())  # replay the shipped content
     play_run(engine, policy or HeuristicPolicy())
     return engine
 

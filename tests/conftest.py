@@ -4,11 +4,23 @@ Tests *arrange* state with the small white-box helpers below (set a gauge, set H
 and then *act* exclusively through engine commands, exactly like the UI does. Specific die faces
 and enemy choices are forced through ``Engine.force_draws`` so each rule can be exercised
 directly; determinism tests use the real BD-PCG32-v1 streams.
+
+Two content sets are used on purpose:
+
+* **Mechanics content** (``mechanics_content()``, the default for ``start()``): the shipped
+  classes, dice, enemies, upgrades and balance, with the encounter table frozen at the
+  rules-1.1.0 values in ``tests/golden/encounters_mechanics.json``. Rule fixtures assert exact
+  arithmetic (a Slash for 2 against 6 HP, and so on); freezing the encounter numbers keeps them
+  about the *rules*, so a balance retune of enemy HP, damage or speed does not rewrite them.
+* **Shipped content** (the ``content`` fixture / ``packaged_content()``): exactly what players
+  get. The content tables, party-scaling, full-run, replay, simulator and UI tests use it.
 """
 
 from __future__ import annotations
 
 import copy
+import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -19,13 +31,33 @@ from battle_dice.core.engine import Engine, run_until_input
 from battle_dice.core.models import STATE_DOWNED, Combatant, CombatPhase, StatusInstance
 
 _CONTENT: Content | None = None
+_MECHANICS: Content | None = None
+_MECHANICS_ENCOUNTERS = Path(__file__).parent / "golden" / "encounters_mechanics.json"
 
 
 def packaged_content() -> Content:
+    """The shipped content, exactly as players get it."""
     global _CONTENT
     if _CONTENT is None:
         _CONTENT = load_content()
     return _CONTENT
+
+
+def mechanics_documents() -> dict[str, Any]:
+    """Shipped documents with the encounter table frozen at the rules-1.1.0 fixture values."""
+    documents = copy.deepcopy(load_documents())
+    encounters = json.loads(_MECHANICS_ENCOUNTERS.read_text(encoding="utf-8"))
+    encounters["content_version"] = documents["balance"]["content_version"]
+    documents["encounters"] = encounters
+    return documents
+
+
+def mechanics_content() -> Content:
+    """Content for rule fixtures: shipped rules data, frozen encounter numbers."""
+    global _MECHANICS
+    if _MECHANICS is None:
+        _MECHANICS = build_content(mechanics_documents())
+    return _MECHANICS
 
 
 @pytest.fixture(scope="session")
@@ -40,8 +72,8 @@ def documents() -> dict[str, Any]:
 
 
 def content_with(mutate: Any) -> Content:
-    """Build validated content from the packaged documents after applying ``mutate(documents)``."""
-    documents = copy.deepcopy(load_documents())
+    """Build validated content from the mechanics documents after applying ``mutate(documents)``."""
+    documents = mechanics_documents()
     mutate(documents)
     return build_content(documents)
 
@@ -56,7 +88,8 @@ def party_spec(*members: str) -> list[dict[str, str]]:
 
 
 def start(*members: str, seed: int = 1, content: Content | None = None) -> Engine:
-    engine = Engine(content or packaged_content())
+    """Start a run. Uses the mechanics content unless ``content`` is given (pass the shipped set explicitly)."""
+    engine = Engine(content or mechanics_content())
     result = engine.do(cmd.START_RUN, seed=seed, party=party_spec(*members))
     assert result.accepted, result.reason
     return engine
