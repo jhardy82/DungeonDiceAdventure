@@ -32,6 +32,7 @@ tests, and add an entry here.
 | D-15 | 5.7 area effects | At resolution an area action hits the committed targets that are still eligible; if none remain it is cancelled. | Consistent with "committed targets" plus fallback. |
 | D-16 | 7.2 cooldowns | No enemy ability cooldowns are authored, so none are implemented. | The PRD mentions cooldowns only as a general possibility. Deferred (F). |
 | D-17 | 9.4 enemy mana | Mana costs are charged to heroes only. Enemies have no mana pool. | 9.4: "Enemies in the initial fixtures do not use player mana pools". |
+| D-18 | 13 runtime | **Python 3.15 or newer is required** (`requires-python = ">=3.15"`), replacing the PRD's delegated default of "Python 3.12+". CI, the lint target and the type-check target are pinned to the 3.15 line, so new 3.15.x patches are picked up but 3.16 is not adopted automatically. | Owner direction (2026-11-09): use the newest stable Python. 3.15.2 was the newest stable build in GitHub's `actions/python-versions` manifest on that date; 3.16 was alpha only. |
 
 ## 2. Content authored under delegation
 
@@ -83,8 +84,16 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 
 ## 6. Acceptance evidence
 
-268 automated tests pass on the reference environment (Linux container, Python 3.12.3,
-pygame-ce 2.5.8): 144 unit, 78 fixture, 36 integration, 10 headless UI. `ruff` and `mypy` are clean.
+268 automated tests pass on the reference environment (Linux container, Python 3.15.2,
+pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 144 unit, 78 fixture, 36 integration,
+10 headless UI. `ruff` 0.17.4 and `mypy` 2.4.1 are clean with their 3.15 targets.
+
+Before the move to 3.15 the same suite also passed on Python 3.12.3 and 3.13; those versions are
+no longer installable because of the 3.15 floor (an install attempt on 3.12.3 is refused with
+"does not satisfy Python>=3.15").
+
+Dependency minimums were raised to the versions verified on 3.15: `pygame-ce>=2.5.8` (its
+`cp315` wheels include `win_amd64`), `ruff>=0.17.4`, `mypy>=2.4`.
 
 | Criterion | Evidence |
 |-----------|----------|

@@ -5,7 +5,7 @@ defined by **BD-PRD-MVP-001 v1.0.0**: configure a party of 1 to 5 heroes, win tw
 by rolling, keeping and rerolling inspectable dice, counter revealed enemy intent with reactions,
 and apply one mandatory dice upgrade between the battles.
 
-- **Runtime:** Python 3.12+ and [pygame-ce](https://pyga.me/). Runs from source.
+- **Runtime:** Python 3.15+ (the newest stable release) and [pygame-ce](https://pyga.me/). Runs from source.
 - **Rules engine:** pure Python, deterministic, no pygame import. Seeded by the pinned
   `BD-PCG32-v1` generator.
 - **Content:** versioned JSON fixtures, schema-validated before a run can start.
@@ -15,7 +15,7 @@ and apply one mandatory dice upgrade between the battles.
 Windows (PowerShell), the primary validation environment:
 
 ```powershell
-py -3.12 -m venv .venv
+py -3.15 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
 python -m battle_dice
@@ -24,7 +24,7 @@ python -m battle_dice
 macOS / Linux:
 
 ```bash
-python3.12 -m venv .venv
+python3.15 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
 python -m battle_dice
