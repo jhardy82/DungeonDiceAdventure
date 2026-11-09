@@ -1,0 +1,26 @@
+{
+  "content_version": "1.0.0",
+  "battle_count": 2,
+  "encounters": {
+    "1": [
+      {"battle": 1, "enemies": [{"archetype": "goblin"}]},
+      {"battle": 2, "enemies": [{"archetype": "captain", "overrides": {"max_hp": 9, "actions": {"strike": {"power": 2}}}}]}
+    ],
+    "2": [
+      {"battle": 1, "enemies": [{"archetype": "goblin"}, {"archetype": "hex_adept"}]},
+      {"battle": 2, "enemies": [{"archetype": "captain", "overrides": {"max_hp": 10}}, {"archetype": "goblin"}]}
+    ],
+    "3": [
+      {"battle": 1, "enemies": [{"archetype": "goblin"}, {"archetype": "goblin"}, {"archetype": "hex_adept"}]},
+      {"battle": 2, "enemies": [{"archetype": "captain"}, {"archetype": "goblin"}, {"archetype": "hex_adept"}]}
+    ],
+    "4": [
+      {"battle": 1, "enemies": [{"archetype": "goblin"}, {"archetype": "goblin"}, {"archetype": "hex_adept"}, {"archetype": "hex_adept"}]},
+      {"battle": 2, "enemies": [{"archetype": "captain", "overrides": {"max_hp": 14}}, {"archetype": "goblin"}, {"archetype": "goblin"}, {"archetype": "hex_adept"}]}
+    ],
+    "5": [
+      {"battle": 1, "enemies": [{"archetype": "goblin"}, {"archetype": "goblin"}, {"archetype": "goblin"}, {"archetype": "hex_adept"}, {"archetype": "hex_adept"}]},
+      {"battle": 2, "enemies": [{"archetype": "captain", "overrides": {"max_hp": 16}}, {"archetype": "goblin"}, {"archetype": "goblin"}, {"archetype": "hex_adept"}, {"archetype": "hex_adept"}]}
+    ]
+  }
+}

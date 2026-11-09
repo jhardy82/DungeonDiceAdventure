@@ -1,0 +1,109 @@
+{
+  "content_version": "1.0.0",
+  "classes": {
+    "squire": {
+      "name": "Squire",
+      "max_hp": 14, "start_hp": 14,
+      "speed": 7, "base_initiative": 5,
+      "max_mana": 3, "start_mana": 2,
+      "max_corruption": 6, "start_corruption": 0,
+      "rerolls": 2,
+      "dice_capacity": 2,
+      "starting_dice": ["iron_d6", "oath_d4"],
+      "bench_dice": ["bulwark_d4"],
+      "suggested_row": "front",
+      "scheduling": {
+        "policy": "single",
+        "label": "Single Commitment",
+        "max_actions": 1,
+        "summary": "One dice action per activation."
+      },
+      "passive": {
+        "id": "steadfast", "name": "Steadfast", "type": "self_defense_bonus", "amount": 1,
+        "summary": "+1 shield when its own Defense die action targets itself."
+      },
+      "reaction": "interpose"
+    },
+    "apprentice": {
+      "name": "Apprentice",
+      "max_hp": 9, "start_hp": 9,
+      "speed": 9, "base_initiative": 4,
+      "max_mana": 6, "start_mana": 3,
+      "max_corruption": 6, "start_corruption": 1,
+      "rerolls": 2,
+      "dice_capacity": 2,
+      "starting_dice": ["arcane_d6", "focus_d4"],
+      "bench_dice": ["spark_d4"],
+      "suggested_row": "back",
+      "scheduling": {
+        "policy": "sequence",
+        "label": "Channel and Cast",
+        "max_actions": 2,
+        "first_category": "resource",
+        "second_categories": ["attack", "defense", "healing", "status"],
+        "summary": "Two actions only as Resource first, then one non-Resource action; otherwise one."
+      },
+      "passive": {
+        "id": "arcane_resonance", "name": "Arcane Resonance", "type": "spell_damage_at_corruption",
+        "threshold": 3, "amount": 1,
+        "summary": "+1 spell damage while corruption is 3 or more."
+      },
+      "reaction": "grounding"
+    },
+    "scout": {
+      "name": "Scout",
+      "max_hp": 10, "start_hp": 10,
+      "speed": 13, "base_initiative": 6,
+      "max_mana": 4, "start_mana": 2,
+      "max_corruption": 6, "start_corruption": 0,
+      "rerolls": 2,
+      "dice_capacity": 2,
+      "starting_dice": ["striker_d8", "tools_d4"],
+      "bench_dice": ["venom_d4"],
+      "suggested_row": "back",
+      "scheduling": {
+        "policy": "sequence",
+        "label": "Exploit Combo",
+        "max_actions": 2,
+        "first_category": "status",
+        "second_categories": ["attack"],
+        "summary": "Two actions only as Status first, then Attack; otherwise one."
+      },
+      "passive": {
+        "id": "exploit_opening", "name": "Exploit Opening", "type": "combo_attack_bonus", "amount": 1,
+        "summary": "+1 damage to the Attack of a Status then Attack combo, once the Status resolves."
+      },
+      "reaction": "disrupt"
+    }
+  },
+  "reactions": {
+    "interpose": {
+      "name": "Interpose", "stage": "guard", "mana_cost": 1, "priority": 10,
+      "requires_row": "front",
+      "trigger": "hostile_damage",
+      "target": "intent_target",
+      "effects": [{"type": "shield", "target": "target", "amount": 2}],
+      "summary": "Grant 2 shield to one targeted ally before the enemy damage lands."
+    },
+    "grounding": {
+      "name": "Grounding", "stage": "resource", "mana_cost": 0, "priority": 10,
+      "requires_row": null,
+      "trigger": "hostile_any",
+      "target": "intent_target",
+      "requires_resource_change": true,
+      "effects": [
+        {"type": "remove_corruption", "target": "target", "amount": 1},
+        {"type": "gain_mana", "target": "self", "amount": 1}
+      ],
+      "summary": "One targeted ally loses up to 1 corruption; the Apprentice gains 1 mana."
+    },
+    "disrupt": {
+      "name": "Disrupt", "stage": "interrupt", "mana_cost": 1, "priority": 10,
+      "requires_row": null,
+      "trigger": "hostile_interruptible",
+      "target": "intent",
+      "effects": [{"type": "interrupt", "resisted_damage_reduction": 2, "resisted_magnitude_reduction": 1}],
+      "summary": "Cancel a basic hostile ability. Elite-resistant abilities are weakened instead: -2 damage, or -1 status/resource magnitude."
+    }
+  }
+}

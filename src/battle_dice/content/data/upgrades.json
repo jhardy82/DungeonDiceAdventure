@@ -1,0 +1,40 @@
+{
+  "content_version": "1.0.0",
+  "kinds": {
+    "sharpen": {"name": "Sharpen", "summary": "+1 power to one non-blank face (cap applies). Poison and Weaken gain +1 duration instead."},
+    "reforge": {"name": "Reforge", "summary": "Replace one Blank face with a low-power class face."},
+    "imbue": {"name": "Imbue", "summary": "Replace one face with a named class-native alternate face."}
+  },
+  "reforge_faces": {
+    "squire": ["rf_sq_jab", "rf_sq_brace", "rf_sq_resolve"],
+    "apprentice": ["rf_ap_spark", "rf_ap_ward", "rf_ap_trickle"],
+    "scout": ["rf_sc_nick", "rf_sc_duck", "rf_sc_breath"]
+  },
+  "imbue_faces": {
+    "squire": ["im_sq_heavy_blow", "im_sq_bulwark"],
+    "apprentice": ["im_ap_arc_surge", "im_ap_deep_focus"],
+    "scout": ["im_sc_volley", "im_sc_crippling_shot"]
+  },
+  "face_library": {
+    "rf_sq_jab": {"name": "Jab", "category": "attack", "power": 1, "target_scope": "single_enemy", "range_type": "melee", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}], "can_revive": false, "tags": ["melee"]},
+    "rf_sq_brace": {"name": "Brace", "category": "defense", "power": 2, "target_scope": "single_ally", "range_type": "ally", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "shield", "target": "target"}], "can_revive": false, "tags": []},
+    "rf_sq_resolve": {"name": "Resolve", "category": "resource", "power": 1, "target_scope": "self", "range_type": "self", "action_speed": 3, "mana_cost": 0, "effects": [{"type": "gain_mana", "target": "self"}], "can_revive": false, "tags": []},
+
+    "rf_ap_spark": {"name": "Spark", "category": "attack", "power": 1, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}, {"type": "gain_corruption", "target": "self", "amount": 1}], "can_revive": false, "tags": ["spell", "ranged"]},
+    "rf_ap_ward": {"name": "Minor Ward", "category": "defense", "power": 1, "target_scope": "single_ally", "range_type": "ally", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "shield", "target": "target"}], "can_revive": false, "tags": []},
+    "rf_ap_trickle": {"name": "Trickle", "category": "resource", "power": 1, "target_scope": "self", "range_type": "self", "action_speed": 3, "mana_cost": 0, "effects": [{"type": "gain_mana", "target": "self"}], "can_revive": false, "tags": []},
+
+    "rf_sc_nick": {"name": "Nick", "category": "attack", "power": 1, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}], "can_revive": false, "tags": ["ranged"]},
+    "rf_sc_duck": {"name": "Duck", "category": "defense", "power": 1, "target_scope": "single_ally", "range_type": "ally", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "shield", "target": "target"}], "can_revive": false, "tags": []},
+    "rf_sc_breath": {"name": "Breath", "category": "resource", "power": 1, "target_scope": "self", "range_type": "self", "action_speed": 3, "mana_cost": 0, "effects": [{"type": "gain_mana", "target": "self"}], "can_revive": false, "tags": []},
+
+    "im_sq_heavy_blow": {"name": "Heavy Blow", "category": "attack", "power": 3, "target_scope": "single_enemy", "range_type": "melee", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}], "can_revive": false, "tags": ["melee"]},
+    "im_sq_bulwark": {"name": "Bulwark", "category": "defense", "power": 4, "target_scope": "single_ally", "range_type": "ally", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "shield", "target": "target"}], "can_revive": false, "tags": []},
+
+    "im_ap_arc_surge": {"name": "Arc Surge", "category": "attack", "power": 4, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 2, "effects": [{"type": "damage", "target": "target"}, {"type": "gain_corruption", "target": "self", "amount": 1}], "can_revive": false, "tags": ["spell", "ranged"]},
+    "im_ap_deep_focus": {"name": "Deep Focus", "category": "resource", "power": 3, "target_scope": "self", "range_type": "self", "action_speed": 3, "mana_cost": 0, "effects": [{"type": "gain_mana", "target": "self"}], "can_revive": false, "tags": []},
+
+    "im_sc_volley": {"name": "Volley", "category": "attack", "power": 1, "target_scope": "all_enemies", "range_type": "ranged", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}], "can_revive": false, "tags": ["ranged", "all_enemies"]},
+    "im_sc_crippling_shot": {"name": "Crippling Shot", "category": "status", "power": 1, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "apply_status", "target": "target", "status": "weaken", "duration": 3}], "can_revive": false, "tags": ["ranged"]}
+  }
+}

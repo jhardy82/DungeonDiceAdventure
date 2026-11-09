@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://battle-dice.invalid/schemas/battle_dice.schema.json",
+  "title": "Battle Dice content contracts (BD-PRD-MVP-001 section 14.2)",
+  "$defs": {
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "bounded_int": {"type": "integer", "minimum": 0, "maximum": 999},
+    "row": {"enum": ["front", "back"]},
+    "category": {"enum": ["attack", "defense", "healing", "status", "resource", "blank"]},
+    "executable_category": {"enum": ["attack", "defense", "healing", "status", "resource"]},
+    "status_kind": {"enum": ["poison", "weaken", "speed_up"]},
+    "effect": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {"enum": ["damage", "shield", "heal", "apply_status", "gain_mana", "gain_corruption", "remove_corruption", "interrupt"]},
+        "target": {"enum": ["target", "self"]},
+        "amount": {"$ref": "#/$defs/bounded_int"},
+        "status": {"$ref": "#/$defs/status_kind"},
+        "duration": {"type": "integer", "minimum": 1, "maximum": 9},
+        "resisted_damage_reduction": {"$ref": "#/$defs/bounded_int"},
+        "resisted_magnitude_reduction": {"$ref": "#/$defs/bounded_int"}
+      },
+      "allOf": [
+        {"if": {"properties": {"type": {"const": "apply_status"}}}, "then": {"required": ["status", "duration"]}}
+      ]
+    },
+    "face": {
+      "type": "object",
+      "required": ["name", "category", "power", "target_scope", "range_type", "action_speed", "mana_cost", "effects", "can_revive", "tags"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "category": {"$ref": "#/$defs/category"},
+        "power": {"$ref": "#/$defs/bounded_int"},
+        "target_scope": {"enum": ["single_enemy", "single_ally", "self", "all_enemies", "all_allies", "none"]},
+        "range_type": {"enum": ["melee", "ranged", "ally", "self", "none"]},
+        "action_speed": {"type": ["integer", "null"], "minimum": 0, "maximum": 9},
+        "mana_cost": {"$ref": "#/$defs/bounded_int"},
+        "effects": {"type": "array", "items": {"$ref": "#/$defs/effect"}},
+        "can_revive": {"type": "boolean"},
+        "tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "weight": {"$ref": "#/$defs/bounded_int"},
+        "random_target": {"type": "boolean"}
+      }
+    },
+    "balance_file": {
+      "type": "object",
+      "required": ["content_version", "party", "timeline", "shield", "statuses", "corruption", "upgrades", "recovery", "ai", "reactions"],
+      "additionalProperties": false,
+      "properties": {
+        "content_version": {"$ref": "#/$defs/version"},
+        "party": {"type": "object", "required": ["min_size", "max_size"], "additionalProperties": false,
+          "properties": {"min_size": {"type": "integer", "minimum": 1}, "max_size": {"type": "integer", "minimum": 1, "maximum": 9}}},
+        "timeline": {"type": "object", "required": ["ready_threshold", "min_speed", "max_speed", "start_gauge", "revive_gauge"], "additionalProperties": false,
+          "properties": {
+            "ready_threshold": {"type": "integer", "minimum": 1, "maximum": 100000},
+            "min_speed": {"type": "integer", "minimum": 1}, "max_speed": {"type": "integer", "minimum": 1, "maximum": 999},
+            "start_gauge": {"$ref": "#/$defs/bounded_int"}, "revive_gauge": {"$ref": "#/$defs/bounded_int"}}},
+        "shield": {"type": "object", "required": ["cap"], "additionalProperties": false, "properties": {"cap": {"$ref": "#/$defs/bounded_int"}}},
+        "statuses": {"type": "object", "required": ["poison", "weaken", "speed_up"], "additionalProperties": false,
+          "properties": {
+            "poison": {"type": "object", "required": ["stack_cap", "damage_per_stack", "default_duration"], "additionalProperties": false,
+              "properties": {"stack_cap": {"$ref": "#/$defs/bounded_int"}, "damage_per_stack": {"$ref": "#/$defs/bounded_int"}, "default_duration": {"$ref": "#/$defs/bounded_int"}}},
+            "weaken": {"type": "object", "required": ["stack_cap", "damage_penalty_per_stack", "default_duration"], "additionalProperties": false,
+              "properties": {"stack_cap": {"$ref": "#/$defs/bounded_int"}, "damage_penalty_per_stack": {"$ref": "#/$defs/bounded_int"}, "default_duration": {"$ref": "#/$defs/bounded_int"}}},
+            "speed_up": {"type": "object", "required": ["stack_cap", "default_duration"], "additionalProperties": false,
+              "properties": {"stack_cap": {"$ref": "#/$defs/bounded_int"}, "default_duration": {"$ref": "#/$defs/bounded_int"}}}}},
+        "corruption": {"type": "object", "required": ["backlash_threshold", "backlash_damage"], "additionalProperties": false,
+          "properties": {"backlash_threshold": {"$ref": "#/$defs/bounded_int"}, "backlash_damage": {"$ref": "#/$defs/bounded_int"}}},
+        "upgrades": {"type": "object", "required": ["face_power_cap", "offers_per_die", "mandatory_upgrades_per_run", "max_swaps_per_run"], "additionalProperties": false,
+          "properties": {"face_power_cap": {"$ref": "#/$defs/bounded_int"}, "offers_per_die": {"type": "integer", "minimum": 1, "maximum": 9},
+            "mandatory_upgrades_per_run": {"const": 1}, "max_swaps_per_run": {"$ref": "#/$defs/bounded_int"}}},
+        "recovery": {"type": "object", "required": ["standing_heal_percent", "downed_restore_percent"], "additionalProperties": false,
+          "properties": {"standing_heal_percent": {"type": "integer", "minimum": 0, "maximum": 100}, "downed_restore_percent": {"type": "integer", "minimum": 1, "maximum": 100}}},
+        "ai": {"type": "object", "required": ["priority_lethal", "priority_setup", "priority_default"], "additionalProperties": false,
+          "properties": {"priority_lethal": {"$ref": "#/$defs/bounded_int"}, "priority_setup": {"$ref": "#/$defs/bounded_int"}, "priority_default": {"$ref": "#/$defs/bounded_int"}}},
+        "reactions": {"type": "object", "required": ["charges_per_activation"], "additionalProperties": false,
+          "properties": {"charges_per_activation": {"type": "integer", "minimum": 0, "maximum": 9}}}
+      }
+    },
+    "class_def": {
+      "type": "object",
+      "required": ["name", "max_hp", "start_hp", "speed", "base_initiative", "max_mana", "start_mana", "max_corruption", "start_corruption", "rerolls", "dice_capacity", "starting_dice", "bench_dice", "suggested_row", "scheduling", "passive", "reaction"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "max_hp": {"type": "integer", "minimum": 1, "maximum": 999}, "start_hp": {"type": "integer", "minimum": 1, "maximum": 999},
+        "speed": {"type": "integer", "minimum": 1, "maximum": 999}, "base_initiative": {"$ref": "#/$defs/bounded_int"},
+        "max_mana": {"$ref": "#/$defs/bounded_int"}, "start_mana": {"$ref": "#/$defs/bounded_int"},
+        "max_corruption": {"$ref": "#/$defs/bounded_int"}, "start_corruption": {"$ref": "#/$defs/bounded_int"},
+        "rerolls": {"type": "integer", "minimum": 0, "maximum": 9},
+        "dice_capacity": {"type": "integer", "minimum": 1, "maximum": 6},
+        "starting_dice": {"type": "array", "items": {"$ref": "#/$defs/id"}, "minItems": 1},
+        "bench_dice": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "suggested_row": {"$ref": "#/$defs/row"},
+        "scheduling": {
+          "type": "object", "required": ["policy", "label", "max_actions", "summary"], "additionalProperties": false,
+          "properties": {
+            "policy": {"enum": ["single", "sequence", "free"]},
+            "label": {"type": "string"}, "summary": {"type": "string"},
+            "max_actions": {"type": "integer", "minimum": 1, "maximum": 6},
+            "first_category": {"$ref": "#/$defs/executable_category"},
+            "second_categories": {"type": "array", "items": {"$ref": "#/$defs/executable_category"}, "minItems": 1}
+          },
+          "allOf": [{"if": {"properties": {"policy": {"const": "sequence"}}}, "then": {"required": ["first_category", "second_categories"]}}]
+        },
+        "passive": {
+          "type": "object", "required": ["id", "name", "type", "amount", "summary"], "additionalProperties": false,
+          "properties": {
+            "id": {"$ref": "#/$defs/id"}, "name": {"type": "string"}, "summary": {"type": "string"},
+            "type": {"enum": ["self_defense_bonus", "spell_damage_at_corruption", "combo_attack_bonus"]},
+            "amount": {"$ref": "#/$defs/bounded_int"}, "threshold": {"$ref": "#/$defs/bounded_int"}
+          }
+        },
+        "reaction": {"$ref": "#/$defs/id"}
+      }
+    },
+    "reaction_def": {
+      "type": "object",
+      "required": ["name", "stage", "mana_cost", "priority", "requires_row", "trigger", "target", "effects", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"}, "summary": {"type": "string"},
+        "stage": {"enum": ["guard", "resource", "interrupt"]},
+        "mana_cost": {"$ref": "#/$defs/bounded_int"}, "priority": {"$ref": "#/$defs/bounded_int"},
+        "requires_row": {"oneOf": [{"$ref": "#/$defs/row"}, {"type": "null"}]},
+        "trigger": {"enum": ["hostile_damage", "hostile_any", "hostile_interruptible"]},
+        "target": {"enum": ["intent_target", "intent"]},
+        "requires_resource_change": {"type": "boolean"},
+        "effects": {"type": "array", "items": {"$ref": "#/$defs/effect"}, "minItems": 1}
+      }
+    },
+    "classes_file": {
+      "type": "object", "required": ["content_version", "classes", "reactions"], "additionalProperties": false,
+      "properties": {
+        "content_version": {"$ref": "#/$defs/version"},
+        "classes": {"type": "object", "minProperties": 1, "propertyNames": {"$ref": "#/$defs/id"}, "additionalProperties": {"$ref": "#/$defs/class_def"}},
+        "reactions": {"type": "object", "propertyNames": {"$ref": "#/$defs/id"}, "additionalProperties": {"$ref": "#/$defs/reaction_def"}}
+      }
+    },
+    "die_def": {
+      "type": "object", "required": ["name", "affinity_class", "size", "role", "definition_version", "faces"], "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"}, "affinity_class": {"$ref": "#/$defs/id"},
+        "size": {"enum": [4, 6, 8]},
+        "role": {"enum": ["starting", "sidegrade"]},
+        "definition_version": {"type": "integer", "minimum": 1},
+        "faces": {"type": "array", "items": {"$ref": "#/$defs/id"}, "minItems": 4, "maxItems": 8}
+      }
+    },
+    "dice_file": {
+      "type": "object", "required": ["content_version", "face_library", "dice"], "additionalProperties": false,
+      "properties": {
+        "content_version": {"$ref": "#/$defs/version"},
+        "face_library": {"type": "object", "propertyNames": {"$ref": "#/$defs/id"}, "additionalProperties": {"$ref": "#/$defs/face"}},
+        "dice": {"type": "object", "propertyNames": {"$ref": "#/$defs/id"}, "additionalProperties": {"$ref": "#/$defs/die_def"}}
+      }
+    },
+    "enemy_def": {
+      "type": "object", "required": ["name", "row", "max_hp", "speed", "base_initiative", "actions"], "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"}, "row": {"$ref": "#/$defs/row"},
+        "max_hp": {"type": "integer", "minimum": 1, "maximum": 999},
+        "speed": {"type": "integer", "minimum": 1, "maximum": 999}, "base_initiative": {"$ref": "#/$defs/bounded_int"},
+        "actions": {"type": "object", "minProperties": 1, "propertyNames": {"$ref": "#/$defs/id"},
+          "additionalProperties": {"allOf": [{"$ref": "#/$defs/face"}, {"required": ["weight", "random_target"]}]}}
+      }
+    },
+    "enemies_file": {
+      "type": "object", "required": ["content_version", "enemies"], "additionalProperties": false,
+      "properties": {
+        "content_version": {"$ref": "#/$defs/version"},
+        "enemies": {"type": "object", "minProperties": 1, "propertyNames": {"$ref": "#/$defs/id"}, "additionalProperties": {"$ref": "#/$defs/enemy_def"}}
+      }
+    },
+    "encounter_enemy": {
+      "type": "object", "required": ["archetype"], "additionalProperties": false,
+      "properties": {
+        "archetype": {"$ref": "#/$defs/id"},
+        "overrides": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "max_hp": {"type": "integer", "minimum": 1, "maximum": 999},
+            "speed": {"type": "integer", "minimum": 1, "maximum": 999},
+            "actions": {"type": "object", "propertyNames": {"$ref": "#/$defs/id"},
+              "additionalProperties": {"type": "object", "additionalProperties": false, "properties": {"power": {"$ref": "#/$defs/bounded_int"}, "weight": {"$ref": "#/$defs/bounded_int"}}}}
+          }
+        }
+      }
+    },
+    "encounters_file": {
+      "type": "object", "required": ["content_version", "battle_count", "encounters"], "additionalProperties": false,
+      "properties": {
+        "content_version": {"$ref": "#/$defs/version"},
+        "battle_count": {"const": 2},
+        "encounters": {
+          "type": "object", "propertyNames": {"pattern": "^[1-9]$"},
+          "additionalProperties": {
+            "type": "array", "minItems": 2, "maxItems": 2,
+            "items": {"type": "object", "required": ["battle", "enemies"], "additionalProperties": false,
+              "properties": {"battle": {"enum": [1, 2]}, "enemies": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/encounter_enemy"}}}}
+          }
+        }
+      }
+    },
+    "upgrades_file": {
+      "type": "object", "required": ["content_version", "kinds", "reforge_faces", "imbue_faces", "face_library"], "additionalProperties": false,
+      "properties": {
+        "content_version": {"$ref": "#/$defs/version"},
+        "kinds": {"type": "object", "required": ["sharpen", "reforge", "imbue"], "additionalProperties": false,
+          "properties": {
+            "sharpen": {"type": "object", "required": ["name", "summary"], "additionalProperties": false, "properties": {"name": {"type": "string"}, "summary": {"type": "string"}}},
+            "reforge": {"type": "object", "required": ["name", "summary"], "additionalProperties": false, "properties": {"name": {"type": "string"}, "summary": {"type": "string"}}},
+            "imbue": {"type": "object", "required": ["name", "summary"], "additionalProperties": false, "properties": {"name": {"type": "string"}, "summary": {"type": "string"}}}}},
+        "reforge_faces": {"type": "object", "propertyNames": {"$ref": "#/$defs/id"}, "additionalProperties": {"type": "array", "items": {"$ref": "#/$defs/id"}, "minItems": 1}},
+        "imbue_faces": {"type": "object", "propertyNames": {"$ref": "#/$defs/id"}, "additionalProperties": {"type": "array", "items": {"$ref": "#/$defs/id"}, "minItems": 1}},
+        "face_library": {"type": "object", "propertyNames": {"$ref": "#/$defs/id"}, "additionalProperties": {"$ref": "#/$defs/face"}}
+      }
+    }
+  }
+}

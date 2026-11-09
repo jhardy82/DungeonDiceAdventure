@@ -1,0 +1,52 @@
+{
+  "content_version": "1.0.0",
+  "face_library": {
+    "blank": {"name": "Blank", "category": "blank", "power": 0, "target_scope": "none", "range_type": "none", "action_speed": null, "mana_cost": 0, "effects": [], "can_revive": false, "tags": []},
+
+    "sq_strike_2": {"name": "Strike", "category": "attack", "power": 2, "target_scope": "single_enemy", "range_type": "melee", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}], "can_revive": false, "tags": ["melee"]},
+    "sq_jab_1": {"name": "Jab", "category": "attack", "power": 1, "target_scope": "single_enemy", "range_type": "melee", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}], "can_revive": false, "tags": ["melee"]},
+    "sq_guard_3": {"name": "Guard", "category": "defense", "power": 3, "target_scope": "single_ally", "range_type": "ally", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "shield", "target": "target"}], "can_revive": false, "tags": []},
+    "sq_guard_2": {"name": "Brace", "category": "defense", "power": 2, "target_scope": "single_ally", "range_type": "ally", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "shield", "target": "target"}], "can_revive": false, "tags": []},
+    "sq_rally": {"name": "Rally", "category": "healing", "power": 2, "target_scope": "single_ally", "range_type": "ally", "action_speed": 1, "mana_cost": 1, "effects": [{"type": "heal", "target": "target"}], "can_revive": true, "tags": ["revival"]},
+    "sq_resolve": {"name": "Resolve", "category": "resource", "power": 1, "target_scope": "self", "range_type": "self", "action_speed": 3, "mana_cost": 0, "effects": [{"type": "gain_mana", "target": "self"}], "can_revive": false, "tags": []},
+    "sq_tend_1": {"name": "Tend", "category": "healing", "power": 1, "target_scope": "single_ally", "range_type": "ally", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "heal", "target": "target"}], "can_revive": false, "tags": []},
+
+    "ap_bolt_3": {"name": "Arcane Bolt", "category": "attack", "power": 3, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 1, "effects": [{"type": "damage", "target": "target"}, {"type": "gain_corruption", "target": "self", "amount": 1}], "can_revive": false, "tags": ["spell", "ranged"]},
+    "ap_mend": {"name": "Mend", "category": "healing", "power": 3, "target_scope": "single_ally", "range_type": "ally", "action_speed": 1, "mana_cost": 2, "effects": [{"type": "heal", "target": "target"}], "can_revive": true, "tags": ["spell", "revival"]},
+    "ap_enfeeble": {"name": "Enfeeble", "category": "status", "power": 1, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "apply_status", "target": "target", "status": "weaken", "duration": 2}], "can_revive": false, "tags": ["ranged"]},
+    "ap_cleanse_2": {"name": "Cleanse", "category": "resource", "power": 2, "target_scope": "self", "range_type": "self", "action_speed": 3, "mana_cost": 0, "effects": [{"type": "remove_corruption", "target": "self"}], "can_revive": false, "tags": []},
+    "ap_channel_2": {"name": "Channel", "category": "resource", "power": 2, "target_scope": "self", "range_type": "self", "action_speed": 3, "mana_cost": 0, "effects": [{"type": "gain_mana", "target": "self"}], "can_revive": false, "tags": []},
+    "ap_ward_2": {"name": "Ward", "category": "defense", "power": 2, "target_scope": "single_ally", "range_type": "ally", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "shield", "target": "target"}], "can_revive": false, "tags": []},
+    "ap_trickle_1": {"name": "Trickle", "category": "resource", "power": 1, "target_scope": "self", "range_type": "self", "action_speed": 3, "mana_cost": 0, "effects": [{"type": "gain_mana", "target": "self"}], "can_revive": false, "tags": []},
+    "ap_spark_1": {"name": "Spark", "category": "attack", "power": 1, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}, {"type": "gain_corruption", "target": "self", "amount": 1}], "can_revive": false, "tags": ["spell", "ranged"]},
+
+    "sc_shot_2": {"name": "Shot", "category": "attack", "power": 2, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}], "can_revive": false, "tags": ["ranged"]},
+    "sc_shot_1": {"name": "Quick Shot", "category": "attack", "power": 1, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}], "can_revive": false, "tags": ["ranged"]},
+    "sc_poison": {"name": "Poison", "category": "status", "power": 1, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "apply_status", "target": "target", "status": "poison", "duration": 2}], "can_revive": false, "tags": ["ranged"]},
+    "sc_weaken": {"name": "Hamstring", "category": "status", "power": 1, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "apply_status", "target": "target", "status": "weaken", "duration": 2}], "can_revive": false, "tags": ["ranged"]},
+    "sc_focus_1": {"name": "Focus", "category": "resource", "power": 1, "target_scope": "self", "range_type": "self", "action_speed": 3, "mana_cost": 0, "effects": [{"type": "gain_mana", "target": "self"}], "can_revive": false, "tags": []},
+    "sc_cover_2": {"name": "Cover", "category": "defense", "power": 2, "target_scope": "single_ally", "range_type": "ally", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "shield", "target": "target"}], "can_revive": false, "tags": []}
+  },
+  "dice": {
+    "iron_d6": {"name": "Iron d6", "affinity_class": "squire", "size": 6, "role": "starting", "definition_version": 1,
+      "faces": ["sq_strike_2", "sq_strike_2", "sq_guard_3", "sq_guard_3", "sq_rally", "blank"]},
+    "oath_d4": {"name": "Oath d4", "affinity_class": "squire", "size": 4, "role": "starting", "definition_version": 1,
+      "faces": ["sq_jab_1", "sq_guard_2", "sq_guard_2", "sq_resolve"]},
+    "bulwark_d4": {"name": "Bulwark d4", "affinity_class": "squire", "size": 4, "role": "sidegrade", "definition_version": 1,
+      "faces": ["sq_guard_2", "sq_guard_2", "sq_tend_1", "blank"]},
+
+    "arcane_d6": {"name": "Arcane d6", "affinity_class": "apprentice", "size": 6, "role": "starting", "definition_version": 1,
+      "faces": ["ap_bolt_3", "ap_bolt_3", "ap_mend", "ap_enfeeble", "ap_cleanse_2", "blank"]},
+    "focus_d4": {"name": "Focus d4", "affinity_class": "apprentice", "size": 4, "role": "starting", "definition_version": 1,
+      "faces": ["ap_channel_2", "ap_channel_2", "ap_ward_2", "blank"]},
+    "spark_d4": {"name": "Spark d4", "affinity_class": "apprentice", "size": 4, "role": "sidegrade", "definition_version": 1,
+      "faces": ["ap_trickle_1", "ap_trickle_1", "ap_spark_1", "blank"]},
+
+    "striker_d8": {"name": "Striker d8", "affinity_class": "scout", "size": 8, "role": "starting", "definition_version": 1,
+      "faces": ["sc_shot_2", "sc_shot_2", "sc_shot_2", "sc_poison", "sc_poison", "sc_weaken", "sc_focus_1", "blank"]},
+    "tools_d4": {"name": "Tools d4", "affinity_class": "scout", "size": 4, "role": "starting", "definition_version": 1,
+      "faces": ["sc_shot_1", "sc_shot_1", "sc_cover_2", "blank"]},
+    "venom_d4": {"name": "Venom d4", "affinity_class": "scout", "size": 4, "role": "sidegrade", "definition_version": 1,
+      "faces": ["sc_poison", "sc_shot_1", "sc_shot_1", "blank"]}
+  }
+}
