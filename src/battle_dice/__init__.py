@@ -6,7 +6,7 @@ The rules engine (``battle_dice.core``), content layer (``battle_dice.content``)
 """
 
 #: Version of the executable rules. Golden RNG vectors and replay hashes are locked to this value.
-RULES_VERSION = "1.0.0"
+RULES_VERSION = "1.1.0"
 
 #: Identifier of the pinned RNG algorithm (BD-PRD-MVP-001 section 14.4).
 RNG_ALGORITHM = "BD-PCG32-v1"

@@ -201,11 +201,11 @@ def attack_bonus(ctx: Engine, actor: Combatant, face: FaceDefinition, intent: Ac
 
 
 def shield_bonus(ctx: Engine, actor: Combatant, face: FaceDefinition, target: Combatant, intent: ActionIntent | None) -> int:
-    """Steadfast: +1 shield when the Squire's own Defense die action targets itself."""
+    """Steadfast: +1 shield on every Defense die action the Squire takes (self or ally), never on reactions."""
     if not actor.is_hero or intent is None or intent.source_die_id is None:
         return 0
     passive = ctx.content.class_def(actor.archetype_id)["passive"]
-    if passive["type"] == "self_defense_bonus" and face.category == CATEGORY_DEFENSE and target.id == actor.id:
+    if passive["type"] == "defense_die_bonus" and face.category == CATEGORY_DEFENSE and target.standing:
         return int(passive["amount"])
     return 0
 

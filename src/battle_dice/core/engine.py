@@ -754,7 +754,8 @@ class Engine:
             return [cmd.CHOOSE_UPGRADE, cmd.SET_FORMATION]
         if state.phase == RunPhase.EQUIPMENT:
             allowed = [cmd.ADVANCE_PHASE, cmd.SET_FORMATION]
-            if state.swaps_used < self.content.balance["upgrades"]["max_swaps_per_run"]:
+            limit = self.content.balance["upgrades"]["max_swaps_per_hero"]
+            if any(state.swaps_used.get(member["id"], 0) < limit for member in state.party):
                 allowed.append(cmd.SWAP_DIE)
             return allowed
         if state.phase != RunPhase.BATTLE:

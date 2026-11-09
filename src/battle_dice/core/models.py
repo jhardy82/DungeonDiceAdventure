@@ -333,7 +333,8 @@ class RunState:
     #: hero_id -> die_id -> upgraded, versioned die definition.
     die_overrides: dict[str, dict[str, DieDefinition]] = field(default_factory=dict)
     upgrade_offers: dict[str, dict[str, list[dict[str, Any]]]] = field(default_factory=dict)
-    swaps_used: int = 0
+    #: hero_id -> optional bench swaps used this run (limit: balance.upgrades.max_swaps_per_hero).
+    swaps_used: dict[str, int] = field(default_factory=dict)
     combat: CombatState | None = None
     battle_records: list[dict[str, Any]] = field(default_factory=list)
 

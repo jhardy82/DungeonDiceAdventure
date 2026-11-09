@@ -126,9 +126,9 @@ def test_t05_disabled_reactions_explain_why():
     assert interrupt["reason"] == "Needs 1 mana (has 0)."
 
     back_row = start("squire:back", "scout")
-    add_status(back_row, "h01", "weaken")
-    add_status(back_row, "h01", "weaken")
+    force_slash(back_row)
     begin_enemy(back_row, "b1_e01")
+    assert back_row.combat.committed_intent.name == "Slash"  # a damaging intent, so only the row rule blocks Interpose
     option = reactions.stage_options(back_row, "guard")[0]
     assert option["reason"] == "Must be in the front row."
 

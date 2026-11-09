@@ -1,6 +1,6 @@
 # Battle Dice MVP: Decision Log
 
-Contract: **BD-PRD-MVP-001 v1.0.0** (2026-11-09). Rules version `1.0.0`, content version `1.0.0`,
+Contract: **BD-PRD-MVP-001 v1.0.0** (2026-11-09). Rules version `1.1.0`, content version `1.1.0`,
 RNG `BD-PCG32-v1`.
 
 This log records (1) how gaps and contradictions between *delegated default* (DD) statements in
@@ -15,16 +15,16 @@ tests, and add an entry here.
 
 | ID | PRD area | Decision | Reason |
 |----|----------|----------|--------|
-| D-01 | 8.1 / 8.2 Steadfast | +1 shield only when the Squire's own Defense **die** action targets **itself**. Guard on an ally and the Interpose reaction get no bonus. | The face table ("+1 if self") is more specific than the prose. Narrower reading. |
+| D-01 | 8.1 / 8.2 Steadfast | **Owner decision, 2026-11-09 (rules 1.1.0):** +1 shield on every Defense **die** action the Squire takes, on itself or an ally. The Interpose reaction is not a die action and gets no bonus. | Supersedes the 1.0.0 reading (self only). The PRD prose says "its own selected Defense die actions (not to Guard reactions)"; the owner chose that broader reading over the face table's "if self". |
 | D-02 | 5.4 reroll | A reroll rerolls **all** unkept dice. | Q71 is approved (A) and wins over the "selected unkept die" sentence. |
 | D-03 | 5.5 Channel and Cast | The second action must be a **non-Resource** category (Attack, Defense, Healing, Status). Resource + Resource is not a legal two-action plan. | "Any other legal category" read as "other than Resource". Narrower reading. |
 | D-04 | 9.2 / 9.3 stack cap | At the cap, the oldest stack is refreshed to the applied duration **only if that raises it**, and the refreshed stack then counts as the newest. | Makes "refresh the oldest" rotate through stacks instead of touching the same one forever. |
 | D-05 | 14.4 "unrefreshable cap" | A status application is illegal for the AI only when the target is at the stack cap **and** every stack already has at least the applied duration. | Follows from D-04: that is exactly when applying changes nothing. |
 | D-06 | 14.4 priority 20 | Granted when at least one eligible target has **zero** stacks of the status the action applies (and for War Cry while no speed modifier is active). | The PRD says "its proposed target" but targets are chosen after the action; this is the equivalent test. |
 | D-07 | 6.2 / 9.2 Poison at start | If Poison downs or defeats the actor at activation start, the activation ends immediately. A downed hero's status durations are **not** decremented for that activation. | 10: "do not tick activation-based effects while downed". |
-| D-08 | 12.1 enemy ranges | Slash, Strike and **Dirty Trick** are melee. Shadow Bolt, Poison Dart, Corrupt Mark and Blight Wave are ranged. | The PRD gives ranges only for damage. Dirty Trick is a Goblin (front-row skirmisher) ability; treating it as melee keeps back-row heroes protected, the narrower reading. |
+| D-08 | 12.1 enemy ranges | **Owner decision, 2026-11-09 (rules 1.1.0):** Dirty Trick is **ranged** and can reach back-row heroes. Slash and Strike are melee. Shadow Bolt, Poison Dart, Corrupt Mark and Blight Wave are ranged. | Supersedes the 1.0.0 reading (Dirty Trick melee). The PRD gives ranges only for damage. |
 | D-09 | 7.3 Interpose | The Squire may choose **itself** when it is one of the targeted heroes. | Otherwise a solo Squire could never demonstrate the Guard archetype (12.2). |
-| D-10 | 11.2 optional swap | At most **one swap per run** (party-wide), value `max_swaps_per_run` in `balance.json`. | Literal reading of "swap zero or one equipped die". |
+| D-10 | 11.2 optional swap | **Owner decision, 2026-11-09 (rules 1.1.0):** at most **one swap per hero** per run, value `max_swaps_per_hero` in `balance.json`. A hero that has swapped cannot swap again, including back. The upgraded die stays locked (approved requirement). | Supersedes the 1.0.0 reading (one swap per run, party-wide). |
 | D-11 | 11.2 Sharpen | Each die offers Sharpen on one face chosen by the rewards stream. Poison/Weaken faces gain +1 duration, capped at the face power cap (5). | The PRD does not say which face; a deterministic seeded choice keeps "three cards". |
 | D-12 | 11.2 Imbue | Imbue may replace **any** face (including a Blank); the face index comes from the rewards stream. | "Replace one face". |
 | D-13 | 9.6 Speed Up | Re-applying while active refreshes the duration; it never stacks. The AI treats a repeat as illegal (14.4). | "Stacking is not used in the MVP". |
@@ -61,7 +61,7 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 | E-07 | The weighted enemy draw is always consumed, even when the top tier holds a single action, so the enemy stream position does not depend on tier size. |
 | E-08 | `Engine.force_draws()` queues forced bounded results for a stream. It exists only for fixtures (11.2: "fixture tests can force a known catalog order"); forced draws are logged as `<stream>:forced` and do not advance the PCG stream. |
 | E-09 | Rules text shown to the player is generated from face data (`view.describe_face`), so it cannot drift from behaviour. |
-| E-10 | The golden RNG vectors in `tests/golden/rng_vectors.json` are locked to rules version 1.0.0. The raw generator is also checked against the published PCG32 reference output (seed 42, sequence 54). |
+| E-10 | The golden RNG vectors in `tests/golden/rng_vectors.json` are locked to the current rules version (label updated to 1.1.0; the vectors are unchanged because the RNG algorithm is unchanged). The raw generator is also checked against the published PCG32 reference output (seed 42, sequence 54). |
 
 ## 4. Deviations from the plan
 

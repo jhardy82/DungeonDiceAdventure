@@ -489,7 +489,7 @@ class AppController:
         if self._guard(self._send, cmd.CHOOSE_UPGRADE, hero_id=self.upgrade_hero, die_id=self.upgrade_die,
                        offer_id=self.upgrade_offer):
             self.upgrade_offer = None
-            self.info("Upgrade applied. Optional: swap one die or change rows, then start Battle 2.")
+            self.info("Upgrade applied. Optional: swap one die per hero or change rows, then start Battle 2.")
 
     def swap_die(self, hero_id: str, out_die_id: str, in_die_id: str) -> None:
         if self._guard(self._send, cmd.SWAP_DIE, hero_id=hero_id, out_die_id=out_die_id, in_die_id=in_die_id):

@@ -47,12 +47,12 @@ Options:
    choose actions and targets, then **Confirm** the whole plan. Unused dice are discarded.
 4. On an enemy's activation its action and targets are revealed first. Eligible heroes may react
    in three stages: **Guard**, **Resource**, **Interrupt**. Then the enemy action resolves.
-5. Win Battle 1, apply one required **dice upgrade**, optionally swap one die and change rows,
+5. Win Battle 1, apply one required **dice upgrade**, optionally swap one die per hero and change rows,
    then win Battle 2.
 
 | Class | Scheduling | Passive | Reaction |
 |-------|------------|---------|----------|
-| Squire | Single Commitment: one action | Steadfast: +1 shield on own Defense die targeting itself | Interpose (Guard): +2 shield to a targeted ally |
+| Squire | Single Commitment: one action | Steadfast: +1 shield on every Defense die action (self or ally) | Interpose (Guard): +2 shield to a targeted ally |
 | Apprentice | Channel and Cast: Resource, then one other action | Arcane Resonance: +1 spell damage at corruption 3+ | Grounding (Resource): ally -1 corruption, self +1 mana |
 | Scout | Exploit Combo: Status, then Attack | Exploit Opening: +1 damage to the combo Attack | Disrupt (Interrupt): cancel a basic action, weaken an elite one |
 
@@ -135,7 +135,7 @@ rerun the tests, add a decision-log entry). No numeric balance value is hard-cod
 
 In scope: the two-battle loop, three classes, three enemy archetypes, d4 / d6 / d8 dice, the
 action-gauge timeline, staged reactions, Poison, Weaken, mana, corruption, shields, downing and
-explicit revival, recovery, one mandatory upgrade and one optional swap.
+explicit revival, recovery, one mandatory upgrade and one optional swap per hero.
 
 Deferred: save and resume across restarts, d10 / d12 / d20, class unlocks and levelling,
 procedural encounters, packaged releases, controller support, art and audio.

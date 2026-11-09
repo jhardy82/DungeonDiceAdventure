@@ -248,11 +248,13 @@ def hero_turn_view(engine: Engine) -> dict[str, Any] | None:
 def upgrade_view(engine: Engine) -> dict[str, Any]:
     state = engine.state
     heroes = engine.combat.side(SIDE_HERO)
-    swaps_left = engine.content.balance["upgrades"]["max_swaps_per_run"] - state.swaps_used
+    swap_limit = engine.content.balance["upgrades"]["max_swaps_per_hero"]
+    swaps_left = {hero.id: max(0, swap_limit - state.swaps_used.get(hero.id, 0)) for hero in heroes}
     result: dict[str, Any] = {
         "upgrade_chosen": bool(state.upgrades),
         "upgrades": list(state.upgrades),
-        "swaps_remaining": swaps_left,
+        "swaps_remaining": sum(swaps_left.values()),
+        "swaps_per_hero": swap_limit,
         "heroes": [],
     }
     for hero in heroes:
@@ -268,6 +270,7 @@ def upgrade_view(engine: Engine) -> dict[str, Any]:
             {
                 "hero_id": hero.id,
                 "hero_name": hero.name,
+                "swaps_remaining": swaps_left[hero.id],
                 "equipped": [
                     {"die": die_view(engine.die_for(hero.id, d)), "locked": d in locked,
                      "offers": state.upgrade_offers.get(hero.id, {}).get(d, [])}

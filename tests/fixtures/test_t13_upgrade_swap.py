@@ -107,7 +107,22 @@ def test_t13_optional_swap_cannot_remove_the_upgrade():
     assert hero.equipped_dice_ids == ["iron_d6", "bulwark_d4"] and len(hero.equipped_dice_ids) == 2
     assert engine.state.inventory["h01"] == ["oath_d4"]
     assert engine.die_for("h01", "iron_d6").definition_version == 2  # the upgrade survived the swap
-    rejected(engine.do(cmd.SWAP_DIE, hero_id="h02", out_die_id="tools_d4", in_die_id="venom_d4"), "already been used")
+    assert engine.state.swaps_used == {"h01": 1}
+
+    # One swap per hero (rules 1.1.0): the same hero cannot swap again, not even back.
+    rejected(engine.do(cmd.SWAP_DIE, hero_id="h01", out_die_id="bulwark_d4", in_die_id="oath_d4"), "already used its optional swap")
+    after = snapshot(engine)["upgrade"]
+    assert [h["swaps_remaining"] for h in after["heroes"]] == [0, 1] and after["swaps_remaining"] == 1
+    assert all(not s["allowed"] for s in after["heroes"][0]["bench"][0]["swaps"])
+    assert cmd.SWAP_DIE in engine.permissible_commands()
+
+    # A different hero still has its own swap.
+    ok(engine.do(cmd.SWAP_DIE, hero_id="h02", out_die_id="tools_d4", in_die_id="venom_d4"))
+    assert unit(engine, "h02").equipped_dice_ids == ["striker_d8", "venom_d4"]
+    assert engine.state.inventory["h02"] == ["tools_d4"]
+    assert engine.state.swaps_used == {"h01": 1, "h02": 1}
+    assert cmd.SWAP_DIE not in engine.permissible_commands()  # every hero has used its swap
+    assert engine.die_for("h01", "iron_d6").definition_version == 2
 
     ok(engine.do(cmd.ADVANCE_PHASE))
     begin_hero(engine, "h01", bulwark_d4=3, iron_d6=offer["face_index"] + 1)
@@ -121,7 +136,7 @@ def test_t13_swap_is_optional_and_a_new_run_has_no_upgrade():
     offer = engine.state.upgrade_offers["h01"]["tools_d4"][0]
     ok(engine.do(cmd.CHOOSE_UPGRADE, hero_id="h01", die_id="tools_d4", offer_id=offer["offer_id"]))
     ok(engine.do(cmd.ADVANCE_PHASE))  # zero swaps is allowed
-    assert engine.state.phase == RunPhase.BATTLE and engine.state.swaps_used == 0
+    assert engine.state.phase == RunPhase.BATTLE and engine.state.swaps_used == {}
 
     retry = start("scout")  # Retry Same Party / Modify Party both begin a brand-new run
     assert retry.state.upgrades == [] and retry.state.die_overrides == {}

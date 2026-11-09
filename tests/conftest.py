@@ -216,10 +216,17 @@ def enemy_acts(engine: Engine, enemy_id: str, action_roll: int | None = None) ->
     finish_activation(engine)
 
 
-def force_slash(engine: Engine, hero_id: str) -> None:
-    """Arrange: put two full-duration Weaken stacks on a hero so Dirty Trick is illegal for goblins."""
-    add_status(engine, hero_id, "weaken", remaining=2)
-    add_status(engine, hero_id, "weaken", remaining=2)
+def force_slash(engine: Engine, *_hero_ids: str) -> None:
+    """Arrange: make Dirty Trick illegal so a Goblin's only legal action is Slash.
+
+    Dirty Trick is ranged (rules 1.1.0), so it can reach any standing hero. Two full-duration
+    Weaken stacks on *every* hero leave it nothing to change, which makes it illegal for the AI.
+    Hero ids are accepted for readability at the call site; all heroes are always saturated.
+    """
+    for hero in heroes(engine):
+        hero.status_instances = [s for s in hero.status_instances if s.kind != "weaken"]
+        add_status(engine, hero.id, "weaken", remaining=2)
+        add_status(engine, hero.id, "weaken", remaining=2)
 
 
 def captain_content(size: int) -> Content:

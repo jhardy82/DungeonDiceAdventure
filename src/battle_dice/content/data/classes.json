@@ -1,5 +1,5 @@
 {
-  "content_version": "1.0.0",
+  "content_version": "1.1.0",
   "classes": {
     "squire": {
       "name": "Squire",
@@ -19,8 +19,8 @@
         "summary": "One dice action per activation."
       },
       "passive": {
-        "id": "steadfast", "name": "Steadfast", "type": "self_defense_bonus", "amount": 1,
-        "summary": "+1 shield when its own Defense die action targets itself."
+        "id": "steadfast", "name": "Steadfast", "type": "defense_die_bonus", "amount": 1,
+        "summary": "+1 shield on every Defense die action it takes, on itself or an ally."
       },
       "reaction": "interpose"
     },

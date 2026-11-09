@@ -99,7 +99,7 @@ CONTROLS_TEXT = [
     ("Your activation", "R rolls, then R rerolls every die you did not Keep.  Z / X toggle Keep on die 1 / 2.  1 / 2 plan the rolled face of die 1 / 2; when a target is needed, press the number shown on a legal target (or click it).  O swaps the order of equal-speed actions.  C clears the plan.  Enter confirms the whole plan.  P passes."),
     ("Enemy activation", "The enemy's action and targets are revealed first.  Number keys use a listed reaction.  S skips the current stage (Guard, then Resource, then Interrupt)."),
     ("Pacing", "Automatic steps play on a short timer.  F toggles fast mode.  Space with nothing focused steps immediately."),
-    ("Upgrade", "After Battle 1, pick a hero and a die, select one of three cards, then A applies it.  Optionally swap one die or change rows, then Enter starts Battle 2."),
+    ("Upgrade", "After Battle 1, pick a hero and a die, select one of three cards, then A applies it.  Optionally swap one die per hero or change rows, then Enter starts Battle 2."),
     ("Reading the board", "HP, SH (shield), MP (mana), CR (corruption).  PSN / WKN / SPD+ show stacks and remaining activations.  The gauge bar fills to 100 by speed each tick; the Next row forecasts who acts."),
 ]
 
@@ -569,7 +569,7 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
 
     # Equipment column
     ui.panel(942, 56, 326, 510, "Optional bench swap")
-    ui.text(952, 80, f"Swaps remaining this run: {upgrade['swaps_remaining']}", 14, Theme.DIM)
+    ui.text(952, 80, f"{hero_view['hero_name']}: {hero_view['swaps_remaining']} swap left (one per hero)", 14, Theme.DIM)
     y = 102.0
     die_names = {e["die"]["id"]: e["die"]["name"] for e in hero_view["equipped"]}
     for bench in hero_view["bench"]:

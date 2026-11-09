@@ -293,8 +293,8 @@ def swap_problem(ctx: Engine, hero_id: str, out_die_id: str, in_die_id: str) -> 
     hero = ctx.combat.combatants.get(hero_id)
     if hero is None or not hero.is_hero:
         return f"Unknown hero '{hero_id}'."
-    if state.swaps_used >= ctx.content.balance["upgrades"]["max_swaps_per_run"]:
-        return "The optional swap has already been used this run."
+    if state.swaps_used.get(hero_id, 0) >= ctx.content.balance["upgrades"]["max_swaps_per_hero"]:
+        return f"{hero.name} has already used its optional swap this run."
     if out_die_id not in hero.equipped_dice_ids:
         return f"{hero.name} does not have die '{out_die_id}' equipped."
     if out_die_id in upgraded_die_ids(ctx, hero_id):
@@ -318,7 +318,7 @@ def apply_swap(ctx: Engine, hero_id: str, out_die_id: str, in_die_id: str) -> st
     bench = state.inventory[hero_id]
     bench[bench.index(in_die_id)] = out_die_id
     assert len(hero.equipped_dice_ids) == capacity
-    state.swaps_used += 1
+    state.swaps_used[hero_id] = state.swaps_used.get(hero_id, 0) + 1
     ctx.emit(
         EventType.DIE_SWAPPED,
         actor_id=hero_id,

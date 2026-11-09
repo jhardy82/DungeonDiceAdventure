@@ -1,10 +1,10 @@
 {
-  "content_version": "1.0.0",
+  "content_version": "1.1.0",
   "enemies": {
     "goblin": {
       "name": "Goblin Skirmisher", "row": "front", "max_hp": 6, "speed": 10, "base_initiative": 4,
       "actions": {
-        "dirty_trick": {"name": "Dirty Trick", "category": "status", "power": 1, "target_scope": "single_enemy", "range_type": "melee", "action_speed": 1, "mana_cost": 0,
+        "dirty_trick": {"name": "Dirty Trick", "category": "status", "power": 1, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 0,
           "effects": [{"type": "apply_status", "target": "target", "status": "weaken", "duration": 2}],
           "can_revive": false, "tags": ["basic", "interruptible", "hostile"], "weight": 1, "random_target": false},
         "slash": {"name": "Slash", "category": "attack", "power": 2, "target_scope": "single_enemy", "range_type": "melee", "action_speed": 1, "mana_cost": 0,

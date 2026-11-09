@@ -106,6 +106,12 @@ def test_enemy_archetypes(content):
         "hex_adept": {"corrupt_mark": 1, "poison_dart": 1, "shadow_bolt": 2},
         "captain": {"blight_wave": 1, "corrupt_mark": 1, "strike": 3, "war_cry": 1},
     }
+    ranges = {k: {a: f.range_type for a, f in actions.items()} for k, actions in content.enemy_actions.items()}
+    assert ranges == {
+        "goblin": {"dirty_trick": "ranged", "slash": "melee"},
+        "hex_adept": {"corrupt_mark": "ranged", "poison_dart": "ranged", "shadow_bolt": "ranged"},
+        "captain": {"blight_wave": "ranged", "corrupt_mark": "ranged", "strike": "melee", "war_cry": "self"},
+    }
     powers = {k: {a: f.power for a, f in actions.items()} for k, actions in content.enemy_actions.items()}
     assert powers["goblin"]["slash"] == 2 and powers["hex_adept"]["shadow_bolt"] == 3
     assert powers["captain"] == {"blight_wave": 1, "corrupt_mark": 1, "strike": 3, "war_cry": 2}
@@ -187,3 +193,13 @@ def test_missing_document_is_reported():
     with pytest.raises(ContentError) as caught:
         build_content(documents)
     assert "dice.json: document is missing" in caught.value.problems
+
+
+def test_versions_and_owner_rule_changes_of_1_1_0(content):
+    from battle_dice import RULES_VERSION
+
+    assert RULES_VERSION == "1.1.0" and content.content_version == "1.1.0"
+    assert {doc["content_version"] for doc in content.documents.values()} == {"1.1.0"}
+    assert content.classes["squire"]["passive"]["type"] == "defense_die_bonus"
+    assert content.balance["upgrades"]["max_swaps_per_hero"] == 1
+    assert "max_swaps_per_run" not in content.balance["upgrades"]

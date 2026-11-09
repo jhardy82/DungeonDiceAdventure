@@ -70,9 +70,9 @@
               "properties": {"stack_cap": {"$ref": "#/$defs/bounded_int"}, "default_duration": {"$ref": "#/$defs/bounded_int"}}}}},
         "corruption": {"type": "object", "required": ["backlash_threshold", "backlash_damage"], "additionalProperties": false,
           "properties": {"backlash_threshold": {"$ref": "#/$defs/bounded_int"}, "backlash_damage": {"$ref": "#/$defs/bounded_int"}}},
-        "upgrades": {"type": "object", "required": ["face_power_cap", "offers_per_die", "mandatory_upgrades_per_run", "max_swaps_per_run"], "additionalProperties": false,
+        "upgrades": {"type": "object", "required": ["face_power_cap", "offers_per_die", "mandatory_upgrades_per_run", "max_swaps_per_hero"], "additionalProperties": false,
           "properties": {"face_power_cap": {"$ref": "#/$defs/bounded_int"}, "offers_per_die": {"type": "integer", "minimum": 1, "maximum": 9},
-            "mandatory_upgrades_per_run": {"const": 1}, "max_swaps_per_run": {"$ref": "#/$defs/bounded_int"}}},
+            "mandatory_upgrades_per_run": {"const": 1}, "max_swaps_per_hero": {"$ref": "#/$defs/bounded_int"}}},
         "recovery": {"type": "object", "required": ["standing_heal_percent", "downed_restore_percent"], "additionalProperties": false,
           "properties": {"standing_heal_percent": {"type": "integer", "minimum": 0, "maximum": 100}, "downed_restore_percent": {"type": "integer", "minimum": 1, "maximum": 100}}},
         "ai": {"type": "object", "required": ["priority_lethal", "priority_setup", "priority_default"], "additionalProperties": false,
@@ -111,7 +111,7 @@
           "type": "object", "required": ["id", "name", "type", "amount", "summary"], "additionalProperties": false,
           "properties": {
             "id": {"$ref": "#/$defs/id"}, "name": {"type": "string"}, "summary": {"type": "string"},
-            "type": {"enum": ["self_defense_bonus", "spell_damage_at_corruption", "combo_attack_bonus"]},
+            "type": {"enum": ["defense_die_bonus", "spell_damage_at_corruption", "combo_attack_bonus"]},
             "amount": {"$ref": "#/$defs/bounded_int"}, "threshold": {"$ref": "#/$defs/bounded_int"}
           }
         },

@@ -146,7 +146,11 @@ def test_shield_cap_and_steadfast():
     squire, scout = unit(engine, "h01"), unit(engine, "h02")
     begin_hero(engine, "h01", iron_d6=3, oath_d4=1)
     resolve_hero(engine, action("iron_d6", "h02"))
-    assert scout.shields == 3  # Guard on an ally: no Steadfast bonus
+    assert scout.shields == 4  # Guard on an ally: 3 + 1 Steadfast (rules 1.1.0: any target)
+    assert last_event(engine, "action_resolved").delta["results"][0]["bonus"] == 1
+    begin_hero(engine, "h01", iron_d6=3, oath_d4=2)
+    resolve_hero(engine, action("oath_d4", "h02"))
+    assert scout.shields == 7  # Brace on an ally: 2 + 1 Steadfast
     begin_hero(engine, "h01", iron_d6=3, oath_d4=1)
     resolve_hero(engine, action("iron_d6", "h01"))
     assert squire.shields == 4  # Guard on self: +1 Steadfast
@@ -263,3 +267,45 @@ def test_healing_caps_at_max_hp_and_full_hp_ally_is_a_legal_target():
     begin_hero(engine, "h01", iron_d6=5, oath_d4=1)
     ok(engine.do(cmd.SET_ACTION_PLAN, actions=[action("iron_d6", "h01")]))  # full HP is still legal
     ok(engine.do(cmd.COMMIT_ACTION_PLAN))
+
+
+def test_steadfast_applies_only_to_the_squires_defense_die_actions():
+    # Another class shielding an ally gets no bonus.
+    engine = start("squire", "scout")
+    begin_hero(engine, "h02", striker_d8=8, tools_d4=3)
+    resolve_hero(engine, action("tools_d4", "h01"))
+    assert unit(engine, "h01").shields == 2
+    assert last_event(engine, "action_resolved").delta["results"][0]["bonus"] == 0
+
+    # The Squire's non-Defense die faces are unaffected: Rally still heals exactly 2.
+    healing = start("squire", "scout")
+    unit(healing, "h02").hp = 5
+    begin_hero(healing, "h01", iron_d6=5, oath_d4=1)
+    resolve_hero(healing, action("iron_d6", "h02"))
+    assert (unit(healing, "h02").hp, unit(healing, "h02").shields) == (7, 0)
+
+    # The Interpose reaction is not a die action, so it grants exactly 2 shield.
+    from battle_dice.core import commands as cmd
+    from tests.conftest import begin_enemy
+
+    reaction = start("squire", "scout")
+    force_slash(reaction)
+    begin_enemy(reaction, "b1_e01")
+    ok(reaction.do(cmd.USE_REACTION, hero_id="h01", target_id="h01"))
+    assert unit(reaction, "h01").shields == 2
+
+
+def test_dirty_trick_is_ranged_while_slash_stays_melee():
+    engine = start("squire", "scout")  # Squire front, Scout back
+    goblin = unit(engine, "b1_e01")
+    trick, slash = engine.enemy_action(goblin, "dirty_trick"), engine.enemy_action(goblin, "slash")
+    assert (trick.range_type, slash.range_type) == ("ranged", "melee")
+    assert eligible_targets(engine.combat, goblin, trick) == ["h01", "h02"]  # reaches the back row
+    assert protected_targets(engine.combat, goblin, trick) == []
+    assert eligible_targets(engine.combat, goblin, slash) == ["h01"]  # melee still stops at the front row
+
+    # With the front-row Squire already Weakened, the Goblin's setup action goes to the back-row Scout.
+    add_status(engine, "h01", "weaken")
+    enemy_acts(engine, "b1_e01")
+    assert last_event(engine, "action_resolved").delta["name"] == "Dirty Trick"
+    assert unit(engine, "h02").stacks_of("weaken") == 1

@@ -44,5 +44,15 @@ def test_t01_melee_reaches_a_lone_back_row_hero():
     run_until_input(engine)
     hero = unit(engine, "h01")
     assert hero.row == "back"
-    assert hero.stacks_of("weaken") == 1  # the Goblin's melee Dirty Trick landed: no standing front row to protect
+    assert hero.stacks_of("weaken") == 1  # the Goblin opened with its ranged Dirty Trick
     ok(engine.do(cmd.ROLL_DICE))
+    ok(engine.do(cmd.SET_ACTION_PLAN, actions=[]))
+    ok(engine.do(cmd.COMMIT_ACTION_PLAN))
+    # Second Goblin activation: Weaken is present, so Slash (melee) is in the tier. Force it.
+    engine.force_draws("enemy", [1])
+    run_until_input(engine)
+    skip_reactions(engine)
+    run_until_input(engine)
+    slash = [e for e in events_of(engine, "action_resolved") if e.delta["name"] == "Slash"]
+    assert slash and slash[0].delta["target_ids"] == ["h01"]  # no standing front row: melee reaches the back row
+    assert unit(engine, "h01").hp == 12

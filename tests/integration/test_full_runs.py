@@ -34,7 +34,9 @@ def check_invariants(engine: Engine) -> None:
     if combat.turn is not None:
         assert 0 <= combat.turn.rerolls_remaining <= 2
     assert len(engine.state.upgrades) <= 1
-    assert engine.state.swaps_used <= balance["upgrades"]["max_swaps_per_run"]
+    hero_ids = {member["id"] for member in engine.state.party}
+    assert set(engine.state.swaps_used) <= hero_ids
+    assert all(0 < used <= balance["upgrades"]["max_swaps_per_hero"] for used in engine.state.swaps_used.values())
 
 
 def play_checked(engine: Engine, policy, limit: int = 20000) -> str:
