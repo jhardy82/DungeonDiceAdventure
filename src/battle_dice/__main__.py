@@ -48,13 +48,16 @@ def run_smoke_test(report_path: str | None = None) -> int:
                 raise RuntimeError(f"the run did not start: {controller.message}")
             policy = HeuristicPolicy()
             frames = 0
+            sprites = app.ui.assets.load_all()
+            if sprites == 0 or app.ui.assets.missing:
+                raise RuntimeError(f"sprites failed to load: {sorted(app.ui.assets.missing) or 'none found'}")
             while not engine.finished():
                 if engine.needs_input():
                     policy.act(engine)
                 else:
                     engine.do("AdvancePhase")
                 controller.refresh()
-                app.frame(0)
+                app.frame(40)
                 frames += 1
                 seen.add(controller.screen)
                 if frames > 20000:
@@ -65,7 +68,7 @@ def run_smoke_test(report_path: str | None = None) -> int:
                 raise RuntimeError(f"the event log was not written: {controller.log_error}")
             lines.append(
                 f"SMOKE TEST OK: outcome={engine.state.outcome} frames={frames} events={len(engine.events)} "
-                f"screens={sorted(seen)} rules={RULES_VERSION} content={controller.content.content_version} "
+                f"screens={sorted(seen)} sprites={sprites} rules={RULES_VERSION} content={controller.content.content_version} "
                 f"python={sys.version.split()[0]} pygame-ce={pygame.version.ver} frozen={bool(getattr(sys, 'frozen', False))}"
             )
             pygame.quit()
@@ -85,6 +88,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=None, help="use this root seed for every run (reproducible dice)")
     parser.add_argument("--size", default="1280x720", help="window size WIDTHxHEIGHT (minimum 960x540)")
     parser.add_argument("--log-dir", default=None, help="folder for JSONL event logs")
+    parser.add_argument("--no-animation", action="store_true",
+                        help="start with animation turned off (reduced motion); M toggles it in battle")
     parser.add_argument("--smoke-test", action="store_true",
                         help="run a headless self-check (no window) and exit 0 on success")
     parser.add_argument("--smoke-out", default=None, metavar="FILE",
@@ -105,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     from battle_dice.ui.app import GameApp
 
     controller = AppController(fixed_seed=args.seed, log_dir=args.log_dir)
-    GameApp(controller, size=(width, height)).run()
+    GameApp(controller, size=(width, height), animations=not args.no_animation).run()
     return 0
 
 

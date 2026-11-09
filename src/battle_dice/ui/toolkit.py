@@ -14,6 +14,9 @@ from typing import Any
 
 import pygame
 
+from battle_dice.ui.animation import Animator
+from battle_dice.ui.artwork import PLACEHOLDER_COLOUR, AssetStore
+
 LOGICAL_W, LOGICAL_H = 1280, 720
 MIN_W, MIN_H = 960, 540
 FONT_CANDIDATES = ("segoeui", "arial", "liberationsans", "dejavusans", "helvetica", "freesans")
@@ -70,6 +73,9 @@ class UI:
         self._font_paths: dict[bool, str | None] = {}
         self.on_disabled: Callable[[str], None] | None = None
         self.escape_action: Callable[[], Any] | None = None
+        self.assets = AssetStore()
+        self.anim = Animator()
+        self._backdrops: dict[tuple[int, int, int], pygame.Surface] = {}
 
     # -- frame lifecycle ---------------------------------------------------------------------
 
@@ -204,7 +210,7 @@ class UI:
             self.text(x + 8, y + 5, title, 15, Theme.DIM, bold=True, max_width=w - 16)
 
     def bar(
-        self, x: float, y: float, w: float, h: float, value: int, maximum: int,
+        self, x: float, y: float, w: float, h: float, value: float, maximum: int,
         color: tuple[int, int, int], back: tuple[int, int, int] = (20, 22, 28),
     ) -> None:
         assert self.surface is not None
@@ -220,6 +226,86 @@ class UI:
         assert self.surface is not None
         a, b = self.r(x1, y1, 1, 1), self.r(x2, y2, 1, 1)
         pygame.draw.line(self.surface, color, a.topleft, b.topleft, 1)
+
+    # -- pixel art ---------------------------------------------------------------------------
+
+    def sprite(
+        self, key: str | None, x: float, y: float, w: float, h: float, variant: str = "", alpha: int = 255,
+    ) -> int:
+        """Draw a sprite centred in a logical slot at the largest whole-number scale that fits.
+
+        Returns the scale used (0 when ``key`` is None). A missing sprite draws a visible
+        placeholder box and is recorded in ``assets.missing``; it never raises.
+        """
+        assert self.surface is not None
+        if key is None:
+            return 0
+        slot = self.r(x, y, w, h)
+        base = self.assets.base(key)
+        if base is None:
+            pygame.draw.rect(self.surface, PLACEHOLDER_COLOUR, slot, 1)
+            return 0
+        scale = self.assets.fit_scale(base.get_size(), slot.size)
+        image = self.assets.scaled(key, scale, variant)
+        assert image is not None
+        if alpha < 255:
+            image = image.copy()
+            image.set_alpha(alpha)
+        self.surface.blit(image, image.get_rect(center=slot.center))
+        return scale
+
+    def backdrop(self, x: float, y: float, w: float, h: float, wall_rows: int = 1, dim: int = 150) -> None:
+        """Tiled dungeon floor behind a dark overlay, so text on top keeps its contrast."""
+        assert self.surface is not None
+        area = self.r(x, y, w, h)
+        cache_key = (area.width, area.height, wall_rows)
+        cached = self._backdrops.get(cache_key)
+        if cached is None:
+            cached = pygame.Surface(area.size)
+            cached.fill(Theme.BG)
+            layout = self.assets.manifest["backdrop"]
+            tile = self.assets.tile_size
+            scale = max(2, int(round(3 * self.scale)))
+            step = tile * scale
+            floors = layout["floor"]
+            for row in range(area.height // step + 1):
+                for col in range(area.width // step + 1):
+                    if row < wall_rows:
+                        key = layout["wall"]
+                    else:
+                        key = floors[(((col * 73856093) ^ (row * 19349663)) >> 3) % len(floors)]
+                    image = self.assets.scaled(key, scale)
+                    if image is not None:
+                        cached.blit(image, (col * step, row * step))
+            shade = pygame.Surface(area.size, pygame.SRCALPHA)
+            shade.fill((14, 15, 20, dim))
+            cached.blit(shade, (0, 0))
+            if len(self._backdrops) > 12:
+                self._backdrops.clear()
+            self._backdrops[cache_key] = cached
+        self.surface.blit(cached, area.topleft)
+
+    def rect_of(self, key: str) -> pygame.Rect | None:
+        """Screen rectangle of a widget registered in the frame being built (or the last frame)."""
+        for widget in reversed(self._building):
+            if widget.key == key:
+                return widget.rect
+        found = self.widget(key)
+        return found.rect if found is not None else None
+
+    def floating_text(self, rect: pygame.Rect, text: str, colour: tuple[int, int, int], progress: float, lane: int = 0) -> None:
+        """A number or word that rises from a card and fades. Drawn in screen pixels."""
+        assert self.surface is not None
+        font = self.font(18, bold=True)
+        rise = self.px(26) * progress + lane * self.px(16)
+        alpha = 255 if progress < 0.6 else max(0, int(255 * (1 - (progress - 0.6) / 0.4)))
+        image = font.render(text, True, colour)
+        shadow = font.render(text, True, (10, 10, 14))
+        x = rect.centerx - image.get_width() // 2
+        y = rect.y + self.px(6) - int(rise)
+        for surface, offset in ((shadow, (1, 1)), (image, (0, 0))):
+            surface.set_alpha(alpha)
+            self.surface.blit(surface, (x + offset[0], y + offset[1]))
 
     # -- widgets -----------------------------------------------------------------------------
 

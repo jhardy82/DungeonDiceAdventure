@@ -70,6 +70,7 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 | V-01 | The PRD text is **not** vendored into `docs/`. It was supplied as pasted text with tab-separated tables, and a retyped copy could not be guaranteed byte-faithful to the owner's canonical document. The owner should add the canonical file as `docs/BD-PRD-MVP-001.md`. |
 | V-02 | The rules engine orchestrator (`core/engine.py`) is committed with WP-06, where all of its dependencies exist, rather than as a skeleton in WP-02. Unit tests that need the engine land with WP-06; the T01-T16 fixtures and integration tests land with WP-08. |
 | V-03 | **Scope added by the owner, 2026-11-09:** Windows packaging, which the PRD lists as outside the MVP. Two routes ship: a source launcher (`scripts/Start-BattleDice.ps1`, `Play-BattleDice.cmd`) and a PyInstaller one-folder build produced by the `Package (Windows)` workflow. Not included: code signing, an installer, or published releases. The app is unsigned and is distributed only as a workflow artifact. |
+| V-04 | **Scope added by the owner, 2026-11-09:** a pixel-art graphics pass with animation, using Kenney CC0 packs. The PRD lists original art as not required. Characters, enemies, action icons and dungeon tiles are from Kenney's Tiny Dungeon (CC0). The pack has no goblin and no polyhedral dice, so the Goblin is a recoloured Tiny Dungeon tile and the d4 / d6 / d8 dice plus the Weaken and Speed Up icons are original. Panels and buttons keep the existing flat style; a pixel-art UI reskin is not included. |
 
 ## 5. Presentation choices (section 13, DD)
 
@@ -84,12 +85,16 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 | U-07 | Run seeds come from the clock in the application layer (or `--seed`). The rules engine never reads the clock. |
 | U-08 | `--smoke-test` plays one seeded run through the real UI with no window and exits 0 on success. It is the verification step for packaged builds: it proves the bundled content, pygame-ce and fonts load inside the frozen app. |
 | U-09 | A packaged (frozen) build writes event logs to `%LOCALAPPDATA%\\BattleDice\\logs`, because its own folder may be read-only. From source the default stays `./logs`. |
+| U-10 | Sprites are 16x16 and are scaled by whole numbers only (nearest-neighbour); panels and text keep the fractional UI scale. Card and planner slots are sized so characters draw at 2x at both 960x540 and 1280x720. |
+| U-11 | Art lives in `ui/assets` with a manifest (file, source pack, tile number, any modification) and a credits file. The mapping from class or enemy to sprite is presentation data, not rules content, so the content hash and replays do not change. Tests fail if a file is unlisted, uncredited, or not CC0. |
+| U-12 | Animation reads the engine's event log and frame time only. It never calls the engine or its random streams (covered by a test). `M` and `--no-animation` turn it off; fast mode shortens it. The dice tumble cycles through the die's own faces by elapsed time and then shows the real result. |
+| U-13 | A missing sprite draws a visible placeholder box and is recorded, never raising. The smoke test fails if any sprite is missing, so packaged builds prove the art was bundled. |
 
 ## 6. Acceptance evidence
 
-268 automated tests pass on the reference environment (Linux container, Python 3.15.2,
-pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 144 unit, 78 fixture, 36 integration,
-10 headless UI. `ruff` 0.17.4 and `mypy` 2.4.1 are clean with their 3.15 targets.
+294 automated tests pass on the reference environment (Linux container, Python 3.15.2,
+pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 147 unit, 78 fixture, 37 integration,
+32 headless UI and graphics. `ruff` 0.17.4 and `mypy` 2.4.1 are clean with their 3.15 targets.
 
 Before the move to 3.15 the same suite also passed on Python 3.12.3 and 3.13; those versions are
 no longer installable because of the 3.15 floor (an install attempt on 3.12.3 is refused with

@@ -20,7 +20,7 @@ FAST_DELAY_MS = 25
 
 class GameApp:
     def __init__(self, controller: AppController | None = None, size: tuple[int, int] = (LOGICAL_W, LOGICAL_H),
-                 headless: bool = False):
+                 headless: bool = False, animations: bool = True):
         if headless:
             for variable in ("SDL_VIDEODRIVER", "SDL_AUDIODRIVER"):
                 if not os.environ.get(variable):
@@ -30,6 +30,7 @@ class GameApp:
         self.controller = controller or AppController()
         self.ui = UI()
         self.ui.on_disabled = self.controller.warn
+        self.ui.anim.enabled = animations
         self.running = True
         self.fast = False
         self._timer = 0.0
@@ -59,6 +60,10 @@ class GameApp:
                 self.fast = not self.fast
                 self.controller.info("Fast mode on." if self.fast else "Fast mode off.")
                 return
+            if event.key == pygame.K_m:
+                self.ui.anim.enabled = not self.ui.anim.enabled
+                self.controller.info("Animation on." if self.ui.anim.enabled else "Animation off (reduced motion).")
+                return
             if event.key == pygame.K_SPACE and self.ui.focus_key is None and not self.controller.waiting_for_player():
                 self._timer = 1e9  # step on the next update
                 return
@@ -68,6 +73,7 @@ class GameApp:
 
     def update(self, dt_ms: float) -> None:
         controller = self.controller
+        self._animate(dt_ms)
         if controller.screen == Screen.BATTLE and not controller.waiting_for_player():
             self._timer += dt_ms
             delay = FAST_DELAY_MS if self.fast else STEP_DELAY_MS
@@ -76,6 +82,17 @@ class GameApp:
                 controller.auto_advance()
         else:
             self._timer = 0.0
+
+    def _animate(self, dt_ms: float) -> None:
+        """Feed new engine events to the animator and advance it. Read-only on the engine."""
+        animator = self.ui.anim
+        engine = self.controller.engine
+        animator.fast = self.fast
+        animator.sync(engine)
+        actual_hp = None
+        if engine is not None and engine.started:
+            actual_hp = {c.id: c.hp for c in engine.combat.combatants.values()}
+        animator.update(dt_ms, actual_hp)
 
     def draw(self) -> None:
         ui, controller = self.ui, self.controller

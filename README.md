@@ -37,6 +37,7 @@ Options:
 | `--seed N` | Use root seed `N` for every run, so dice and enemy choices repeat exactly. |
 | `--size 1280x720` | Window size. Minimum supported is `960x540`; the window is resizable. |
 | `--log-dir PATH` | Folder for JSONL event logs (default `./logs`, or `BATTLE_DICE_LOG_DIR`). |
+| `--no-animation` | Start with animation off (reduced motion). `M` toggles it during a battle. |
 | `--smoke-test` | Play one hidden, seeded run through the real UI and exit 0 on success. No window opens. |
 
 ## Play on Windows
@@ -98,14 +99,26 @@ control to read what it does; a disabled control shows why it is unavailable.
 | Party setup | `1` `2` `3` add Squire / Apprentice / Scout, `B` begin |
 | Hero activation | `R` roll, then reroll unkept; `Z` `X` keep die 1 / 2; `1` `2` plan die 1 / 2; number keys pick a numbered target; `O` swap tie order; `C` clear; `Enter` confirm; `P` pass |
 | Reaction window | number keys use a listed reaction, `S` skip stage |
-| Pacing | `F` fast mode, `Space` (nothing focused) step now |
+| Pacing | `F` fast mode, `Space` (nothing focused) step now, `M` animation on / off |
 | Upgrade | `1` `2` `3` select a card, `A` apply, `Enter` start Battle 2 |
 | Outcome | `R` retry same party, `M` modify party |
+
+## Art
+
+Pixel art, 16x16. Characters, enemies, action icons and dungeon tiles come from
+[Tiny Dungeon](https://kenney.nl/assets/tiny-dungeon) by Kenney (CC0). The d4 / d6 / d8 dice and
+the Weaken and Speed Up icons were drawn for this project. Every file and its source is listed in
+`src/battle_dice/ui/assets/manifest.json`; credits are in `src/battle_dice/ui/assets/CREDITS.md`.
+
+- Sprites are scaled by whole numbers only, so pixels stay sharp at any window size.
+- Animation (dice tumble, floating numbers, eased HP bars, a pulse on the acting unit) is
+  presentation-only: it reads the event log and never changes rules state or seeded replays.
+- Text and shape cues are unchanged; art is added to them, never used instead of them.
 
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 268 tests: unit, T01-T16 fixtures, integration, headless UI
+python -m pytest                 # 294 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
 python -m ruff check src tests
 python -m mypy src/battle_dice/core src/battle_dice/rng.py src/battle_dice/content src/battle_dice/sim src/battle_dice/app
 ```
@@ -118,7 +131,7 @@ commands on Linux and Windows.
 | `tests/unit` | RNG golden vectors, content tables, command envelope, timeline, dice, planning, targeting, effects, enemy AI, purity |
 | `tests/fixtures` | One module per PRD fixture, `test_t01_solo_basic.py` to `test_t16_seed_replay.py` |
 | `tests/integration` | Full two-battle runs for every party size, invariants after every command, both outcomes |
-| `tests/ui` | Scripted mouse run at 1280x720 and keyboard-only run at 960x540 through every screen |
+| `tests/ui` | Scripted mouse run at 1280x720 and keyboard-only run at 960x540 through every screen; sprite manifest, licences, whole-number scaling and animation |
 
 ## Headless simulation and replay
 
@@ -155,6 +168,8 @@ src/battle_dice/
   app/controller.py   application state machine (menus, drafts, feedback), no pygame
   sim/                heuristic and random policies, seed-matrix runner
   ui/                 pygame-ce presentation: toolkit, screens, app shell
+  ui/assets/          16x16 pixel-art sprites, manifest.json, CREDITS.md
+tools/                build_sprites.py: rebuilds the sprite set from Kenney's Tiny Dungeon pack
 scripts/              Start-BattleDice.ps1 launcher (Windows)
 packaging/            PyInstaller entry point and spec for the standalone app
 docs/DECISION_LOG.md  interpretations, authored catalogs, deviations, measured evidence
@@ -170,4 +185,5 @@ action-gauge timeline, staged reactions, Poison, Weaken, mana, corruption, shiel
 explicit revival, recovery, one mandatory upgrade and one optional swap per hero.
 
 Deferred: save and resume across restarts, d10 / d12 / d20, class unlocks and levelling,
-procedural encounters, signed installers and published releases, controller support, art and audio.
+procedural encounters, signed installers and published releases, controller support, audio, and a
+pixel-art reskin of panels and buttons.

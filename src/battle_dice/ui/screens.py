@@ -61,7 +61,8 @@ def status_bar(ui: UI, ctrl: AppController, extra: str = "") -> None:
 def draw_die_faces(ui: UI, x: float, y: float, w: float, die: dict[str, Any], highlight_face: int | None = None,
                    max_rows: int = 8) -> float:
     """List every distinct face with its frequency and exact probability. Returns the next y."""
-    ui.text(x, y, f"{die['name']}  (d{die['size']}, {die['size']} faces, v{die['definition_version']})", 15, Theme.ACCENT, bold=True, max_width=w)
+    ui.sprite(ui.assets.die_key(die["size"]), x, y - 2, 20, 20)
+    ui.text(x + 24, y, f"{die['name']}  (d{die['size']}, {die['size']} faces, v{die['definition_version']})", 15, Theme.ACCENT, bold=True, max_width=w - 24)
     y += 20
     for group in die["groups"][:max_rows]:
         face = group["face"]
@@ -81,6 +82,13 @@ def draw_die_faces(ui: UI, x: float, y: float, w: float, die: dict[str, Any], hi
 
 
 def draw_main_menu(ui: UI, ctrl: AppController, quit_action: Callable[[], Any]) -> None:
+    ui.backdrop(0, 0, 1280, 694, wall_rows=2, dim=175)
+    for position, class_id in enumerate(("squire", "apprentice", "scout")):
+        ui.sprite(ui.assets.combatant_key(class_id), 150 + position * 104, 330, 96, 96)
+    for position, archetype in enumerate(("goblin", "hex_adept", "captain")):
+        ui.sprite(ui.assets.combatant_key(archetype), 826 + position * 104, 330, 96, 96)
+    for position, size in enumerate((4, 6, 8)):
+        ui.sprite(ui.assets.die_key(size), 574 + position * 46, 262, 40, 40)
     ui.text(640, 150, "BATTLE DICE", 64, Theme.ACCENT, bold=True, align="center")
     ui.text(640, 232, "A turn-based tactical dice RPG. Two battles, one upgrade, every die face visible.", 18, Theme.DIM, align="center")
     ui.button("menu:new", 490, 310, 300, 56, "New Run  (N)", ctrl.new_run, hotkeys=(pygame.K_n,), default=True, size=22,
@@ -98,7 +106,7 @@ CONTROLS_TEXT = [
     ("Party setup", "1 / 2 / 3 add a Squire / Apprentice / Scout.  Each hero has a Row and a Remove button.  B begins the encounter."),
     ("Your activation", "R rolls, then R rerolls every die you did not Keep.  Z / X toggle Keep on die 1 / 2.  1 / 2 plan the rolled face of die 1 / 2; when a target is needed, press the number shown on a legal target (or click it).  O swaps the order of equal-speed actions.  C clears the plan.  Enter confirms the whole plan.  P passes."),
     ("Enemy activation", "The enemy's action and targets are revealed first.  Number keys use a listed reaction.  S skips the current stage (Guard, then Resource, then Interrupt)."),
-    ("Pacing", "Automatic steps play on a short timer.  F toggles fast mode.  Space with nothing focused steps immediately."),
+    ("Pacing", "Automatic steps play on a short timer.  F toggles fast mode.  Space with nothing focused steps immediately.  M turns animation off or on (reduced motion)."),
     ("Upgrade", "After Battle 1, pick a hero and a die, select one of three cards, then A applies it.  Optionally swap one die per hero or change rows, then Enter starts Battle 2."),
     ("Reading the board", "HP, SH (shield), MP (mana), CR (corruption).  PSN / WKN / SPD+ show stacks and remaining activations.  The gauge bar fills to 100 by speed each tick; the Next row forecasts who acts."),
 ]
@@ -133,9 +141,10 @@ def draw_party_setup(ui: UI, ctrl: AppController) -> None:
             cls = ctrl.content.class_def(member["class_id"])
             selected = index == ctrl.selected_slot
             ui.panel(26, y, 410, 78, fill=Theme.PANEL_ALT, border=Theme.ACCENT if selected else Theme.BORDER, width=2 if selected else 1)
-            ui.button(f"slot:{index}:select", 34, y + 8, 180, 62, f"{index + 1}. {cls['name']}",
+            ui.sprite(ui.assets.combatant_key(member["class_id"]), 30, y + 11, 56, 56)
+            ui.button(f"slot:{index}:select", 90, y + 8, 124, 62, f"{index + 1}. {cls['name']}",
                       lambda i=index: setattr(ctrl, "selected_slot", i), selected=selected,
-                      sublabel=f"HP {cls['max_hp']}  SPD {cls['speed']}  MP {cls['start_mana']}/{cls['max_mana']}",
+                      sublabel=f"HP {cls['max_hp']}  SPD {cls['speed']}",
                       tooltip=f"Inspect {cls['name']}: stats, abilities and dice.")
             ui.button(f"slot:{index}:row", 222, y + 8, 110, 62, f"Row: {member['row'].capitalize()}",
                       lambda i=index: ctrl.toggle_party_row(i), sublabel="toggle",
@@ -169,6 +178,7 @@ def draw_party_setup(ui: UI, ctrl: AppController) -> None:
         class_id = class_ids[0]
     info = ctrl.class_view(class_id)
     ui.panel(458, 60, 806, 606, f"Class: {info['name']}")
+    ui.sprite(ui.assets.combatant_key(class_id), 1186, 66, 70, 70)
     x, y = 472.0, 88.0
     ui.text(x, y, f"HP {info['start_hp']}/{info['max_hp']}    Speed {info['speed']}    Initiative {info['base_initiative']}    "
             f"Mana {info['start_mana']}/{info['max_mana']}    Corruption {info['start_corruption']}/{info['max_corruption']}    "
@@ -242,9 +252,18 @@ def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float
     ui.register(key, rect, action, enabled, reason, _combatant_tooltip(c), hotkeys)
 
     fill = Theme.PANEL_ALT if standing else (26, 26, 30)
-    border = Theme.ACCENT if active else side_color if standing else Theme.FAINT
+    if active:
+        glow = ui.anim.pulse()  # the acting card's border breathes between accent and white
+        border = tuple(int(a + (255 - a) * 0.55 * glow) for a in Theme.ACCENT)
+    else:
+        border = side_color if standing else Theme.FAINT
     ui.panel(x, y, w, h, fill=fill, border=border, width=3 if active else 1)
     ui.decorate(key, rect, enabled)
+    sprite_key = ui.assets.combatant_key(c["archetype_id"])
+    if standing or c["side"] == "hero":
+        ui.sprite(sprite_key, x + 3, y + 21, 44, 44, variant="" if standing else "grey")
+    else:
+        ui.sprite("marker_downed", x + 3, y + 21, 44, 44)
 
     tag = ""
     if not standing:
@@ -259,21 +278,25 @@ def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float
     if tag:
         ui.text(x + w - 6, y + 3, tag, 14, Theme.ACCENT if tag.startswith(("TARGET", "ACTING")) else Theme.BAD, bold=True, align="right")
 
-    ui.bar(x + 6, y + 22, 100, 11, c["hp"], c["max_hp"], Theme.GOOD if standing else Theme.FAINT)
-    ui.text(x + 112, y + 19, f"HP {c['hp']}/{c['max_hp']}", 14, Theme.TEXT)
+    shown_hp = ui.anim.shown_hp(c["id"], c["hp"])
+    ui.bar(x + 50, y + 22, 60, 11, shown_hp, c["max_hp"], Theme.GOOD if standing else Theme.FAINT)
+    ui.text(x + 114, y + 19, f"HP {c['hp']}/{c['max_hp']}", 14, Theme.TEXT)
     ui.text(x + w - 6, y + 19, f"SH {c['shields']}", 14, Theme.SHIELD if c["shields"] else Theme.FAINT, bold=bool(c["shields"]), align="right")
     if c["side"] == "hero":
         backlash = "!" if c.get("corruption_backlash") else ""
-        ui.text(x + 6, y + 36, f"MP {c['mana']}/{c['max_mana']}", 14, Theme.MANA)
-        ui.text(x + 78, y + 36, f"CR {c['corruption']}/{c['max_corruption']}{backlash}", 14, Theme.BAD if backlash else Theme.CORRUPT, bold=bool(backlash))
+        ui.text(x + 50, y + 36, f"MP {c['mana']}/{c['max_mana']}", 14, Theme.MANA)
+        ui.text(x + 106, y + 36, f"CR {c['corruption']}/{c['max_corruption']}{backlash}", 14, Theme.BAD if backlash else Theme.CORRUPT, bold=bool(backlash))
         ui.text(x + w - 6, y + 36, f"React {c['reaction_charges']}", 14, Theme.TEXT if c["reaction_charges"] else Theme.FAINT, align="right")
     else:
-        ui.text(x + 6, y + 36, f"SPD {c['speed']}   {c['row'].capitalize()} row", 14, Theme.DIM)
-    ui.bar(x + 6, y + 56, 70, 8, min(c["gauge"], view["ready_threshold"]), view["ready_threshold"], Theme.GAUGE)
-    ui.text(x + 80, y + 51, f"G{c['gauge']}", 13, Theme.FAINT)
+        ui.text(x + 50, y + 36, f"SPD {c['speed']}   {c['row'].capitalize()} row", 14, Theme.DIM)
+    ui.bar(x + 50, y + 56, 44, 8, min(c["gauge"], view["ready_threshold"]), view["ready_threshold"], Theme.GAUGE)
+    ui.text(x + 98, y + 51, f"G{c['gauge']}", 13, Theme.FAINT)
+    kinds = list(dict.fromkeys(status["kind"] for status in c["statuses"]))
+    for position, kind in enumerate(kinds[:3]):  # badges at the character's feet; the text below stays
+        ui.sprite(ui.assets.status_key(kind), x + 2 + position * 15, y + 52, 16, 16)
     statuses = _status_text(c)
     if statuses:
-        ui.text(x + w - 6, y + 51, statuses, 13, Theme.WARN, bold=True, align="right", max_width=110)
+        ui.text(x + w - 6, y + 51, statuses, 13, Theme.WARN, bold=True, align="right", max_width=96)
 
 
 def draw_formation(ui: UI, ctrl: AppController, view: dict[str, Any], targeting: dict[str, Any] | None) -> None:
@@ -300,8 +323,11 @@ def draw_center(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
     if intent is not None:
         ui.panel(478, 88, 324, 104, "Enemy intent (committed)", border=Theme.ENEMY, width=2)
         state = "CANCELLED" if intent["cancelled"] else "elite-resistant" if intent["elite_resistant"] else "interruptible" if intent["interruptible"] else "not interruptible"
-        ui.text(488, 110, f"{intent['actor_name']}: {intent['name']}", 16, Theme.TEXT, bold=True, max_width=304)
-        ui.text(488, 130, f"{intent['glyph']} {intent['power']}: {intent['text']}", 14, Theme.DIM, max_width=304)
+        actor_archetype = next((c["archetype_id"] for c in view["combatants"] if c["id"] == intent["actor_id"]), "")
+        ui.sprite(ui.assets.combatant_key(actor_archetype), 760, 106, 36, 36)
+        ui.sprite(ui.assets.category_key(intent["category"]), 722, 106, 36, 36)
+        ui.text(488, 110, f"{intent['actor_name']}: {intent['name']}", 16, Theme.TEXT, bold=True, max_width=230)
+        ui.text(488, 130, f"{intent['glyph']} {intent['power']}: {intent['text']}", 14, Theme.DIM, max_width=230)
         ui.text(488, 148, "Targets: " + ", ".join(intent["target_names"]), 14, Theme.ACCENT, max_width=304)
         mods = []
         if intent["damage_reduction"]:
@@ -326,6 +352,7 @@ def draw_center(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
 
 def draw_header(ui: UI, ctrl: AppController, view: dict[str, Any], fast: bool) -> None:
     names = {c["id"]: c["name"] for c in view["combatants"]}
+    archetypes = {c["id"]: c["archetype_id"] for c in view["combatants"]}
     ui.panel(0, 0, 1280, 40, fill=(12, 13, 18), border=(12, 13, 18))
     ui.text(12, 9, f"Battle {view['battle']} of {view['battle_count']}", 20, Theme.ACCENT, bold=True)
     actor = names.get(view["active_combatant_id"] or "", "nobody")
@@ -337,8 +364,10 @@ def draw_header(ui: UI, ctrl: AppController, view: dict[str, Any], fast: bool) -
     for position, cid in enumerate(view["forecast"][:8]):
         name = names.get(cid, cid)
         hero = cid.startswith("h")
-        ui.panel(x, 46, 146, 28, fill=Theme.PANEL, border=Theme.HERO if hero else Theme.ENEMY)
-        ui.text(x + 5, 53, f"{position + 1}. {name}", 13, Theme.TEXT, max_width=138)
+        ui.panel(x, 46, 146, 28, fill=Theme.PANEL, border=Theme.ACCENT if position == 0 else Theme.HERO if hero else Theme.ENEMY,
+                 width=2 if position == 0 else 1)
+        ui.sprite(ui.assets.combatant_key(archetypes.get(cid, "")), x + 3, 49, 22, 22)
+        ui.text(x + 28, 53, name, 13, Theme.TEXT, max_width=114)
         x += 151
 
 
@@ -357,7 +386,9 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
     inspect = ctrl.inspect_die
     for index, die in enumerate(turn["dice"][:2]):
         x = 16 + index * 256
-        face = die["face"]
+        tumbling = ui.anim.is_tumbling(die["die_id"])
+        shown_index = ui.anim.tumbling_face(die["die_id"], die["die_size"], die["face_index"])
+        face = die["die"]["faces"][shown_index] if tumbling else die["face"]
         in_plan = die["die_id"] in drafted
         awaiting = ctrl.targeting_die == die["die_id"]
         if awaiting:
@@ -369,18 +400,22 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
         ui.text(x + 8, 505, f"Die {index + 1}: {die['die_name']}", 14, Theme.DIM, bold=True, max_width=150)
         state = "KEPT" if die["kept"] else "will reroll"
         ui.text(x + 240, 505, state, 14, Theme.ACCENT if die["kept"] else Theme.FAINT, bold=die["kept"], align="right")
-        ui.text(x + 8, 524, f"{face['glyph']}  {face['name']}", 20, CATEGORY_COLORS[face["category"]], bold=True, max_width=232)
-        ui.paragraph(x + 8, 550, face["text"], 232, 14, Theme.TEXT, line_height=17, max_lines=2)
-        detail = f"Face {die['face_index'] + 1}/{die['die_size']}"
+        ui.sprite(ui.assets.category_key(face["category"]), x + 4, 521, 44, 44)
+        ui.sprite(ui.assets.die_key(die["die_size"]), x + 200, 521, 44, 44)
+        ui.text(x + 52, 533, f"{face['glyph']}  {face['name']}", 17, CATEGORY_COLORS[face["category"]], bold=True, max_width=146)
+        ui.paragraph(x + 8, 567, face["text"], 232, 14, Theme.TEXT, line_height=15, max_lines=2)
+        detail = f"Face {shown_index + 1}/{die['die_size']}"
         if face["action_speed"] is not None:
             detail += f"   speed {face['action_speed']}   target: {face['target_label']}"
-        ui.text(x + 8, 588, detail, 13, Theme.FAINT, max_width=232)
-        if die["reason"]:
-            ui.text(x + 8, 606, die["reason"], 13, Theme.WARN, bold=True, max_width=232)
+        ui.text(x + 8, 598, detail, 13, Theme.FAINT, max_width=232)
+        if tumbling:
+            ui.text(x + 8, 612, "ROLLING ...", 13, Theme.ACCENT, bold=True)
+        elif die["reason"]:
+            ui.text(x + 8, 612, die["reason"], 13, Theme.WARN, bold=True, max_width=232)
         elif in_plan:
-            ui.text(x + 8, 606, "IN PLAN", 13, Theme.ACCENT, bold=True)
+            ui.text(x + 8, 612, "IN PLAN", 13, Theme.ACCENT, bold=True)
         elif awaiting:
-            ui.text(x + 8, 606, "CHOOSE A TARGET", 13, Theme.ACCENT, bold=True)
+            ui.text(x + 8, 612, "CHOOSE A TARGET", 13, Theme.ACCENT, bold=True)
         keep_key = (pygame.K_z, pygame.K_x)[index]
         ui.button(f"die:{die['die_id']}:keep", x + 8, 628, 112, 48, "Unkeep" if die["kept"] else "Keep",
                   lambda d=die["die_id"]: ctrl.toggle_keep(d), selected=die["kept"], hotkeys=(keep_key,),
@@ -475,6 +510,7 @@ def draw_reactions(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
 
 def draw_battle(ui: UI, ctrl: AppController, fast: bool) -> None:
     view = ctrl.view()
+    ui.backdrop(0, 80, 1280, 394)
     draw_header(ui, ctrl, view, fast)
     targeting = None
     waiting = view["needs_input"]
@@ -487,9 +523,13 @@ def draw_battle(ui: UI, ctrl: AppController, fast: bool) -> None:
     else:
         ui.panel(8, 476, 1264, 214, "Resolving")
         ui.text(640, 560, PHASE_LABELS.get(view["combat_phase"], view["combat_phase"]) + " ...", 24, Theme.DIM, bold=True, align="center")
-        ui.text(640, 600, "Space steps immediately.  F toggles fast mode.", 15, Theme.FAINT, align="center")
+        ui.text(640, 600, "Space steps immediately.  F toggles fast mode.  M toggles animation.", 15, Theme.FAINT, align="center")
     draw_formation(ui, ctrl, view, targeting)
     draw_center(ui, ctrl, view)
+    for floater, progress in ui.anim.active_floaters():
+        rect = ui.rect_of(f"unit:{floater.target_id}")
+        if rect is not None:
+            ui.floating_text(rect, floater.text, floater.colour, progress, floater.lane)
     status_bar(ui, ctrl, "your decision" if waiting else "resolving")
 
 
@@ -503,6 +543,7 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
     upgrade = view["upgrade"]
     chosen = upgrade["upgrade_chosen"]
     ui.text(20, 12, "Recovery and Upgrade", 28, Theme.ACCENT, bold=True)
+    ui.sprite("chest", 372, 8, 40, 40)
     step = "Step 2 of 2: optional swap and rows, then start Battle 2." if chosen else "Step 1 of 2: choose one dice upgrade (required)."
     ui.text(420, 22, step, 17, Theme.TEXT, bold=True)
 
@@ -621,6 +662,12 @@ def draw_outcome(ui: UI, ctrl: AppController) -> None:
     records = "   ".join(f"Battle {r['battle']}: {r['outcome']} ({r['activations']} activations, {r['ticks']} ticks)" for r in outcome["battle_records"])
     ui.text(640, 146, records, 15, Theme.DIM, align="center", max_width=1200)
 
+    party = [c for c in ctrl.view()["combatants"] if c["side"] == "hero"]
+    for position, hero in enumerate(party[:5]):
+        ui.sprite(ui.assets.combatant_key(hero["archetype_id"]), 190, 190 + position * 64, 60, 60,
+                  variant="" if hero["state"] == "standing" else "grey")
+        ui.text(260, 212 + position * 64, "standing" if hero["state"] == "standing" else "DOWNED", 13,
+                Theme.DIM if hero["state"] == "standing" else Theme.BAD)
     ui.panel(340, 180, 600, 330, "Combat metrics")
     y = 210.0
     for key, label in STAT_LABELS:
