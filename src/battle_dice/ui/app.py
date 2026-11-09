@@ -22,8 +22,9 @@ class GameApp:
     def __init__(self, controller: AppController | None = None, size: tuple[int, int] = (LOGICAL_W, LOGICAL_H),
                  headless: bool = False):
         if headless:
-            os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-            os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+            for variable in ("SDL_VIDEODRIVER", "SDL_AUDIODRIVER"):
+                if not os.environ.get(variable):
+                    os.environ[variable] = "dummy"
         pygame.display.init()
         pygame.font.init()
         self.controller = controller or AppController()

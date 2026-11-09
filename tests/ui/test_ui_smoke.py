@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import os
 
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+for _variable in ("SDL_VIDEODRIVER", "SDL_AUDIODRIVER"):
+    if not os.environ.get(_variable):  # unset or empty: run without a display or sound device
+        os.environ[_variable] = "dummy"
 
 import pygame  # noqa: E402
 import pytest  # noqa: E402
