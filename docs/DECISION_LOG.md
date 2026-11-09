@@ -83,8 +83,8 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 
 ## 6. Acceptance evidence
 
-267 automated tests pass on the reference environment (Linux container, Python 3.12.3,
-pygame-ce 2.5.8): 144 unit, 78 fixture, 36 integration, 9 headless UI. `ruff` and `mypy` are clean.
+268 automated tests pass on the reference environment (Linux container, Python 3.12.3,
+pygame-ce 2.5.8): 144 unit, 78 fixture, 36 integration, 10 headless UI. `ruff` and `mypy` are clean.
 
 | Criterion | Evidence |
 |-----------|----------|

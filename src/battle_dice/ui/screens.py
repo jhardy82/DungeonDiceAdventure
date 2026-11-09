@@ -480,7 +480,9 @@ def draw_battle(ui: UI, ctrl: AppController, fast: bool) -> None:
     waiting = view["needs_input"]
     if view["reaction"] is not None:
         draw_reactions(ui, ctrl, view)
-    elif view["hero_turn"] is not None and view["combat_phase"] in (CombatPhase.HERO_ROLL, CombatPhase.KEEP_REROLL):
+    elif view["hero_turn"] is not None and view["combat_phase"] in (
+        CombatPhase.HERO_ROLL, CombatPhase.KEEP_REROLL, CombatPhase.ACTION_PLAN
+    ):
         targeting = draw_planner(ui, ctrl, view)
     else:
         ui.panel(8, 476, 1264, 214, "Resolving")

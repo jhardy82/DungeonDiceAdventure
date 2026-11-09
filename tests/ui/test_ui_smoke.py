@@ -304,3 +304,22 @@ def test_unhandled_engine_error_shows_a_recoverable_screen(tmp_path, monkeypatch
     assert driver.ctrl.screen == Screen.MAIN_MENU and driver.ctrl.engine is None
     driver.press("menu:new")
     assert driver.ctrl.screen == Screen.PARTY_SETUP
+
+
+def test_planner_stays_usable_if_a_plan_was_set_but_not_committed(tmp_path):
+    """ACTION_PLAN is an input phase: the planner must still be shown so the player is never stuck."""
+    driver = Driver(tmp_path, seed=11)
+    start_party(driver, ("squire",))
+    driver.press("party:begin")
+    for _ in range(40):
+        driver.run_to_input()
+        if "plan:roll" in driver.app.ui.keys():
+            break
+        driver.press("react:skip")
+    driver.press("plan:roll")
+    assert driver.ctrl.engine.do("SetActionPlan", actions=[]).accepted  # plan set, commit never sent
+    driver.app.frame(0)
+    assert driver.ctrl.waiting_for_player()
+    assert {"plan:confirm", "plan:pass"} <= set(driver.app.ui.keys())
+    driver.press("plan:pass")
+    assert driver.ctrl.engine.combat.turn is None or driver.ctrl.engine.combat.turn.committed

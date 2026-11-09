@@ -75,7 +75,7 @@ control to read what it does; a disabled control shows why it is unavailable.
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 267 tests: unit, T01-T16 fixtures, integration, headless UI
+python -m pytest                 # 268 tests: unit, T01-T16 fixtures, integration, headless UI
 python -m ruff check src tests
 python -m mypy src/battle_dice/core src/battle_dice/rng.py src/battle_dice/content src/battle_dice/sim src/battle_dice/app
 ```

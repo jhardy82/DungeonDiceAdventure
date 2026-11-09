@@ -8,6 +8,7 @@ become a recoverable error screen instead of a crash.
 
 from __future__ import annotations
 
+import copy
 import os
 import time
 import traceback
@@ -22,7 +23,7 @@ from battle_dice.core.events import summarize, write_jsonl
 from battle_dice.core.models import ROW_BACK, ROW_FRONT, CombatPhase, RunPhase
 from battle_dice.core.progression import face_from_plain
 from battle_dice.core.replay import export_run
-from battle_dice.core.view import combat_log, die_view, face_view, snapshot
+from battle_dice.core.view import combat_log, die_view, face_view, hero_turn_view, snapshot
 
 
 class Screen:
@@ -134,7 +135,8 @@ class AppController:
         owner: tuple[str | None, int] = (None, -1)
         if engine is not None and engine.started and engine.state.phase == RunPhase.BATTLE:
             combat = engine.combat
-            if combat.turn is not None and combat.phase in (CombatPhase.HERO_ROLL, CombatPhase.KEEP_REROLL):
+            planning_phases = (CombatPhase.HERO_ROLL, CombatPhase.KEEP_REROLL, CombatPhase.ACTION_PLAN)
+            if combat.turn is not None and combat.phase in planning_phases:
                 owner = (combat.turn.hero_id, combat.activation_count)
         if owner != self._draft_owner:
             self._draft_owner = owner
@@ -248,8 +250,6 @@ class AppController:
     def _turn_view(self) -> dict[str, Any] | None:
         if self.engine is None or not self.engine.started or self.engine.state.phase != RunPhase.BATTLE:
             return None
-        from battle_dice.core.view import hero_turn_view
-
         return hero_turn_view(self.engine)
 
     def roll(self) -> None:
@@ -459,8 +459,6 @@ class AppController:
         """Before/after die views (faces and probabilities) for an upgrade card."""
         engine = self.engine
         assert engine is not None
-        import copy
-
         before = engine.die_for(offer["hero_id"], offer["die_id"])
         after = copy.deepcopy(before)
         after.faces[offer["face_index"]] = face_from_plain(offer["after"])
