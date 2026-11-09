@@ -131,3 +131,27 @@ def test_snapshot_is_available_in_every_phase_of_a_run(content):
             CombatPhase.ACTION_PLAN, CombatPhase.LOCK_PLAN, CombatPhase.ACTION_RESOLVE, CombatPhase.ENEMY_INTENT,
             CombatPhase.REVEAL_INTENT, CombatPhase.ENEMY_RESOLVE, CombatPhase.ACTOR_END,
             CombatPhase.TERMINAL_CHECK} <= phases
+
+
+def test_simulator_matrix_is_identical_for_any_job_count_and_accepts_a_content_dir(content, tmp_path):
+    import json
+
+    from battle_dice.content.loader import load_documents
+    from battle_dice.sim.runner import main, run_matrix
+
+    serial = run_matrix(content, [0, 1], [1], "heuristic")
+    parallel = run_matrix(content, [0, 1], [1], "heuristic", jobs=2)
+    for key in ("overall", "by_party_size", "by_composition", "content_hash"):
+        assert serial[key] == parallel[key]
+    assert serial["overall"]["runs"] == 6 and sum(v["runs"] for v in serial["by_composition"].values()) == 6
+
+    # A candidate fixture set in a folder is validated and measured without touching the packaged content.
+    documents = load_documents()
+    documents["encounters"]["encounters"]["1"][0]["enemies"][0]["overrides"] = {"max_hp": 60}
+    for name, document in documents.items():
+        (tmp_path / f"{name}.json").write_text(json.dumps(document), encoding="utf-8")
+    out = tmp_path / "result.json"
+    assert main(["--seeds", "1", "--sizes", "1", "--content-dir", str(tmp_path), "--out", str(out)]) == 0
+    result = json.loads(out.read_text(encoding="utf-8"))
+    assert result["content_hash"] != content.content_hash and result["content_dir"] == str(tmp_path)
+    assert result["overall"]["runs"] == 3
