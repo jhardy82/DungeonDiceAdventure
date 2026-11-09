@@ -324,3 +324,28 @@ def test_planner_stays_usable_if_a_plan_was_set_but_not_committed(tmp_path):
     assert {"plan:confirm", "plan:pass"} <= set(driver.app.ui.keys())
     driver.press("plan:pass")
     assert driver.ctrl.engine.combat.turn is None or driver.ctrl.engine.combat.turn.committed
+
+
+def test_smoke_test_flag_plays_a_full_headless_run(tmp_path, capsys):
+    from battle_dice.__main__ import main
+
+    report = tmp_path / "smoke.txt"
+    assert main(["--smoke-test", "--smoke-out", str(report)]) == 0
+    text = report.read_text(encoding="utf-8")
+    assert text.startswith("SMOKE TEST OK: outcome=")
+    assert "'battle'" in text and "'outcome'" in text and "frozen=False" in text
+    assert "SMOKE TEST OK" in capsys.readouterr().out
+
+
+def test_packaged_builds_log_to_the_user_data_folder(monkeypatch, tmp_path):
+    import sys
+
+    from battle_dice.app import controller as controller_module
+
+    monkeypatch.delenv("BATTLE_DICE_LOG_DIR", raising=False)
+    assert controller_module.default_log_dir().name == "logs"
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    assert controller_module.default_log_dir() == tmp_path / "BattleDice" / "logs"
+    monkeypatch.setenv("BATTLE_DICE_LOG_DIR", str(tmp_path / "custom"))
+    assert controller_module.default_log_dir() == tmp_path / "custom"

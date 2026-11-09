@@ -37,6 +37,36 @@ Options:
 | `--seed N` | Use root seed `N` for every run, so dice and enemy choices repeat exactly. |
 | `--size 1280x720` | Window size. Minimum supported is `960x540`; the window is resizable. |
 | `--log-dir PATH` | Folder for JSONL event logs (default `./logs`, or `BATTLE_DICE_LOG_DIR`). |
+| `--smoke-test` | Play one hidden, seeded run through the real UI and exit 0 on success. No window opens. |
+
+## Play on Windows
+
+Two routes. Neither has been launched on a physical Windows display by the author of this
+repository; both are built and smoke-tested on a Windows CI runner.
+
+**1. Launcher (from a checkout, needs Python 3.15).** Double-click `Play-BattleDice.cmd`, or run:
+
+```powershell
+.\scripts\Start-BattleDice.ps1
+```
+
+The launcher finds Python 3.15, creates `.venv` on first run, installs the game only when
+`pyproject.toml` has changed, then starts it. It never installs Python or changes machine
+settings. Options: `-Seed 123`, `-Size 960x540`, `-LogDir PATH`, `-Reinstall`, `-NoLaunch`.
+
+**2. Standalone app (no Python needed).** Open the latest successful **Package (Windows)** run
+under the repository's Actions tab, download the `BattleDice-windows-x64` artifact, unzip it, and
+run `BattleDice\BattleDice.exe`.
+
+- The app is **unsigned**, so Windows SmartScreen will warn on first run ("More info", then
+  "Run anyway").
+- Workflow artifacts expire (90 days by default); re-run the workflow to rebuild.
+- Event logs go to `%LOCALAPPDATA%\BattleDice\logs`.
+- `BattleDice.exe --smoke-test --smoke-out result.txt` plays one hidden run and writes the result,
+  which is how the build is verified.
+
+To build it yourself: `python -m pip install ".[package]"`, then
+`python -m PyInstaller packaging/battle_dice.spec --noconfirm` (output in `dist\BattleDice`).
 
 ## How to play
 
@@ -125,6 +155,8 @@ src/battle_dice/
   app/controller.py   application state machine (menus, drafts, feedback), no pygame
   sim/                heuristic and random policies, seed-matrix runner
   ui/                 pygame-ce presentation: toolkit, screens, app shell
+scripts/              Start-BattleDice.ps1 launcher (Windows)
+packaging/            PyInstaller entry point and spec for the standalone app
 docs/DECISION_LOG.md  interpretations, authored catalogs, deviations, measured evidence
 ```
 
@@ -138,4 +170,4 @@ action-gauge timeline, staged reactions, Poison, Weaken, mana, corruption, shiel
 explicit revival, recovery, one mandatory upgrade and one optional swap per hero.
 
 Deferred: save and resume across restarts, d10 / d12 / d20, class unlocks and levelling,
-procedural encounters, packaged releases, controller support, art and audio.
+procedural encounters, signed installers and published releases, controller support, art and audio.

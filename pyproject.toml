@@ -19,6 +19,9 @@ dev = [
     "ruff>=0.17.4",
     "mypy>=2.4",
 ]
+package = [
+    "pyinstaller>=6.22.3",
+]
 
 [project.scripts]
 battle-dice = "battle_dice.__main__:main"

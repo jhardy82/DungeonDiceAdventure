@@ -69,6 +69,7 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 |----|-----------|
 | V-01 | The PRD text is **not** vendored into `docs/`. It was supplied as pasted text with tab-separated tables, and a retyped copy could not be guaranteed byte-faithful to the owner's canonical document. The owner should add the canonical file as `docs/BD-PRD-MVP-001.md`. |
 | V-02 | The rules engine orchestrator (`core/engine.py`) is committed with WP-06, where all of its dependencies exist, rather than as a skeleton in WP-02. Unit tests that need the engine land with WP-06; the T01-T16 fixtures and integration tests land with WP-08. |
+| V-03 | **Scope added by the owner, 2026-11-09:** Windows packaging, which the PRD lists as outside the MVP. Two routes ship: a source launcher (`scripts/Start-BattleDice.ps1`, `Play-BattleDice.cmd`) and a PyInstaller one-folder build produced by the `Package (Windows)` workflow. Not included: code signing, an installer, or published releases. The app is unsigned and is distributed only as a workflow artifact. |
 
 ## 5. Presentation choices (section 13, DD)
 
@@ -81,6 +82,8 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 | U-05 | State is never conveyed by color alone: numeric HP/SH/MP/CR, text tags (ACTING, DOWNED, TARGET n, KEPT, IN PLAN), a hatch pattern on disabled controls, and a ring plus pointer on the focused control. Disabled controls show their reason in the status bar on hover or focus, and when activated. |
 | U-06 | A system sans-serif is used when available, with pygame's bundled font as fallback. Text is truncated with an ellipsis rather than overflowing. |
 | U-07 | Run seeds come from the clock in the application layer (or `--seed`). The rules engine never reads the clock. |
+| U-08 | `--smoke-test` plays one seeded run through the real UI with no window and exits 0 on success. It is the verification step for packaged builds: it proves the bundled content, pygame-ce and fonts load inside the frozen app. |
+| U-09 | A packaged (frozen) build writes event logs to `%LOCALAPPDATA%\\BattleDice\\logs`, because its own folder may be read-only. From source the default stays `./logs`. |
 
 ## 6. Acceptance evidence
 

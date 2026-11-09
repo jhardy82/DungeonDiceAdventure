@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 import os
+import sys
 import time
 import traceback
 from pathlib import Path
@@ -46,6 +47,21 @@ FALLBACK_TEXT = {
 }
 
 
+def default_log_dir() -> Path:
+    """Where JSONL event logs go when no folder is given.
+
+    From source this is ``./logs``. A packaged build may live in a read-only folder, so it uses
+    the per-user application data folder instead.
+    """
+    override = os.environ.get("BATTLE_DICE_LOG_DIR")
+    if override:
+        return Path(override)
+    if getattr(sys, "frozen", False):
+        base = os.environ.get("LOCALAPPDATA") or str(Path.home())
+        return Path(base) / "BattleDice" / "logs"
+    return Path.cwd() / "logs"
+
+
 def default_seed() -> int:
     """A fresh run seed. Chosen by the application layer, never by the rules engine."""
     return time.time_ns() & 0xFFFFFFFF
@@ -68,8 +84,7 @@ class AppController:
         self.error_text = ""
         self.fixed_seed = fixed_seed
         self._seed_source = seed_source or default_seed
-        env_dir = os.environ.get("BATTLE_DICE_LOG_DIR")
-        self.log_dir = Path(log_dir) if log_dir is not None else Path(env_dir) if env_dir else Path.cwd() / "logs"
+        self.log_dir = Path(log_dir) if log_dir is not None else default_log_dir()
         self.log_path: Path | None = None
         self.log_error: str | None = None
         self.runs_started = 0
@@ -111,6 +126,10 @@ class AppController:
             return False
         self._sync_screen()
         return True
+
+    def refresh(self) -> None:
+        """Re-derive the current screen from engine state (for callers that drove the engine directly)."""
+        self._guard(self._sync_screen)
 
     def _sync_screen(self) -> None:
         engine = self.engine
