@@ -67,3 +67,86 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 | ID | Deviation |
 |----|-----------|
 | V-01 | The PRD text is **not** vendored into `docs/`. It was supplied as pasted text with tab-separated tables, and a retyped copy could not be guaranteed byte-faithful to the owner's canonical document. The owner should add the canonical file as `docs/BD-PRD-MVP-001.md`. |
+| V-02 | The rules engine orchestrator (`core/engine.py`) is committed with WP-06, where all of its dependencies exist, rather than as a skeleton in WP-02. Unit tests that need the engine land with WP-06; the T01-T16 fixtures and integration tests land with WP-08. |
+
+## 5. Presentation choices (section 13, DD)
+
+| ID | Choice |
+|----|--------|
+| U-01 | Layout is authored on a 1280x720 logical canvas and scaled uniformly, letterboxed, to the window. The window is resizable and clamped to at least 960x540. |
+| U-02 | Immediate-mode widgets: each frame is rebuilt from an engine snapshot, and input is routed to the widgets of the last drawn frame. Rendering never mutates state or draws random numbers (covered by a test). |
+| U-03 | The plan is a local draft in the controller until Confirm, which sends `SetActionPlan` then `CommitActionPlan`. Rerolling removes drafted actions on rerolled dice. |
+| U-04 | Automatic combat steps play on a 260 ms timer (25 ms in fast mode). This deliberate pacing is outside the engine latency target. |
+| U-05 | State is never conveyed by color alone: numeric HP/SH/MP/CR, text tags (ACTING, DOWNED, TARGET n, KEPT, IN PLAN), a hatch pattern on disabled controls, and a ring plus pointer on the focused control. Disabled controls show their reason in the status bar on hover or focus, and when activated. |
+| U-06 | A system sans-serif is used when available, with pygame's bundled font as fallback. Text is truncated with an ellipsis rather than overflowing. |
+| U-07 | Run seeds come from the clock in the application layer (or `--seed`). The rules engine never reads the clock. |
+
+## 6. Acceptance evidence
+
+267 automated tests pass on the reference environment (Linux container, Python 3.12.3,
+pygame-ce 2.5.8): 144 unit, 78 fixture, 36 integration, 9 headless UI. `ruff` and `mypy` are clean.
+
+| Criterion | Evidence |
+|-----------|----------|
+| AC-01 party 1-5, duplicates, rows | `unit/test_commands.py` (party size and row tests) |
+| AC-02 exact dice and stats, distinct scheduling | `unit/test_content.py`, `fixtures/test_t02_three_class_combo.py` |
+| AC-03 faces, frequencies, probabilities, seeded rolls | `unit/test_content.py`, `unit/test_dice_and_planning.py` |
+| AC-04 keep / reroll | `unit/test_dice_and_planning.py`, `unit/test_commands.py` |
+| AC-05 class caps, plan lock, discard | `unit/test_dice_and_planning.py` |
+| AC-06 deterministic timeline, speed change keeps gauge | `unit/test_timeline.py`, `fixtures/test_t11_speed_reorder.py` |
+| AC-07 action speed orders standard actions only | `unit/test_dice_and_planning.py` (free-policy tests) |
+| AC-08 formation targeting | `unit/test_targeting_effects.py` |
+| AC-09 retarget and cancel | `fixtures/test_t07_target_fallback.py` |
+| AC-10 intent reveal and stage windows | `unit/test_enemy_ai.py`, `fixtures/test_t05_reaction_stages.py` |
+| AC-11 Guard, Resource, Interrupt, charges, elite resistance | `fixtures/test_t05_reaction_stages.py`, `fixtures/test_t06_interrupt_resistance.py` |
+| AC-12 shields, Poison, Weaken, mana, corruption | `unit/test_targeting_effects.py`, `fixtures/test_t08_poison_lethal.py`, `fixtures/test_t10_corruption_tradeoff.py` |
+| AC-13 revival and final-party-down defeat | `fixtures/test_t09_revival.py`, `fixtures/test_t15_terminal_edges.py` |
+| AC-14 both battles per party size, mandatory upgrade | `fixtures/test_t14_party_scaling.py`, `fixtures/test_t13_upgrade_swap.py` |
+| AC-15 bench swap keeps the upgrade | `fixtures/test_t13_upgrade_swap.py` |
+| AC-16 recovery, persistence, restart | `fixtures/test_t12_two_battle_persistence.py`, `fixtures/test_t13_upgrade_swap.py` |
+| AC-17 both outcomes, no soft locks or negative resources | `integration/test_full_runs.py` (invariants checked after every command) |
+| AC-18 seed replay | `fixtures/test_t16_seed_replay.py` |
+| AC-19 mouse and keyboard, supported resolutions, disabled reasons | `ui/test_ui_smoke.py` |
+
+Not verified here: the game has not been launched on a physical Windows display. The engine,
+content and headless UI tests run on a Windows CI runner; interactive feel, font rendering and
+window behaviour on Windows remain to be confirmed by the owner.
+
+## 7. Measured balance and latency (not balance claims)
+
+Command: `battle-dice-sim --seeds 20 --policy <policy>`. Seeds 0-19, every class composition for
+each party size (55 compositions, 1,100 runs per policy), heroes in their suggested rows,
+content 1.0.0.
+
+| Party size | Runs | Heuristic policy wins | Random policy wins |
+|-----------:|-----:|----------------------:|-------------------:|
+| 1 | 60 | 60 (100.0%) | 41 (68.3%) |
+| 2 | 120 | 119 (99.2%) | 58 (48.3%) |
+| 3 | 200 | 187 (93.5%) | 103 (51.5%) |
+| 4 | 300 | 293 (97.7%) | 159 (53.0%) |
+| 5 | 420 | 407 (96.9%) | 212 (50.5%) |
+
+- **Heuristic policy:** keeps the dice in its best-scoring plan, rerolls the rest, always reacts
+  when it can. **Random policy:** uniformly random legal decisions.
+- **Reading:** legal parties of every size can win under informed play, and uninformed play loses
+  about half the time, so losses are possible. This is two scripted policies over 20 seeds, not
+  human playtesting.
+- **Latency:** 791,204 engine transitions, median 0.25 ms, p95 0.45 ms on the reference
+  container, against the proposed target of under 100 ms. The figure includes the policy's own
+  decision time averaged over the commands it sent, so the engine alone is faster. It was not
+  measured on the Windows target machine.
+
+### Observations for the owner (no fixture was changed)
+
+1. **Solo runs never lost to the heuristic in this sample (60 of 60).** A lone hero faces one
+   Goblin and then a reduced Captain, and can out-shield or out-pace their damage.
+2. **The exact AI policy in 14.4 front-loads setup actions.** Priority 20 beats priority 10, so a
+   Goblin uses Dirty Trick whenever a reachable hero has no Weaken, a Hex Adept uses Poison Dart
+   whenever a hero has no Poison, and the Captain opens with War Cry. Enemy damage in the first
+   activations is therefore low. This is implemented exactly as specified.
+3. **Disrupt cancels a basic action outright for 1 mana once per Scout activation**, and the
+   Scout is the fastest unit, which removes a large share of Battle 1 enemy actions.
+
+If a tighter challenge is wanted, candidates to evaluate with the simulator are the priority-20
+rule, Disrupt's cost, and the solo encounter stats. Each would be a versioned content or rules
+change with the acceptance tests rerun.
