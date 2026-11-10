@@ -51,9 +51,16 @@ repository; both are built and smoke-tested on a Windows CI runner.
 .\scripts\Start-BattleDice.ps1
 ```
 
-The launcher finds Python 3.15, creates `.venv` on first run, installs the game only when
+The launcher finds Python 3.15 (the `py` launcher, `python` on PATH, the standard install
+folders, then the registry), creates `.venv` on first run, installs the game only when
 `pyproject.toml` has changed, then starts it. It never installs Python or changes machine
-settings. Options: `-Seed 123`, `-Size 960x540`, `-LogDir PATH`, `-Reinstall`, `-NoLaunch`.
+settings. If it cannot find Python 3.15, for example because an older Python comes first on
+PATH, it lists what it did find; pass the interpreter directly with
+`-Python C:\path\to\python.exe`. Other options: `-Seed 123`, `-Size 960x540`, `-LogDir PATH`,
+`-Reinstall`, `-NoLaunch`.
+
+Tip: keep the checkout outside OneDrive or other synced folders. Syncing the thousands of files
+in `.venv` is slow and can lock files while the game is being installed.
 
 **2. Standalone app (no Python needed).** Open the latest successful **Package (Windows)** run
 under the repository's Actions tab, download the `BattleDice-windows-x64` artifact, unzip it, and

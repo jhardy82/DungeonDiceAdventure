@@ -65,6 +65,7 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 | E-09 | Rules text shown to the player is generated from face data (`view.describe_face`), so it cannot drift from behaviour. |
 | E-10 | The golden RNG vectors in `tests/golden/rng_vectors.json` are locked to the current rules version (label updated to 1.1.0; the vectors are unchanged because the RNG algorithm is unchanged). The raw generator is also checked against the published PCG32 reference output (seed 42, sequence 54). |
 | E-11 | Rule fixtures (T01-T13, T15 and the engine unit tests) run on the shipped rules data with the encounter table frozen at its rules-1.1.0 values (`tests/golden/encounters_mechanics.json`), so a balance retune does not rewrite tests about rules. The shipped table itself is asserted exactly in `unit/test_content.py` and `fixtures/test_t14_party_scaling.py`, and full-run, replay, simulator and UI tests use the shipped content. |
+| E-12 | **Owner direction, 2026-11-10: use the most updated Node.** The game has no Node code; Node is only the runtime of the GitHub Actions used in CI. They are pinned to their newest majors, all of which run on Node 24: `actions/checkout@v7`, `actions/setup-python@v7`, `actions/upload-artifact@v7` (previously `v4` / `v5` / `v4` on Node 20, end of life 2026-04-30). Node 26 is the newest Node LTS, but no released major of these actions declares a `node26` runtime, so Node 24 is the newest the project can select. |
 
 ## 4. Deviations from the plan
 

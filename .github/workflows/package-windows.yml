@@ -23,9 +23,9 @@ jobs:
     env:
       PYTHONUTF8: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.15"
 
@@ -56,6 +56,60 @@ jobs:
           if (-not (Select-String -Path launcher-second.txt -Pattern 'already installed and up to date' -Quiet)) {
             Write-Error 'The second launcher run should have found everything in place.'; exit 1
           }
+
+      - name: Launcher accepts an explicit -Python path and rebuilds from it
+        shell: powershell
+        run: |
+          $exe = (Get-Command python).Source
+          .\scripts\Start-BattleDice.ps1 -Python $exe -Reinstall -NoLaunch 6>&1 | Tee-Object -FilePath launcher-explicit.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $text = (Get-Content -Raw launcher-explicit.txt) -replace '\s+', ' '
+          if ($text -notmatch 'Creating \.venv with Python 3\.15') {
+            Write-Error 'The launcher should have rebuilt .venv from the explicit Python.'; exit 1
+          }
+
+      - name: Launcher finds Python 3.15 when it is not on PATH (install folder and registry search)
+        shell: powershell
+        run: |
+          # Hide every python and the py launcher from PATH, then register this interpreter the way an
+          # installer does (PEP 514), so only the registry search can find it.
+          $exe = (Get-Command python).Source
+          $key = 'HKCU:\Software\Python\BattleDiceCI\3.15'
+          New-Item -Path "$key\InstallPath" -Force | Out-Null
+          Set-ItemProperty -Path "$key\InstallPath" -Name 'ExecutablePath' -Value $exe
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          if ((Get-Command python -ErrorAction SilentlyContinue) -or (Get-Command py -ErrorAction SilentlyContinue)) {
+            Write-Error 'python or py is still on PATH; the test would prove nothing.'; exit 1
+          }
+          .\scripts\Start-BattleDice.ps1 -Reinstall -NoLaunch -Verbose 6>&1 4>&1 | Tee-Object -FilePath launcher-registry.txt
+          $code = $LASTEXITCODE
+          Remove-Item -Path 'HKCU:\Software\Python\BattleDiceCI' -Recurse -Force
+          if ($code -ne 0) { exit $code }
+          $text = (Get-Content -Raw launcher-registry.txt) -replace '\s+', ' '
+          if ($text -notmatch 'Creating \.venv with Python 3\.15') {
+            Write-Error 'The launcher should have found Python 3.15 without PATH.'; exit 1
+          }
+          if ($text -notmatch 'Using [A-Za-z]:\\') {
+            Write-Error 'Python 3.15 should have been found by path (install folder or registry), not by a command on PATH.'; exit 1
+          }
+
+      - name: Launcher explains what it found when Python 3.15 is missing
+        shell: powershell
+        run: |
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          # cmd merges the child's stderr into plain text, so the message is compared as the player sees it.
+          $output = cmd /c "powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Start-BattleDice.ps1 -Python C:\no\such\python.exe -Reinstall -NoLaunch 2>&1" | Out-String
+          $code = $LASTEXITCODE
+          Write-Output $output
+          if ($code -ne 1) { Write-Error "Expected exit code 1, got $code."; exit 1 }
+          $flat = $output -replace '\s+', ' '
+          if ($flat -notmatch '\[Battle Dice\] The -Python path is not a working Python 3\.15\. No other Python was found either\.') {
+            Write-Error 'The failure message should be one plain line saying the -Python path is not a working Python 3.15.'; exit 1
+          }
+          if ($flat -match 'CategoryInfo|FullyQualifiedErrorId') {
+            Write-Error 'The failure message should not be wrapped in a PowerShell error record.'; exit 1
+          }
+          exit 0
 
       - name: Double-click wrapper runs the launcher
         shell: cmd
@@ -89,7 +143,7 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path 'dist\BattleDice' -DestinationPath 'BattleDice-windows-x64.zip'
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: BattleDice-windows-x64
           path: BattleDice-windows-x64.zip
