@@ -440,9 +440,13 @@ a difference under 10 points counted as noise, 20 or more as support).
 - **Known limit:** a party of five Squires wins about 16%. Options for the owner later: a rule
   change to Weaken (for example a shorter duration on slow heroes) or to recovery between battles.
 
-**Effect on the playtest findings** (personas, `docs/PLAYTEST.md`): on the candidate the upgrade
-choice is worth 7.9 points (was 1.2) and careless rerolling costs 21.5 (was 4.0); the bench die
-still changes nothing (+0.8). A newcomer still wins about 9%.
+**Confirmation.** The official runner on the packaged content reproduces the table above
+party by party on all three blocks. Engine latency in those runs: median 0.17-0.18 ms, p95
+0.27-0.30 ms, maximum 97 ms.
+
+**Effect on the playtest findings** (personas on 1.3.0, `docs/PLAYTEST.md` section 9): the
+upgrade choice is now worth 7.5 points (was 1.2) and careless rerolling costs 22.5 (was 4.0); the
+bench die still changes nothing (+0.8). A newcomer still wins about 9%.
 
 **Margins are thin.** One enemy health point moved five Squires by 20 points in tuning. Rule
 fixtures are unaffected by this change: they use class, dice and encounter numbers frozen in
