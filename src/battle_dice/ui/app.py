@@ -34,6 +34,7 @@ class GameApp:
         self.running = True
         self.fast = False
         self._timer = 0.0
+        self.render_faults = 0  # frames whose drawing raised; the smoke test requires this to stay 0
         self.headless = headless
         self.surface = self._set_mode(size)
         pygame.display.set_caption("Battle Dice")
@@ -55,7 +56,13 @@ class GameApp:
         if event.type == pygame.VIDEORESIZE:
             self.surface = self._set_mode((event.w, event.h))
             return
-        if event.type == pygame.KEYDOWN and self.controller.screen == Screen.BATTLE:
+        try:
+            self._route(event)
+        except Exception:  # noqa: BLE001 - an input fault must reach the error screen, not close the window
+            self.controller.fail()
+
+    def _route(self, event: pygame.event.Event) -> None:
+        if event.type == pygame.KEYDOWN and self.controller.screen == Screen.BATTLE and not self.controller.paused:
             if event.key == pygame.K_f:
                 self.fast = not self.fast
                 self.controller.info("Fast mode on." if self.fast else "Fast mode off.")
@@ -64,7 +71,7 @@ class GameApp:
                 self.ui.anim.enabled = not self.ui.anim.enabled
                 self.controller.info("Animation on." if self.ui.anim.enabled else "Animation off (reduced motion).")
                 return
-            if event.key == pygame.K_SPACE and self.ui.focus_key is None and not self.controller.waiting_for_player():
+            if event.key == pygame.K_SPACE and not self.controller.waiting_for_player():
                 self._timer = 1e9  # step on the next update
                 return
         self.ui.handle_event(event)
@@ -73,7 +80,11 @@ class GameApp:
 
     def update(self, dt_ms: float) -> None:
         controller = self.controller
-        self._animate(dt_ms)
+        try:
+            self._animate(dt_ms)
+        except Exception:  # noqa: BLE001 - an animation fault must reach the error screen
+            controller.fail()
+            return
         if controller.screen == Screen.BATTLE and not controller.waiting_for_player():
             self._timer += dt_ms
             delay = FAST_DELAY_MS if self.fast else STEP_DELAY_MS
@@ -105,6 +116,8 @@ class GameApp:
                 screens.draw_controls(ui, controller)
             elif screen == Screen.PARTY_SETUP:
                 screens.draw_party_setup(ui, controller)
+            elif controller.paused and screen in (Screen.BATTLE, Screen.UPGRADE):
+                screens.draw_pause(ui, controller)
             elif screen == Screen.BATTLE:
                 screens.draw_battle(ui, controller, self.fast)
             elif screen == Screen.UPGRADE:
@@ -114,10 +127,8 @@ class GameApp:
             else:
                 screens.draw_error(ui, controller)
         except Exception:  # noqa: BLE001 - a rendering fault must leave a usable error screen
-            import traceback
-
-            controller.error_text = traceback.format_exc()
-            controller.screen = Screen.ERROR
+            controller.fail()
+            self.render_faults += 1
             ui.begin(self.surface)
             screens.draw_error(ui, controller)
         ui.end()

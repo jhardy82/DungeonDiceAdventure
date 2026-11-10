@@ -1,6 +1,6 @@
 # Battle Dice MVP: Decision Log
 
-Contract: **BD-PRD-MVP-001 v1.0.0** (2026-11-09). Rules version `1.1.0`, content version `1.2.0`,
+Contract: **BD-PRD-MVP-001 v1.0.0** (2026-11-09). Rules version `1.1.1`, content version `1.2.1`,
 RNG `BD-PCG32-v1`.
 
 This log records (1) how gaps and contradictions between *delegated default* (DD) statements in
@@ -19,8 +19,8 @@ tests, and add an entry here.
 | D-01 | 8.1 / 8.2 Steadfast | **Owner decision, 2026-11-09 (rules 1.1.0):** +1 shield on every Defense **die** action the Squire takes, on itself or an ally. The Interpose reaction is not a die action and gets no bonus. | Supersedes the 1.0.0 reading (self only). The PRD prose says "its own selected Defense die actions (not to Guard reactions)"; the owner chose that broader reading over the face table's "if self". |
 | D-02 | 5.4 reroll | A reroll rerolls **all** unkept dice. | Q71 is approved (A) and wins over the "selected unkept die" sentence. |
 | D-03 | 5.5 Channel and Cast | The second action must be a **non-Resource** category (Attack, Defense, Healing, Status). Resource + Resource is not a legal two-action plan. | "Any other legal category" read as "other than Resource". Narrower reading. |
-| D-04 | 9.2 / 9.3 stack cap | At the cap, the oldest stack is refreshed to the applied duration **only if that raises it**, and the refreshed stack then counts as the newest. | Makes "refresh the oldest" rotate through stacks instead of touching the same one forever. |
-| D-05 | 14.4 "unrefreshable cap" | A status application is illegal for the AI only when the target is at the stack cap **and** every stack already has at least the applied duration. | Follows from D-04: that is exactly when applying changes nothing. |
+| D-04 | 9.2 / 9.3 stack cap | **Changed in rules 1.1.1 (MVP review, 2026-11-10).** At the cap, each further stack refreshes the stack with the **least time left** (the oldest on a tie) to the applied duration, only if that raises it; the refreshed stack then counts as the newest. | Rules 1.0-1.1.0 tried only the oldest stack. With mixed durations (a duration-3 face next to duration-2 faces, reachable after the upgrade) the application did nothing while a newer stack was about to expire, and it disagreed with D-05. Choosing the shortest stack is the only rule under which "applying changes nothing" is exactly D-05. |
+| D-05 | 14.4 "unrefreshable cap" | A status application is illegal for the AI only when the target is at the stack cap **and** every stack already has at least the applied duration. | With D-04 as of rules 1.1.1 that is exactly when applying changes nothing; a test checks the two against each other for every combination of durations. |
 | D-06 | 14.4 priority 20 | Granted when at least one eligible target has **zero** stacks of the status the action applies (and for War Cry while no speed modifier is active). | The PRD says "its proposed target" but targets are chosen after the action; this is the equivalent test. |
 | D-07 | 6.2 / 9.2 Poison at start | If Poison downs or defeats the actor at activation start, the activation ends immediately. A downed hero's status durations are **not** decremented for that activation. | 10: "do not tick activation-based effects while downed". |
 | D-08 | 12.1 enemy ranges | **Owner decision, 2026-11-09 (rules 1.1.0):** Dirty Trick is **ranged** and can reach back-row heroes. Slash and Strike are melee. Shadow Bolt, Poison Dart, Corrupt Mark and Blight Wave are ranged. | Supersedes the 1.0.0 reading (Dirty Trick melee). The PRD gives ranges only for damage. |
@@ -31,6 +31,7 @@ tests, and add an entry here.
 | D-13 | 9.6 Speed Up | Re-applying while active refreshes the duration; it never stacks. The AI treats a repeat as illegal (14.4). | "Stacking is not used in the MVP". |
 | D-14 | 12.1 Corrupt Mark | Legal even if every target is at the corruption cap; the AI only *prefers* targets with room. | 14.4 lists it as a preference, not a legality rule. |
 | D-15 | 5.7 area effects | At resolution an area action hits the committed targets that are still eligible; if none remain it is cancelled. | Consistent with "committed targets" plus fallback. |
+| D-20 | 14.4 area actions | **Rules 1.1.1.** An area enemy action that also applies a status keeps every eligible target; the status legality filter (D-05) no longer removes heroes from its damage. Such an action is illegal only when it would do nothing at all (no status would change and it has no other effect). | The filter used to drop a hero at an unrefreshable cap from the committed targets, so that hero also escaped the damage. No shipped action is affected (Blight Wave carries no status). |
 | D-16 | 7.2 cooldowns | No enemy ability cooldowns are authored, so none are implemented. | The PRD mentions cooldowns only as a general possibility. Deferred (F). |
 | D-17 | 9.4 enemy mana | Mana costs are charged to heroes only. Enemies have no mana pool. | 9.4: "Enemies in the initial fixtures do not use player mana pools". |
 | D-18 | 13 runtime | **Python 3.15 or newer is required** (`requires-python = ">=3.15"`), replacing the PRD's delegated default of "Python 3.12+". CI, the lint target and the type-check target are pinned to the 3.15 line, so new 3.15.x patches are picked up but 3.16 is not adopted automatically. | Owner direction (2026-11-09): use the newest stable Python. 3.15.2 was the newest stable build in GitHub's `actions/python-versions` manifest on that date; 3.16 was alpha only. |
@@ -63,9 +64,15 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 | E-07 | The weighted enemy draw is always consumed, even when the top tier holds a single action, so the enemy stream position does not depend on tier size. |
 | E-08 | `Engine.force_draws()` queues forced bounded results for a stream. It exists only for fixtures (11.2: "fixture tests can force a known catalog order"); forced draws are logged as `<stream>:forced` and do not advance the PCG stream. |
 | E-09 | Rules text shown to the player is generated from face data (`view.describe_face`), so it cannot drift from behaviour. |
-| E-10 | The golden RNG vectors in `tests/golden/rng_vectors.json` are locked to the current rules version (label updated to 1.1.0; the vectors are unchanged because the RNG algorithm is unchanged). The raw generator is also checked against the published PCG32 reference output (seed 42, sequence 54). |
+| E-10 | The golden RNG vectors in `tests/golden/rng_vectors.json` are locked to the current rules version (label 1.1.1; the vectors are unchanged because the RNG algorithm is unchanged). The raw generator is also checked against the published PCG32 reference output (seed 42, sequence 54). |
 | E-11 | Rule fixtures (T01-T13, T15 and the engine unit tests) run on the shipped rules data with the encounter table frozen at its rules-1.1.0 values (`tests/golden/encounters_mechanics.json`), so a balance retune does not rewrite tests about rules. The shipped table itself is asserted exactly in `unit/test_content.py` and `fixtures/test_t14_party_scaling.py`, and full-run, replay, simulator and UI tests use the shipped content. |
 | E-12 | **Owner direction, 2026-11-10: use the most updated Node.** The game has no Node code; Node is only the runtime of the GitHub Actions used in CI. They are pinned to their newest majors, all of which run on Node 24: `actions/checkout@v7`, `actions/setup-python@v7`, `actions/upload-artifact@v7` (previously `v4` / `v5` / `v4` on Node 20, end of life 2026-04-30). Node 26 is the newest Node LTS, but no released major of these actions declares a `node26` runtime, so Node 24 is the newest the project can select. |
+| E-13 | **Command and view safety (MVP review, 2026-11-10).** `Engine.do()` skips ids a replayed log already used, so it works on an engine rebuilt by `replay()`. A command id resubmitted with the same type and parameters is acknowledged as a duplicate; reused for a different command it is rejected. The command log stores its own copy of each command's parameters and the handler gets another, so neither the caller nor the state can change the log. Snapshots and controller views are copies: changing one cannot change the state or the content (tested by emptying every container in a snapshot). |
+| E-14 | **Stricter content validation (content 1.2.1).** The loader now rejects, before a run can start: a reaction-only effect (`interrupt`) on a die face or enemy action; a Poison or Weaken stack cap below 1; the same die listed twice on a class; a revival that restores 0 HP; a tag the engine does not know (a misspelled `interruptible` used to make an action silently unreactable); an executable face with target scope `none`; a reaction effect that reactions do not implement, or one missing its amount or its resisted values; encounter overrides that leave an enemy with no weighted action; a `power` override on an action whose effect has its own `amount`; and inverted speed or party-size limits. Each case has a test. |
+| E-15 | **Keys nothing read were removed (content 1.2.1).** `statuses.*.default_duration` is gone: durations live on the faces that apply a status. `statuses.speed_up.stack_cap` is fixed at 1 in the schema, because Speed Up never stacks (D-13). `upgrades.mandatory_upgrades_per_run` was already fixed at 1 in the schema. |
+| E-16 | **Run logs are replayable (PRD 14.5).** The JSONL header carries the ordered commands, so the file alone reproduces the run. `battle-dice-replay LOG` (or `python -m battle_dice.replay_cli`) replays it on a fresh engine and checks the rules version, the content hash, the event-log hash, the final-state hash and every event line. Logs written before this change have no commands and say so when verified. |
+| E-17 | **Pinned runs.** `tests/golden/replay_pin.json` records the hashes of three fixed-seed heuristic runs on the shipped content. Every test run on Linux and Windows compares against it, so unintended drift in rules, content or random-number use fails. An intended change bumps a version and regenerates the pin with `python tools/update_replay_pin.py`. |
+| E-18 | Status follow-up events (`status_applied`, `status_refreshed`) carry the affected combatant in `id`, as every other follow-up event does, and the stack in `status_id`. Before, the stack id overwrote `id`, so the event's after-state was empty. |
 
 ## 4. Deviations from the plan
 
@@ -75,6 +82,8 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 | V-02 | The rules engine orchestrator (`core/engine.py`) is committed with WP-06, where all of its dependencies exist, rather than as a skeleton in WP-02. Unit tests that need the engine land with WP-06; the T01-T16 fixtures and integration tests land with WP-08. |
 | V-03 | **Scope added by the owner, 2026-11-09:** Windows packaging, which the PRD lists as outside the MVP. Two routes ship: a source launcher (`scripts/Start-BattleDice.ps1`, `Play-BattleDice.cmd`) and a PyInstaller one-folder build produced by the `Package (Windows)` workflow. Not included: code signing, an installer, or published releases. The app is unsigned and is distributed only as a workflow artifact. |
 | V-04 | **Scope added by the owner, 2026-11-09:** a pixel-art graphics pass with animation, using Kenney CC0 packs. The PRD lists original art as not required. Characters, enemies, action icons and dungeon tiles are from Kenney's Tiny Dungeon (CC0). The pack has no goblin and no polyhedral dice, so the Goblin is a recoloured Tiny Dungeon tile and the d4 / d6 / d8 dice plus the Weaken and Speed Up icons are original. Panels and buttons keep the existing flat style; a pixel-art UI reskin is not included. |
+| V-05 | **MVP review, 2026-11-10.** The owner asked for a full review, then chose to build all of it: the UI fix pass, test hardening, replayable logs, launcher fixes, and every latent engine and content defect; and asked for a class-balance tuning proposal before any content change. The owner authorised merging the resulting pull requests. Findings that were judged design questions rather than defects are listed in section 8 and were not changed. |
+| V-06 | **Launcher behaviour (2026-11-10).** A usable Python is found before an existing `.venv` is removed, so a failed `-Reinstall` keeps the install. Python 3.15 or newer is accepted (3.15 is tried first; free-threaded and 32-bit builds are skipped because pygame-ce may have no wheel for them). The install record includes the checkout folder and the launcher checks that the game imports, so a moved checkout or a `.venv` without the game is repaired. `-SmokeTest` runs the hidden self-check through the normal start-up path. `Play-BattleDice.cmd` pauses on any non-zero exit code. Verified only on the Windows CI runner. |
 
 ## 5. Presentation choices (section 13, DD)
 
@@ -87,25 +96,40 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 | U-05 | State is never conveyed by color alone: numeric HP/SH/MP/CR, text tags (ACTING, DOWNED, TARGET n, KEPT, IN PLAN), a hatch pattern on disabled controls, and a ring plus pointer on the focused control. Disabled controls show their reason in the status bar on hover or focus, and when activated. |
 | U-06 | A system sans-serif is used when available, with pygame's bundled font as fallback. Text is truncated with an ellipsis rather than overflowing. |
 | U-07 | Run seeds come from the clock in the application layer (or `--seed`). The rules engine never reads the clock. |
-| U-08 | `--smoke-test` plays one seeded run through the real UI with no window and exits 0 on success. It is the verification step for packaged builds: it proves the bundled content, pygame-ce and fonts load inside the frozen app. |
+| U-08 | `--smoke-test` plays one seeded run with no window and exits 0 on success. Menus are driven by real key events, the pause menu is opened and closed, a unit card is pointed at so the inspect panel is drawn, and every frame of the run is drawn; battle decisions come from the heuristic policy sent straight to the engine, so the run reliably reaches the upgrade and outcome screens. It fails on any frame whose drawing raised, on any visit to the error screen, and on a missing sprite. It is the verification step for packaged builds (content, pygame-ce and sprites load inside the frozen app). It does not prove a bundled-font fallback: the runner has system fonts. |
 | U-09 | A packaged (frozen) build writes event logs to `%LOCALAPPDATA%\\BattleDice\\logs`, because its own folder may be read-only. From source the default stays `./logs`. |
 | U-10 | Sprites are 16x16 and are scaled by whole numbers only (nearest-neighbour); panels and text keep the fractional UI scale. Card and planner slots are sized so characters draw at 2x at both 960x540 and 1280x720. |
 | U-11 | Art lives in `ui/assets` with a manifest (file, source pack, tile number, any modification) and a credits file. The mapping from class or enemy to sprite is presentation data, not rules content, so the content hash and replays do not change. Tests fail if a file is unlisted, uncredited, or not CC0. |
 | U-12 | Animation reads the engine's event log and frame time only. It never calls the engine or its random streams (covered by a test). `M` and `--no-animation` turn it off; fast mode shortens it. The dice tumble cycles through the die's own faces by elapsed time and then shows the real result. |
 | U-13 | A missing sprite draws a visible placeholder box and is recorded, never raising. The smoke test fails if any sprite is missing, so packaged builds prove the art was bundled. |
+| U-14 | **Focus and Enter (MVP review, 2026-11-10).** Only Tab and the arrow keys move the focus ring. Hotkeys and clicks do not, and a click clears it. With a ring, Enter or Space activates the ringed control; with none, Enter activates the screen's default button. A ringed control with nothing to do (a unit card outside targeting) does not swallow Enter. Esc runs the screen's cancel action, or clears the ring when there is none. Before this, any hotkey or click moved the ring, so Enter repeated the last control instead of confirming. |
+| U-15 | **Reaction panel.** One row per reacting hero (at most five) with that reaction's eligible allies as buttons on the row; a reaction that needs no ally shows its effect there instead. Mouse: one click on the ally. Keyboard: the row's number, then the ally's number; Esc cancels the choice. The earlier one-row-per-pair list ran off the panel with five heroes and showed at most four allies. |
+| U-16 | **Leaving a run.** Esc or the Menu button opens a pause menu in battle and on the upgrade screen: resume, controls, abandon to party setup, abandon to the main menu. Nothing advances while it is open. An abandoned run writes no event log. Esc still cancels a target choice first. |
+| U-17 | **Status bar.** A message that arrived since the last frame is shown until the pointer or the focus moves to a different control; after that the hot control's help text returns. Before, the tooltip of the button just used hid the reason a click was refused. |
+| U-18 | **Readable rules text.** Pointing at or focusing a unit card replaces the combat log with an inspect panel: stats, every status stack with what it does, and the full ability list (enemies) or dice, reaction and passive (heroes). Die face rules wrap onto a second line instead of being cut. Unit cards sum status stacks per kind and pick the longest form that fits (`PSN x3 (1-2)`, then `PSN 3(1-2)`, then `P3(1-2)`); the gauge number gives way before the status text can overlap it, and the gauge bar always stays. Names keep their trailing number when shortened. Font widths differ widely between machines (DejaVu Sans is about 40% wider than Liberation Sans), so these layouts are chosen by measuring the text, and the text-fit tests run under the machine's own font, DejaVu Sans where installed, and pygame's bundled font. |
+| U-19 | While a die tumbles the planner shows "Rolling ..." and no face name or rules text, so it never states a face that was not rolled. The buttons act on the real result throughout. |
+| U-20 | A log file name that already exists gets a numeric suffix, so a second session with the same `--seed` does not overwrite the first log. An unexpected crash of the main loop writes `crash-<time>.txt` in the log folder and exits 1. Faults while editing the plan, routing input or animating reach the error screen instead of closing the window. |
 
 ## 6. Acceptance evidence
 
-295 automated tests pass on the reference environment (Linux container, Python 3.15.2,
-pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 148 unit, 78 fixture, 37 integration,
-32 headless UI and graphics. `ruff` 0.17.4 and `mypy` 2.4.1 are clean with their 3.15 targets.
+432 automated tests pass on the reference environment (Linux container, Python 3.15.2,
+pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 200 unit, 78 fixture, 49 integration,
+105 headless UI and graphics. `ruff` 0.17.4 and `mypy` 2.4.1 are clean with their 3.15 targets.
 
-Before the move to 3.15 the same suite also passed on Python 3.12.3 and 3.13; those versions are
-no longer installable because of the 3.15 floor (an install attempt on 3.12.3 is refused with
-"does not satisfy Python>=3.15").
+Line coverage of the rules engine, content loader and random numbers (`battle_dice.core`,
+`battle_dice.content`, `battle_dice.rng`) is 97% against the PRD target of at least 80%. CI fails
+below 90%.
+
+An earlier version of the suite passed on Python 3.12 before the floor was raised to 3.15; older
+versions are no longer installable (an install attempt on 3.12.3 is refused with "does not
+satisfy Python>=3.15").
 
 Dependency minimums were raised to the versions verified on 3.15: `pygame-ce>=2.5.8` (its
 `cp315` wheels include `win_amd64`), `ruff>=0.17.4`, `mypy>=2.4`.
+
+The MVP review (2026-11-10) applied twelve deliberate bugs to a copy of the engine. The suite of
+that time missed eleven of them. The tests added since are listed against the criteria below and
+in `unit/test_review_fixes.py`; the result of re-running those bugs is in section 8.
 
 | Criterion | Evidence |
 |-----------|----------|
@@ -114,20 +138,20 @@ Dependency minimums were raised to the versions verified on 3.15: `pygame-ce>=2.
 | AC-03 faces, frequencies, probabilities, seeded rolls | `unit/test_content.py`, `unit/test_dice_and_planning.py` |
 | AC-04 keep / reroll | `unit/test_dice_and_planning.py`, `unit/test_commands.py` |
 | AC-05 class caps, plan lock, discard | `unit/test_dice_and_planning.py` |
-| AC-06 deterministic timeline, speed change keeps gauge | `unit/test_timeline.py`, `fixtures/test_t11_speed_reorder.py` |
+| AC-06 deterministic timeline, speed change keeps gauge | `unit/test_timeline.py`, `fixtures/test_t11_speed_reorder.py`, `unit/test_review_fixes.py` (War Cry resolved with a non-zero gauge) |
 | AC-07 action speed orders standard actions only | `unit/test_dice_and_planning.py` (free-policy tests) |
 | AC-08 formation targeting | `unit/test_targeting_effects.py` |
-| AC-09 retarget and cancel | `fixtures/test_t07_target_fallback.py` |
+| AC-09 retarget and cancel | `fixtures/test_t07_target_fallback.py`, `unit/test_review_fixes.py` (area action with no target left) |
 | AC-10 intent reveal and stage windows | `unit/test_enemy_ai.py`, `fixtures/test_t05_reaction_stages.py` |
 | AC-11 Guard, Resource, Interrupt, charges, elite resistance | `fixtures/test_t05_reaction_stages.py`, `fixtures/test_t06_interrupt_resistance.py` |
 | AC-12 shields, Poison, Weaken, mana, corruption | `unit/test_targeting_effects.py`, `fixtures/test_t08_poison_lethal.py`, `fixtures/test_t10_corruption_tradeoff.py` |
 | AC-13 revival and final-party-down defeat | `fixtures/test_t09_revival.py`, `fixtures/test_t15_terminal_edges.py` |
-| AC-14 both battles per party size, mandatory upgrade | `fixtures/test_t14_party_scaling.py`, `fixtures/test_t13_upgrade_swap.py` |
+| AC-14 both battles per party size, mandatory upgrade | `fixtures/test_t14_party_scaling.py`, `fixtures/test_t13_upgrade_swap.py`, `unit/test_review_fixes.py` (shipped Slash, Shadow Bolt and Strike damage resolved on the shipped table) |
 | AC-15 bench swap keeps the upgrade | `fixtures/test_t13_upgrade_swap.py` |
-| AC-16 recovery, persistence, restart | `fixtures/test_t12_two_battle_persistence.py`, `fixtures/test_t13_upgrade_swap.py` |
+| AC-16 recovery, persistence, restart | `fixtures/test_t12_two_battle_persistence.py`, `integration/test_replay_logs.py` (retry through the controller starts clean) |
 | AC-17 both outcomes, no soft locks or negative resources | `integration/test_full_runs.py` (invariants checked after every command) |
-| AC-18 seed replay | `fixtures/test_t16_seed_replay.py` |
-| AC-19 mouse and keyboard, supported resolutions, disabled reasons | `ui/test_ui_smoke.py` |
+| AC-18 seed replay | `fixtures/test_t16_seed_replay.py`, `integration/test_replay_logs.py` (log file replay, tamper detection, pinned hashes across platforms) |
+| AC-19 mouse and keyboard, supported resolutions, disabled reasons | `ui/test_ui_smoke.py`, `ui/test_ui_flow.py` (every documented key, Enter after hotkeys and clicks, reaction panel at both sizes, pause menu, text never cut off) |
 
 Not verified here: the game has not been launched on a physical Windows display. The engine,
 content and headless UI tests run on a Windows CI runner; interactive feel, font rendering and
@@ -198,12 +222,43 @@ No single global change put every party size in the band, which is why the table
 
 ### 7.4 Latency
 
-2,298,146 engine transitions in the 1.2.0 heuristic run: median 0.14 ms, p95 0.29 ms on the
-reference container, against the proposed target of under 100 ms. The figure includes the
-policy's own decision time averaged over the commands it sent. It was not measured on the
-Windows target machine.
+2,298,146 engine transitions in the 40-seed heuristic run on rules 1.1.1 and content 1.2.1:
+median 0.18 ms, p95 0.40 ms, maximum 96 ms on the reference container, against the proposed
+target of under 100 ms. The per-size win rates of that run are identical to section 7.1, so the
+1.1.1 rule fixes did not move the measured balance.
+
+- The figure includes the policy's own decision time averaged over the commands it sent.
+- The maximum is a single transition and depends on what else the machine is doing: an
+  independent rerun under load recorded 290 ms. The median and p95 are the stable figures.
+- It was not measured on the Windows target machine.
 
 ### 7.5 History
 
 On rules 1.0.0 (20 seeds) the heuristic won 60/60, 119/120, 187/200, 293/300 and 407/420 for
 sizes 1-5 and the random policy won 41/60, 58/120, 103/200, 159/300 and 212/420.
+
+## 8. Known limits after the MVP review (2026-11-10)
+
+Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one
+at a time to a copy of the current source and the whole suite was run against each.
+
+- Eleven now fail at least one test (before the review work, one did).
+- The twelfth cannot be caught by any test: it removes a call to `legal_revival_pending`, which
+  always returns false, because no revival can be pending once no hero is standing. The game
+  behaves the same with or without it.
+
+Reported by the review and left as they are, because they are design questions or cannot be
+checked here. Each needs an owner decision or a real Windows display.
+
+| Item | State |
+|------|-------|
+| Intent, reaction and status ids restart in Battle 2 | Event `seq` is continuous (E-05); a log reader must key on `seq` or on battle plus id. |
+| Two Scouts can both Disrupt one elite action | The reductions add. The PRD does not say whether the reduction is per intent or per reaction. |
+| Interpose is offered when the ally is already at the shield cap | It then costs mana and the charge for no gain. Grounding has a "must change something" guard; Interpose does not. |
+| A back-row Squire can never Interpose | By data (`requires_row: front`); the panel says so when it applies. |
+| A kept die can be un-kept before a later reroll | "Keep" is a per-reroll mark, as the Keep tooltip states. |
+| Key meanings change when the outcome screen appears | `M` toggles animation in battle and is Modify Party on the outcome screen; there is no input pause between them. |
+| Class balance | Parties with two or more Scouts win about 100%; all-Squire parties win 0% at size 3 and above (section 7.2). A tuning proposal is being measured; nothing changes without owner approval. |
+| Windows display | Never launched on a physical Windows display. Window resize while dragging, font rendering and behaviour at 125% or 150% scaling are unverified. |
+| Python install manager | Whether its `py` command downloads a missing Python on request is `<UNKNOWN>` here; the launcher itself never downloads or installs Python. |
+| Type checking | `mypy` covers the engine, content, simulator, controller and replay tool, not `ui/` (20 findings in `ui/screens.py`, all about lambda and float-versus-int inference). |

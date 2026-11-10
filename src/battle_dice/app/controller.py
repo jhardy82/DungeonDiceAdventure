@@ -81,7 +81,11 @@ class AppController:
         self.party: list[dict[str, str]] = []
         self.message = ""
         self.message_is_error = False
+        self.message_serial = 0  # bumped on every new message, so the status bar can tell it is new
         self.error_text = ""
+        # In-run menu (Esc). While it is open nothing in the run advances.
+        self.paused = False
+        self.pause_help = False
         self.fixed_seed = fixed_seed
         self._seed_source = seed_source or default_seed
         self.log_dir = Path(log_dir) if log_dir is not None else default_log_dir()
@@ -92,6 +96,7 @@ class AppController:
         self.draft: list[dict[str, Any]] = []
         self.targeting_die: str | None = None
         self.inspect_die: str | None = None
+        self.reaction_hero: str | None = None  # reacting hero whose target is being chosen by number key
         self._draft_owner: tuple[str | None, int] = (None, -1)
         # Upgrade screen selection.
         self.upgrade_hero: str | None = None
@@ -105,17 +110,24 @@ class AppController:
 
     def info(self, text: str) -> None:
         self.message, self.message_is_error = text, False
+        self.message_serial += 1
 
     def warn(self, text: str) -> None:
         self.message, self.message_is_error = text, True
+        self.message_serial += 1
+
+    def fail(self) -> None:
+        """Record the exception being handled and switch to the recoverable error screen."""
+        self.error_text = traceback.format_exc()
+        self.screen = Screen.ERROR
+        self.paused = self.pause_help = False
 
     def _guard(self, action: Any, *args: Any, **kwargs: Any) -> Any:
         """Run a controller action; turn an unexpected exception into the recoverable error screen."""
         try:
             return action(*args, **kwargs)
         except Exception:  # noqa: BLE001 - the UI must never crash on an engine fault
-            self.error_text = traceback.format_exc()
-            self.screen = Screen.ERROR
+            self.fail()
             return None
 
     def _send(self, command_type: str, **params: Any) -> bool:
@@ -139,6 +151,7 @@ class AppController:
         if phase in (RunPhase.VICTORY, RunPhase.DEFEAT):
             if self.screen != Screen.OUTCOME:
                 self._write_log()
+                self.info("The run is over. Retry with the same party, change the party, or return to the menu.")
             self.screen = Screen.OUTCOME
         elif phase in (RunPhase.UPGRADE, RunPhase.EQUIPMENT):
             if self.screen != Screen.UPGRADE:
@@ -162,6 +175,9 @@ class AppController:
             self.draft = []
             self.targeting_die = None
             self.inspect_die = None
+        if engine is None or not engine.started or engine.state.phase != RunPhase.BATTLE \
+                or engine.combat.phase not in CombatPhase.STAGE_BY_WINDOW:
+            self.reaction_hero = None
 
     # ----------------------------------------------------------------------------------------
     # Menus and party setup
@@ -177,8 +193,39 @@ class AppController:
     def to_main_menu(self) -> None:
         self.screen = Screen.MAIN_MENU
         self.engine = None
+        self.paused = self.pause_help = False
+        self.reaction_hero = None
         self.message = ""
+        self.message_serial += 1
         self.error_text = ""
+
+    # ----------------------------------------------------------------------------------------
+    # In-run menu
+    # ----------------------------------------------------------------------------------------
+
+    def run_in_progress(self) -> bool:
+        return self.engine is not None and self.screen in (Screen.BATTLE, Screen.UPGRADE)
+
+    def open_pause(self) -> None:
+        if self.run_in_progress():
+            self.paused, self.pause_help = True, False
+            self.info("Paused. Nothing advances while this menu is open.")
+
+    def resume(self) -> None:
+        self.paused = self.pause_help = False
+        self.info("Resumed.")
+
+    def toggle_pause_help(self) -> None:
+        self.pause_help = not self.pause_help
+
+    def abandon_to_menu(self) -> None:
+        """Give up the current run. Nothing is saved; an unfinished run writes no event log."""
+        self.to_main_menu()
+        self.info("Run abandoned.")
+
+    def abandon_to_party(self) -> None:
+        self.modify_party()
+        self.info("Run abandoned. Change the party, then begin a new run.")
 
     def party_limits(self) -> tuple[int, int]:
         limits = self.content.balance["party"]
@@ -232,6 +279,8 @@ class AppController:
             self.warn(result.reason or "The run could not be started.")
             return
         self.engine = engine
+        self.paused = self.pause_help = False
+        self.reaction_hero = None
         self.log_path = None
         self.log_error = None
         self._draft_owner = (None, -1)
@@ -246,6 +295,8 @@ class AppController:
 
     def modify_party(self) -> None:
         self.engine = None
+        self.paused = self.pause_help = False
+        self.reaction_hero = None
         self.screen = Screen.PARTY_SETUP
         self.info("Change the party, then begin a new run.")
 
@@ -254,11 +305,11 @@ class AppController:
     # ----------------------------------------------------------------------------------------
 
     def waiting_for_player(self) -> bool:
-        return self.engine is None or not self.engine.started or self.engine.needs_input()
+        return self.paused or self.engine is None or not self.engine.started or self.engine.needs_input()
 
     def auto_advance(self) -> bool:
         """Advance one automatic combat step. Returns True when a step was taken."""
-        if self.screen != Screen.BATTLE or self.engine is None or self.engine.needs_input():
+        if self.paused or self.screen != Screen.BATTLE or self.engine is None or self.engine.needs_input():
             return False
         return bool(self._guard(self._send, cmd.ADVANCE_PHASE))
 
@@ -300,6 +351,9 @@ class AppController:
 
     def use_die(self, die_id: str) -> None:
         """Add the rolled face of ``die_id`` to the draft plan (or remove it if already planned)."""
+        self._guard(self._use_die, die_id)
+
+    def _use_die(self, die_id: str) -> None:
         view = self._turn_view()
         if view is None or not view["rolled"]:
             return
@@ -331,6 +385,9 @@ class AppController:
         self._report_draft()
 
     def choose_target(self, target_id: str) -> None:
+        self._guard(self._choose_target, target_id)
+
+    def _choose_target(self, target_id: str) -> None:
         engine = self.engine
         view = self._turn_view()
         if engine is None or view is None or self.targeting_die is None:
@@ -356,7 +413,7 @@ class AppController:
     def swap_plan_order(self) -> None:
         if len(self.draft) >= 2:
             self.draft.reverse()
-            self._report_draft()
+            self._guard(self._report_draft)
 
     def clear_plan(self) -> None:
         self.draft = []
@@ -382,6 +439,27 @@ class AppController:
             return result
         intents, problem = engine.preview_plan(self.draft)
         result["problem"] = problem
+        if problem is not None:
+            # Still list what is drafted, so the player can see which action to change.
+            turn = engine.combat.turn
+            for entry in self.draft:
+                if entry["die_id"] not in turn.rolled:
+                    continue
+                face = engine.die_for(hero.id, entry["die_id"]).faces[turn.rolled[entry["die_id"]]]
+                result["ordered"].append(
+                    {
+                        "die_id": entry["die_id"],
+                        "name": face.name,
+                        "category": face.category,
+                        "action_speed": face.action_speed,
+                        "mana_cost": face.mana_cost,
+                        "text": face_view(face)["text"],
+                        "target_names": [engine.combat.combatants[t].name for t in entry["target_ids"]
+                                         if t in engine.combat.combatants],
+                        "fallback": "",
+                    }
+                )
+            return result
         mana = hero.mana
         for intent in intents:
             face = engine.intent_face(intent)
@@ -412,11 +490,14 @@ class AppController:
         return self.plan_preview()["problem"]
 
     def confirm_plan(self) -> None:
+        self._guard(self._confirm_plan)
+
+    def _confirm_plan(self) -> None:
         problem = self.confirm_problem()
         if problem:
             self.warn(problem)
             return
-        self._guard(self._commit, list(self.draft))
+        self._commit(list(self.draft))
 
     def pass_turn(self) -> None:
         self._guard(self._commit, [])
@@ -432,10 +513,29 @@ class AppController:
     # ----------------------------------------------------------------------------------------
 
     def use_reaction(self, hero_id: str, target_id: str | None = None) -> None:
+        self.reaction_hero = None
         if self._guard(self._send, cmd.USE_REACTION, hero_id=hero_id, target_id=target_id):
             self.info("Reaction used.")
 
+    def pick_reaction(self, hero_id: str, needs_target: bool, target_ids: list[str]) -> None:
+        """Keyboard path: choose the reacting hero first, then the ally by number."""
+        if not needs_target:
+            self.use_reaction(hero_id)
+        elif len(target_ids) == 1:
+            self.use_reaction(hero_id, target_ids[0])
+        elif self.reaction_hero == hero_id:
+            self.cancel_reaction_pick()
+        else:
+            self.reaction_hero = hero_id
+            self.info("Choose which ally receives the reaction: press its number or click it (Esc cancels).")
+
+    def cancel_reaction_pick(self) -> None:
+        if self.reaction_hero is not None:
+            self.reaction_hero = None
+            self.info("Reaction target selection cancelled.")
+
     def skip_stage(self) -> None:
+        self.reaction_hero = None
         if self._guard(self._send, cmd.SKIP_REACTION_STAGE):
             self.info("Stage skipped.")
 
@@ -472,7 +572,7 @@ class AppController:
         engine = self.engine
         if engine is None or self.upgrade_hero is None or self.upgrade_die is None:
             return []
-        return engine.state.upgrade_offers.get(self.upgrade_hero, {}).get(self.upgrade_die, [])
+        return copy.deepcopy(engine.state.upgrade_offers.get(self.upgrade_hero, {}).get(self.upgrade_die, []))
 
     def offer_preview(self, offer: dict[str, Any]) -> dict[str, Any]:
         """Before/after die views (faces and probabilities) for an upgrade card."""
@@ -551,15 +651,26 @@ class AppController:
         engine = self.engine
         if engine is None:
             return
-        header = {k: v for k, v in export_run(engine).items() if k != "commands"}
+        # The header carries the ordered commands, so the file alone is enough to replay the run
+        # (battle-dice-replay verifies it).
+        header = export_run(engine)
         header["command_count"] = len(engine.command_log)
         try:
-            path = self.log_dir / f"{engine.state.run_id}.jsonl"
+            path = self._free_log_path(engine.state.run_id)
             write_jsonl(path, header, engine.events)
             self.log_path = path
         except OSError as error:  # a read-only folder must not break the outcome screen
             self.log_path = None
             self.log_error = str(error)
+
+    def _free_log_path(self, run_id: str) -> Path:
+        """A log file name that does not exist yet, so an earlier session's log is never overwritten."""
+        path = self.log_dir / f"{run_id}.jsonl"
+        suffix = 2
+        while path.exists():
+            path = self.log_dir / f"{run_id}-{suffix}.jsonl"
+            suffix += 1
+        return path
 
     def outcome_view(self) -> dict[str, Any]:
         engine = self.engine
@@ -567,12 +678,12 @@ class AppController:
         return {
             "outcome": engine.state.outcome,
             "battle_reached": engine.state.encounter_index + 1,
-            "battle_records": list(engine.state.battle_records),
+            "battle_records": copy.deepcopy(engine.state.battle_records),
             "stats": summarize(engine.events),
             "seed": str(engine.state.seed),
             "log_path": str(self.log_path) if self.log_path else None,
             "log_error": self.log_error,
-            "upgrades": list(engine.state.upgrades),
+            "upgrades": copy.deepcopy(engine.state.upgrades),
         }
 
     # ----------------------------------------------------------------------------------------
@@ -590,11 +701,11 @@ class AppController:
         return combat_log(self.engine, limit)
 
     def class_view(self, class_id: str) -> dict[str, Any]:
-        cls = self.content.class_def(class_id)
+        cls = copy.deepcopy(self.content.class_def(class_id))
         return {
             "id": class_id,
             **cls,
-            "reaction_def": self.content.reactions[cls["reaction"]],
+            "reaction_def": copy.deepcopy(self.content.reactions[cls["reaction"]]),
             "dice": [die_view(self.content.die(d)) for d in cls["starting_dice"]],
             "bench": [die_view(self.content.die(d)) for d in cls["bench_dice"]],
         }

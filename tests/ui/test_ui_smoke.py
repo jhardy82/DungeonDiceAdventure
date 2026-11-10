@@ -76,6 +76,8 @@ class Driver:
         if "react:skip" in keys:
             self.panels_seen.add("reaction")
             options = [k for k in self.enabled("react:") if k != "react:skip"]
+            # Prefer a direct ally button ("react:<hero>:<ally>"); a bare row needs no target.
+            options.sort(key=lambda k: -k.count(":"))
             self.press(options[0] if options else "react:skip")
             return
         self.panels_seen.add("planner")

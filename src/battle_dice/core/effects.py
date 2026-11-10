@@ -89,13 +89,17 @@ def remove_corruption(target: Combatant, amount: int) -> int:
 def apply_status(
     ctx: Engine, source: Combatant, target: Combatant, kind: str, magnitude: int, duration: int
 ) -> list[dict[str, Any]]:
-    """Apply a status. Poison/Weaken add one instance per stack up to the cap, then refresh the oldest."""
+    """Apply a status. Poison/Weaken add one instance per stack up to the cap.
+
+    At the cap, each further stack refreshes the instance with the least time left (the oldest
+    one on a tie). That is the only choice under which "applying changes nothing" is exactly
+    ``status_unrefreshable``: every stack already has at least the new duration.
+    """
     combat = ctx.combat
     results: list[dict[str, Any]] = []
     if magnitude <= 0 or not target.standing:
         return results
     own_activation = combat.active_combatant_id == target.id
-    cap = ctx.content.status_cap(kind)
 
     def new_instance(stacks: int) -> StatusInstance:
         instance = StatusInstance(
@@ -133,15 +137,16 @@ def apply_status(
             results.append({"status": kind, "result": "applied", "id": instance.id, "stacks": magnitude, "duration": duration})
         return results
 
+    cap = ctx.content.status_cap(kind)
     for _ in range(magnitude):
         existing = target.instances_of(kind)
         if len(existing) < cap:
             instance = new_instance(1)
             results.append({"status": kind, "result": "applied", "id": instance.id, "stacks": 1, "duration": duration})
         else:
-            oldest = existing[0]
-            changed = refresh(oldest)
-            results.append({"status": kind, "result": "refreshed" if changed else "no_change", "id": oldest.id})
+            shortest = min(existing, key=lambda s: s.remaining_target_activations)  # min() keeps the oldest on a tie
+            changed = refresh(shortest)
+            results.append({"status": kind, "result": "refreshed" if changed else "no_change", "id": shortest.id})
     return results
 
 
@@ -262,7 +267,9 @@ def _apply_effect(
         applied = apply_status(ctx, actor, target, effect["status"], magnitude, effect["duration"])
         result.update({"status": effect["status"], "magnitude": magnitude, "duration": effect["duration"], "applied": applied})
         for entry in applied:
-            followups.append({"event": _STATUS_EVENTS[entry["result"]], "id": target.id, **entry})
+            # "id" is the affected combatant (as in every follow-up); the stack has its own key.
+            detail = {key: value for key, value in entry.items() if key != "id"}
+            followups.append({"event": _STATUS_EVENTS[entry["result"]], "id": target.id, "status_id": entry["id"], **detail})
     elif kind == "gain_mana":
         result["gained"] = gain_mana(target, face.effect_amount(effect))
     elif kind == "gain_corruption":

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import json
 from typing import Any
 
 from battle_dice import RNG_ALGORITHM, RULES_VERSION, rng
@@ -39,13 +40,18 @@ from battle_dice.core.models import (
 )
 
 
+def _fingerprint(command: Command) -> tuple[str, str]:
+    """What makes two submissions "the same command": its type and parameters."""
+    return command.type, json.dumps(command.params, sort_keys=True, separators=(",", ":"), default=str)
+
+
 class Engine:
     def __init__(self, content: Content | None = None):
         self.content: Content = content if content is not None else load_content()
         self._state: RunState | None = None
         self.events: list[CombatEvent] = []
         self.command_log: list[Command] = []
-        self._accepted: set[str] = set()
+        self._accepted: dict[str, tuple[str, str]] = {}  # command_id -> (type, canonical params)
         self._auto_command = 0
 
     # ----------------------------------------------------------------------------------------
@@ -113,11 +119,19 @@ class Engine:
     def do(self, command_type: str, **params: Any) -> CommandResult:
         """Convenience wrapper: submit a command with an auto-generated id at the current revision."""
         self._auto_command += 1
+        while f"auto-{self._auto_command:06d}" in self._accepted:  # a replayed log already used the low numbers
+            self._auto_command += 1
         return self.submit(Command(command_type, f"auto-{self._auto_command:06d}", self.revision, params))
 
     def submit(self, command: Command) -> CommandResult:
-        if command.command_id in self._accepted:
-            return CommandResult(True, self.revision, duplicate=True)
+        seen = self._accepted.get(command.command_id)
+        if seen is not None:
+            if seen == _fingerprint(command):
+                return CommandResult(True, self.revision, duplicate=True)  # the same command sent twice
+            return CommandResult(
+                False, self.revision,
+                reason=f"command_id '{command.command_id}' was already used by a different command.",
+            )
         problem = cmd.validate_command(command)
         if problem:
             return CommandResult(False, self.revision, reason=problem)
@@ -129,11 +143,14 @@ class Engine:
             )
         if self._state is None and command.type != cmd.START_RUN:
             return CommandResult(False, self.revision, reason="No run has been started; send StartRun first.")
+        # The log keeps its own copy of the parameters: the caller may reuse or change its lists
+        # afterwards, and the handler may keep what it is given inside the state.
+        command = dataclasses.replace(command, params=copy.deepcopy(command.params))
         backup = copy.deepcopy(self._state)
         event_count = len(self.events)
         handler = getattr(self, _HANDLERS[command.type])
         try:
-            handler(**command.params)
+            handler(**copy.deepcopy(command.params))
         except CommandRejected as rejection:
             self._state = backup
             del self.events[event_count:]
@@ -143,7 +160,7 @@ class Engine:
             del self.events[event_count:]
             raise
         self.state.revision += 1
-        self._accepted.add(command.command_id)
+        self._accepted[command.command_id] = _fingerprint(command)
         self.command_log.append(command)
         return CommandResult(True, self.revision, events=self.events[event_count:])
 

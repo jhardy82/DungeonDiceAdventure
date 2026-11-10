@@ -188,8 +188,13 @@ def test_die_view_shows_every_face_frequency_and_probability(content):
 def test_content_hash_is_stable_and_sensitive(content):
     again = build_content(load_documents())
     assert again.content_hash == content.content_hash
-    changed = content_with(lambda d: d["balance"]["shield"].update(cap=11))
-    assert changed.content_hash != content.content_hash
+    # Compare against the same documents with one value changed. (content_with builds from the
+    # frozen-encounter test documents, whose hash differs from the shipped one whatever is changed.)
+    documents = load_documents()
+    documents["balance"]["shield"]["cap"] = 11
+    assert build_content(documents).content_hash != content.content_hash
+    reverted = load_documents()
+    assert build_content(reverted).content_hash == content.content_hash
 
 
 def _expect_error(mutate, fragment):
@@ -226,8 +231,8 @@ def test_missing_document_is_reported():
 def test_versions_and_owner_rule_changes_of_1_1_0(content):
     from battle_dice import RULES_VERSION
 
-    assert RULES_VERSION == "1.1.0" and content.content_version == "1.2.0"  # 1.2.0: balance table only
-    assert {doc["content_version"] for doc in content.documents.values()} == {"1.2.0"}
+    assert RULES_VERSION == "1.1.1" and content.content_version == "1.2.1"
+    assert {doc["content_version"] for doc in content.documents.values()} == {"1.2.1"}
     assert content.classes["squire"]["passive"]["type"] == "defense_die_bonus"
     assert content.balance["upgrades"]["max_swaps_per_hero"] == 1
     assert "max_swaps_per_run" not in content.balance["upgrades"]

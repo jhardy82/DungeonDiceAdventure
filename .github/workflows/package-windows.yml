@@ -7,6 +7,7 @@ on:
       - "packaging/**"
       - "scripts/**"
       - "Play-BattleDice.cmd"
+      - ".gitattributes"
       - "pyproject.toml"
       - ".github/workflows/package-windows.yml"
   push:
@@ -68,7 +69,7 @@ jobs:
             Write-Error 'The launcher should have rebuilt .venv from the explicit Python.'; exit 1
           }
 
-      - name: Launcher finds Python 3.15 when it is not on PATH (install folder and registry search)
+      - name: Launcher finds Python 3.15 when it is not on PATH (registry search)
         shell: powershell
         run: |
           # Hide every python and the py launcher from PATH, then register this interpreter the way an
@@ -93,7 +94,7 @@ jobs:
             Write-Error 'Python 3.15 should have been found by path (install folder or registry), not by a command on PATH.'; exit 1
           }
 
-      - name: Launcher explains what it found when Python 3.15 is missing
+      - name: A failed -Reinstall says why and keeps the working .venv
         shell: powershell
         run: |
           $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
@@ -103,13 +104,53 @@ jobs:
           Write-Output $output
           if ($code -ne 1) { Write-Error "Expected exit code 1, got $code."; exit 1 }
           $flat = $output -replace '\s+', ' '
-          if ($flat -notmatch '\[Battle Dice\] The -Python path is not a working Python 3\.15\. No other Python was found either\.') {
-            Write-Error 'The failure message should be one plain line saying the -Python path is not a working Python 3.15.'; exit 1
+          if ($flat -notmatch '\[Battle Dice\] The -Python path is not a working Python 3\.15 or newer\. It does not exist or does not run\.') {
+            Write-Error 'The failure message should be one plain line saying the -Python path is not a working Python.'; exit 1
           }
-          if ($flat -match 'CategoryInfo|FullyQualifiedErrorId') {
-            Write-Error 'The failure message should not be wrapped in a PowerShell error record.'; exit 1
+          if ($flat -notmatch 'The existing \.venv was kept and still works') {
+            Write-Error 'The message should say that the existing .venv was kept.'; exit 1
           }
+          if ($flat -match 'CategoryInfo|FullyQualifiedErrorId|Removing the existing \.venv') {
+            Write-Error 'The message is wrapped in an error record, or .venv was removed before a Python was found.'; exit 1
+          }
+          & .\.venv\Scripts\python.exe -c "import battle_dice"
+          if ($LASTEXITCODE -ne 0) { Write-Error 'The .venv no longer works after the failed reinstall.'; exit 1 }
           exit 0
+
+      - name: Launcher reinstalls when the checkout was moved, and repairs a broken install
+        shell: powershell
+        run: |
+          $stampFile = '.venv\.battle-dice-install-stamp'
+          $stamp = (Get-Content -LiteralPath $stampFile -TotalCount 1).Trim()
+          # Pretend the install was made from another folder.
+          Set-Content -LiteralPath $stampFile -Value ($stamp.Split('|')[0] + '|C:\somewhere\else') -Encoding UTF8
+          .\scripts\Start-BattleDice.ps1 -NoLaunch 6>&1 | Tee-Object -FilePath launcher-moved.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Select-String -Path launcher-moved.txt -Pattern 'the checkout was moved or renamed' -Quiet)) {
+            Write-Error 'A different checkout folder in the install record should cause a reinstall.'; exit 1
+          }
+          # Remove the game from .venv behind the launcher's back.
+          & .\.venv\Scripts\python.exe -m pip uninstall -y battle-dice | Out-Null
+          .\scripts\Start-BattleDice.ps1 -NoLaunch 6>&1 | Tee-Object -FilePath launcher-repair.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Select-String -Path launcher-repair.txt -Pattern 'could not be imported from \.venv' -Quiet)) {
+            Write-Error 'A .venv without the game should be repaired.'; exit 1
+          }
+          .\scripts\Start-BattleDice.ps1 -NoLaunch 6>&1 | Tee-Object -FilePath launcher-settled.txt
+          if (-not (Select-String -Path launcher-settled.txt -Pattern 'already installed and up to date' -Quiet)) {
+            Write-Error 'After the repair the launcher should find everything in place.'; exit 1
+          }
+
+      - name: Launcher start-up path runs the game (hidden self-check), in both PowerShell editions
+        shell: pwsh
+        run: |
+          foreach ($shell in @('powershell.exe', 'pwsh.exe')) {
+            $output = & $shell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Start-BattleDice.ps1 -SmokeTest 6>&1 | Out-String
+            $code = $LASTEXITCODE
+            Write-Output $output
+            if ($code -ne 0) { Write-Error "${shell}: the launcher passed on exit code $code from the game."; exit 1 }
+            if ($output -notmatch 'SMOKE TEST OK') { Write-Error "${shell}: the game did not report a successful self-check."; exit 1 }
+          }
 
       - name: Double-click wrapper runs the launcher
         shell: cmd
@@ -125,6 +166,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install ".[package]"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m PyInstaller packaging/battle_dice.spec --noconfirm
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -139,12 +181,10 @@ jobs:
           if (-not (Select-String -Path $report -Pattern 'SMOKE TEST OK' -Quiet)) { Write-Error 'No success line in the smoke report.'; exit 1 }
           if (-not (Select-String -Path $report -Pattern 'frozen=True' -Quiet)) { Write-Error 'The smoke test did not run inside the packaged app.'; exit 1 }
 
-      - name: Zip the standalone app
-        shell: pwsh
-        run: Compress-Archive -Path 'dist\BattleDice' -DestinationPath 'BattleDice-windows-x64.zip'
-
+      # Upload the dist folder itself, so the downloaded zip unpacks straight to BattleDice\BattleDice.exe
+      # (uploading a zip made here would give a zip inside the downloaded zip).
       - uses: actions/upload-artifact@v7
         with:
           name: BattleDice-windows-x64
-          path: BattleDice-windows-x64.zip
+          path: dist/
           if-no-files-found: error

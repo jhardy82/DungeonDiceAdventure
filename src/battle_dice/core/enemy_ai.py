@@ -49,12 +49,19 @@ def evaluate_actions(ctx: Engine, enemy: Combatant) -> list[dict[str, Any]]:
         if status is not None:
             if status["status"] == STATUS_SPEED_UP:
                 # Repeating a speed modifier while it is active is illegal.
-                targets = [t for t in targets if not t.instances_of(STATUS_SPEED_UP)]
+                changeable = [t for t in targets if not t.instances_of(STATUS_SPEED_UP)]
             else:
-                targets = [
+                changeable = [
                     t for t in targets
                     if not effects.status_unrefreshable(ctx, t, status["status"], status["duration"])
                 ]
+            if face.target_scope in ("all_enemies", "all_allies"):
+                # An area action hits everyone it can reach. It is illegal only when it would do
+                # nothing at all: no status would change and it has no other effect.
+                if not changeable and all(e["type"] == "apply_status" for e in face.effects):
+                    continue
+            else:
+                targets = changeable
         if not targets:
             continue
         lethal = [t for t in targets if _is_lethal(ctx, enemy, face, t)]

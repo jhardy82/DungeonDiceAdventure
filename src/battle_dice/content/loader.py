@@ -20,6 +20,9 @@ import jsonschema
 from battle_dice.core.models import CATEGORY_BLANK, CATEGORY_HEALING, DieDefinition, FaceDefinition
 
 DOCUMENTS = ("balance", "classes", "dice", "enemies", "encounters", "upgrades")
+# Effects a die face or an enemy action may carry, and the ones a reaction implements.
+FACE_EFFECT_TYPES = ("damage", "shield", "heal", "apply_status", "gain_mana", "gain_corruption", "remove_corruption")
+REACTION_EFFECT_TYPES = ("shield", "remove_corruption", "gain_mana", "interrupt")
 _SCHEMA_DEFS = {
     "balance": "balance_file",
     "classes": "classes_file",
@@ -152,6 +155,15 @@ def build_content(documents: dict[str, Any]) -> Content:
             problems.append(f"{origin}: face '{face_id}' is can_revive but is not a Healing face")
         if raw["can_revive"] and not any(e["type"] == "heal" for e in raw["effects"]):
             problems.append(f"{origin}: face '{face_id}' is can_revive but has no heal effect")
+        if raw["can_revive"] and any(e["type"] == "heal" and e.get("amount", raw["power"]) < 1 for e in raw["effects"]):
+            problems.append(f"{origin}: face '{face_id}' is can_revive but would revive at 0 HP; its heal must be at least 1")
+        if not blank and raw["target_scope"] == "none":
+            problems.append(f"{origin}: executable face '{face_id}' needs a target scope other than 'none'")
+        for effect in raw["effects"]:
+            if effect["type"] not in FACE_EFFECT_TYPES:
+                problems.append(
+                    f"{origin}: face '{face_id}' uses effect '{effect['type']}', which only a reaction can have"
+                )
 
     for face_id, raw in face_library.items():
         check_face("dice.json", face_id, raw)
@@ -192,6 +204,9 @@ def build_content(documents: dict[str, Any]) -> Content:
                     problems.append(f"{origin} cannot use die '{die_id}' of class '{die.affinity_class}'")
                 elif die.role != role:
                     problems.append(f"{origin} lists die '{die_id}' under {key} but its role is '{die.role}'")
+        listed = raw["starting_dice"] + raw["bench_dice"]
+        if len(set(listed)) != len(listed):
+            problems.append(f"{origin} lists the same die more than once across starting_dice and bench_dice")
         if raw["start_hp"] > raw["max_hp"] or raw["start_mana"] > raw["max_mana"]:
             problems.append(f"{origin} has a starting value above its maximum")
         if raw["start_corruption"] > raw["max_corruption"]:
@@ -202,6 +217,28 @@ def build_content(documents: dict[str, Any]) -> Content:
             problems.append(f"{origin} uses the single policy but max_actions is not 1")
         if raw["passive"]["type"] == "spell_damage_at_corruption" and "threshold" not in raw["passive"]:
             problems.append(f"{origin} passive needs a threshold")
+
+    # -- reactions ---------------------------------------------------------------------------
+    for reaction_id, raw in reactions.items():
+        origin = f"classes.json: reaction '{reaction_id}'"
+        for index, effect in enumerate(raw["effects"]):
+            kind = effect["type"]
+            if kind not in REACTION_EFFECT_TYPES:
+                problems.append(f"{origin} uses effect '{kind}', which reactions do not implement")
+            elif kind == "interrupt":
+                if index != 0:
+                    problems.append(f"{origin} must list its interrupt effect first")
+                for key in ("resisted_damage_reduction", "resisted_magnitude_reduction"):
+                    if key not in effect:
+                        problems.append(f"{origin} interrupt effect needs '{key}'")
+            elif effect.get("amount", 0) < 1:
+                problems.append(f"{origin} effect '{kind}' needs an amount of at least 1")
+
+    # -- balance sanity ----------------------------------------------------------------------
+    if balance["timeline"]["min_speed"] > balance["timeline"]["max_speed"]:
+        problems.append("balance.json: timeline min_speed is above max_speed")
+    if balance["party"]["min_size"] > balance["party"]["max_size"]:
+        problems.append("balance.json: party min_size is above max_size")
 
     # -- enemies -----------------------------------------------------------------------------
     enemies = documents["enemies"]["enemies"]
@@ -233,12 +270,27 @@ def build_content(documents: dict[str, Any]) -> Content:
                 if archetype not in enemies:
                     problems.append(f"encounters.json: party size {size_key} uses unknown enemy '{archetype}'")
                     continue
-                for action_id in entry.get("overrides", {}).get("actions", {}):
+                action_overrides = entry.get("overrides", {}).get("actions", {})
+                for action_id, changed in action_overrides.items():
                     if action_id not in enemies[archetype]["actions"]:
                         problems.append(
                             f"encounters.json: party size {size_key} overrides unknown action "
                             f"'{action_id}' of enemy '{archetype}'"
                         )
+                    elif "power" in changed and any("amount" in e for e in enemies[archetype]["actions"][action_id]["effects"]):
+                        problems.append(
+                            f"encounters.json: party size {size_key} overrides the power of '{action_id}' of enemy "
+                            f"'{archetype}', but that action has an effect with its own amount, which the override would not change"
+                        )
+                weights = {
+                    action_id: action_overrides.get(action_id, {}).get("weight", action["weight"])
+                    for action_id, action in enemies[archetype]["actions"].items()
+                }
+                if not any(weight > 0 for weight in weights.values()):
+                    problems.append(
+                        f"encounters.json: party size {size_key} battle {battle['battle']} leaves enemy '{archetype}' "
+                        "with no action of positive weight"
+                    )
             encounters[int(size_key)][battle["battle"]] = copy.deepcopy(battle["enemies"])
 
     # -- upgrades ----------------------------------------------------------------------------
