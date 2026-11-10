@@ -6,6 +6,7 @@ commands back; it never touches the authoritative ``CombatState`` directly (sect
 
 from __future__ import annotations
 
+import copy
 from fractions import Fraction
 from typing import Any
 
@@ -184,9 +185,9 @@ def combatant_view(engine: Engine, c: Combatant) -> dict[str, Any]:
         cls = engine.content.class_def(c.archetype_id)
         view["class_name"] = cls["name"]
         view["dice"] = [die_view(engine.die_for(c.id, d)) for d in c.equipped_dice_ids]
-        view["scheduling"] = cls["scheduling"]
-        view["passive"] = cls["passive"]
-        view["reaction"] = {"id": cls["reaction"], **engine.content.reactions[cls["reaction"]]}
+        view["scheduling"] = copy.deepcopy(cls["scheduling"])
+        view["passive"] = copy.deepcopy(cls["passive"])
+        view["reaction"] = {"id": cls["reaction"], **copy.deepcopy(engine.content.reactions[cls["reaction"]])}
         view["corruption_backlash"] = c.corruption >= balance["corruption"]["backlash_threshold"]
     else:
         view["actions"] = [
@@ -235,7 +236,7 @@ def hero_turn_view(engine: Engine) -> dict[str, Any] | None:
     for option in options:
         option["face"] = face_view(option["face"])
         option["die"] = die_view(engine.die_for(hero.id, option["die_id"]))
-    scheduling = engine.content.class_def(hero.archetype_id)["scheduling"]
+    scheduling = copy.deepcopy(engine.content.class_def(hero.archetype_id)["scheduling"])
     return {
         "hero_id": hero.id,
         "hero_name": hero.name,
@@ -263,7 +264,7 @@ def upgrade_view(engine: Engine) -> dict[str, Any]:
     swaps_left = {hero.id: max(0, swap_limit - state.swaps_used.get(hero.id, 0)) for hero in heroes}
     result: dict[str, Any] = {
         "upgrade_chosen": bool(state.upgrades),
-        "upgrades": list(state.upgrades),
+        "upgrades": copy.deepcopy(state.upgrades),
         "swaps_remaining": sum(swaps_left.values()),
         "swaps_per_hero": swap_limit,
         "heroes": [],
@@ -284,7 +285,7 @@ def upgrade_view(engine: Engine) -> dict[str, Any]:
                 "swaps_remaining": swaps_left[hero.id],
                 "equipped": [
                     {"die": die_view(engine.die_for(hero.id, d)), "locked": d in locked,
-                     "offers": state.upgrade_offers.get(hero.id, {}).get(d, [])}
+                     "offers": copy.deepcopy(state.upgrade_offers.get(hero.id, {}).get(d, []))}
                     for d in hero.equipped_dice_ids
                 ],
                 "bench": bench,
@@ -323,7 +324,7 @@ def snapshot(engine: Engine) -> dict[str, Any]:
         "hero_turn": None,
         "reaction": None,
         "upgrade": None,
-        "battle_records": list(state.battle_records),
+        "battle_records": copy.deepcopy(state.battle_records),
     }
     if state.phase == RunPhase.BATTLE:
         snap["intent"] = intent_view(engine)
@@ -370,7 +371,7 @@ def describe_event(event: CombatEvent, names: dict[str, str], die_names: dict[st
     if kind == EventType.COMBATANT_DEFEATED:
         return f"{name(d['id'])} is defeated."
     if kind == EventType.HERO_REVIVED:
-        return f"{name(d['id'])} is revived at {d['hp']} HP (gauge reset to 0)."
+        return f"{name(d['id'])} is revived at {d['hp']} HP (its gauge starts over)."
     if kind == EventType.DICE_ROLLED:
         return f"{actor} rolls {die(d['die_id'])}: {d['face_name']} (face {d['face']}/{d['die_size']})."
     if kind == EventType.DICE_REROLLED:

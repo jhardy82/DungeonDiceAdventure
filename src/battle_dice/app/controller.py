@@ -572,7 +572,7 @@ class AppController:
         engine = self.engine
         if engine is None or self.upgrade_hero is None or self.upgrade_die is None:
             return []
-        return engine.state.upgrade_offers.get(self.upgrade_hero, {}).get(self.upgrade_die, [])
+        return copy.deepcopy(engine.state.upgrade_offers.get(self.upgrade_hero, {}).get(self.upgrade_die, []))
 
     def offer_preview(self, offer: dict[str, Any]) -> dict[str, Any]:
         """Before/after die views (faces and probabilities) for an upgrade card."""
@@ -651,7 +651,9 @@ class AppController:
         engine = self.engine
         if engine is None:
             return
-        header = {k: v for k, v in export_run(engine).items() if k != "commands"}
+        # The header carries the ordered commands, so the file alone is enough to replay the run
+        # (battle-dice-replay verifies it).
+        header = export_run(engine)
         header["command_count"] = len(engine.command_log)
         try:
             path = self._free_log_path(engine.state.run_id)
@@ -676,12 +678,12 @@ class AppController:
         return {
             "outcome": engine.state.outcome,
             "battle_reached": engine.state.encounter_index + 1,
-            "battle_records": list(engine.state.battle_records),
+            "battle_records": copy.deepcopy(engine.state.battle_records),
             "stats": summarize(engine.events),
             "seed": str(engine.state.seed),
             "log_path": str(self.log_path) if self.log_path else None,
             "log_error": self.log_error,
-            "upgrades": list(engine.state.upgrades),
+            "upgrades": copy.deepcopy(engine.state.upgrades),
         }
 
     # ----------------------------------------------------------------------------------------
@@ -699,11 +701,11 @@ class AppController:
         return combat_log(self.engine, limit)
 
     def class_view(self, class_id: str) -> dict[str, Any]:
-        cls = self.content.class_def(class_id)
+        cls = copy.deepcopy(self.content.class_def(class_id))
         return {
             "id": class_id,
             **cls,
-            "reaction_def": self.content.reactions[cls["reaction"]],
+            "reaction_def": copy.deepcopy(self.content.reactions[cls["reaction"]]),
             "dice": [die_view(self.content.die(d)) for d in cls["starting_dice"]],
             "bench": [die_view(self.content.die(d)) for d in cls["bench_dice"]],
         }

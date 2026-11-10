@@ -41,7 +41,7 @@
         "mana_cost": {"$ref": "#/$defs/bounded_int"},
         "effects": {"type": "array", "items": {"$ref": "#/$defs/effect"}},
         "can_revive": {"type": "boolean"},
-        "tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "tags": {"type": "array", "items": {"enum": ["all_enemies", "basic", "elite_resistant", "hostile", "interruptible", "melee", "ranged", "revival", "self_buff", "spell", "unreactable"]}, "uniqueItems": true},
         "weight": {"$ref": "#/$defs/bounded_int"},
         "random_target": {"type": "boolean"}
       }
@@ -62,12 +62,12 @@
         "shield": {"type": "object", "required": ["cap"], "additionalProperties": false, "properties": {"cap": {"$ref": "#/$defs/bounded_int"}}},
         "statuses": {"type": "object", "required": ["poison", "weaken", "speed_up"], "additionalProperties": false,
           "properties": {
-            "poison": {"type": "object", "required": ["stack_cap", "damage_per_stack", "default_duration"], "additionalProperties": false,
-              "properties": {"stack_cap": {"$ref": "#/$defs/bounded_int"}, "damage_per_stack": {"$ref": "#/$defs/bounded_int"}, "default_duration": {"$ref": "#/$defs/bounded_int"}}},
-            "weaken": {"type": "object", "required": ["stack_cap", "damage_penalty_per_stack", "default_duration"], "additionalProperties": false,
-              "properties": {"stack_cap": {"$ref": "#/$defs/bounded_int"}, "damage_penalty_per_stack": {"$ref": "#/$defs/bounded_int"}, "default_duration": {"$ref": "#/$defs/bounded_int"}}},
-            "speed_up": {"type": "object", "required": ["stack_cap", "default_duration"], "additionalProperties": false,
-              "properties": {"stack_cap": {"$ref": "#/$defs/bounded_int"}, "default_duration": {"$ref": "#/$defs/bounded_int"}}}}},
+            "poison": {"type": "object", "required": ["stack_cap", "damage_per_stack"], "additionalProperties": false,
+              "properties": {"stack_cap": {"type": "integer", "minimum": 1, "maximum": 9}, "damage_per_stack": {"$ref": "#/$defs/bounded_int"}}},
+            "weaken": {"type": "object", "required": ["stack_cap", "damage_penalty_per_stack"], "additionalProperties": false,
+              "properties": {"stack_cap": {"type": "integer", "minimum": 1, "maximum": 9}, "damage_penalty_per_stack": {"$ref": "#/$defs/bounded_int"}}},
+            "speed_up": {"type": "object", "required": ["stack_cap"], "additionalProperties": false,
+              "properties": {"stack_cap": {"const": 1, "description": "Speed Up never stacks; a second application only refreshes it. Fixed by the rules, stated here for readers."}}}}},
         "corruption": {"type": "object", "required": ["backlash_threshold", "backlash_damage"], "additionalProperties": false,
           "properties": {"backlash_threshold": {"$ref": "#/$defs/bounded_int"}, "backlash_damage": {"$ref": "#/$defs/bounded_int"}}},
         "upgrades": {"type": "object", "required": ["face_power_cap", "offers_per_die", "mandatory_upgrades_per_run", "max_swaps_per_hero"], "additionalProperties": false,
@@ -93,8 +93,8 @@
         "max_corruption": {"$ref": "#/$defs/bounded_int"}, "start_corruption": {"$ref": "#/$defs/bounded_int"},
         "rerolls": {"type": "integer", "minimum": 0, "maximum": 9},
         "dice_capacity": {"type": "integer", "minimum": 1, "maximum": 6},
-        "starting_dice": {"type": "array", "items": {"$ref": "#/$defs/id"}, "minItems": 1},
-        "bench_dice": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "starting_dice": {"type": "array", "items": {"$ref": "#/$defs/id"}, "minItems": 1, "uniqueItems": true},
+        "bench_dice": {"type": "array", "items": {"$ref": "#/$defs/id"}, "uniqueItems": true},
         "suggested_row": {"$ref": "#/$defs/row"},
         "scheduling": {
           "type": "object", "required": ["policy", "label", "max_actions", "summary"], "additionalProperties": false,

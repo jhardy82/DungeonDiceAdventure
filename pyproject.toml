@@ -26,6 +26,7 @@ package = [
 [project.scripts]
 battle-dice = "battle_dice.__main__:main"
 battle-dice-sim = "battle_dice.sim.runner:main"
+battle-dice-replay = "battle_dice.replay_cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/battle_dice"]
