@@ -1,65 +1,65 @@
 {
-  "content_version": "1.2.1",
+  "content_version": "1.3.0",
   "battle_count": 2,
   "encounters": {
     "1": [
       {"battle": 1, "enemies": [
-        {"archetype": "goblin", "overrides": {"max_hp": 9, "actions": {"slash": {"power": 3}}}}
+        {"archetype": "goblin", "overrides": {"max_hp": 12, "actions": {"slash": {"power": 3}}}}
       ]},
       {"battle": 2, "enemies": [
-        {"archetype": "captain", "overrides": {"max_hp": 14, "actions": {"strike": {"power": 3}}}}
+        {"archetype": "captain", "overrides": {"max_hp": 18, "actions": {"strike": {"power": 3}}}}
       ]}
     ],
     "2": [
       {"battle": 1, "enemies": [
-        {"archetype": "goblin", "overrides": {"max_hp": 8, "actions": {"slash": {"power": 3}}}},
-        {"archetype": "hex_adept", "overrides": {"max_hp": 10, "actions": {"shadow_bolt": {"power": 4}}}}
+        {"archetype": "goblin", "overrides": {"max_hp": 14, "actions": {"slash": {"power": 3}}}},
+        {"archetype": "hex_adept", "overrides": {"max_hp": 18, "actions": {"shadow_bolt": {"power": 4}}}}
       ]},
       {"battle": 2, "enemies": [
-        {"archetype": "captain", "overrides": {"max_hp": 14, "actions": {"strike": {"power": 4}}}},
-        {"archetype": "goblin", "overrides": {"max_hp": 8, "actions": {"slash": {"power": 3}}}}
+        {"archetype": "captain", "overrides": {"max_hp": 25, "actions": {"strike": {"power": 4}}}},
+        {"archetype": "goblin", "overrides": {"max_hp": 14, "actions": {"slash": {"power": 3}}}}
       ]}
     ],
     "3": [
       {"battle": 1, "enemies": [
-        {"archetype": "goblin", "overrides": {"max_hp": 8, "actions": {"slash": {"power": 3}}, "speed": 12}},
-        {"archetype": "goblin", "overrides": {"max_hp": 8, "actions": {"slash": {"power": 3}}, "speed": 12}},
-        {"archetype": "hex_adept", "overrides": {"max_hp": 10, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}
+        {"archetype": "goblin", "overrides": {"max_hp": 10, "actions": {"slash": {"power": 3}}, "speed": 12}},
+        {"archetype": "goblin", "overrides": {"max_hp": 10, "actions": {"slash": {"power": 3}}, "speed": 12}},
+        {"archetype": "hex_adept", "overrides": {"max_hp": 13, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}
       ]},
       {"battle": 2, "enemies": [
-        {"archetype": "captain", "overrides": {"max_hp": 16, "actions": {"strike": {"power": 4}}, "speed": 11}},
-        {"archetype": "goblin", "overrides": {"max_hp": 8, "actions": {"slash": {"power": 3}}, "speed": 12}},
-        {"archetype": "hex_adept", "overrides": {"max_hp": 10, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}
+        {"archetype": "captain", "overrides": {"max_hp": 22, "actions": {"strike": {"power": 4}}, "speed": 11}},
+        {"archetype": "goblin", "overrides": {"max_hp": 10, "actions": {"slash": {"power": 3}}, "speed": 12}},
+        {"archetype": "hex_adept", "overrides": {"max_hp": 13, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}
       ]}
     ],
     "4": [
       {"battle": 1, "enemies": [
-        {"archetype": "goblin", "overrides": {"max_hp": 8, "actions": {"slash": {"power": 3}}, "speed": 12}},
-        {"archetype": "goblin", "overrides": {"max_hp": 8, "actions": {"slash": {"power": 3}}, "speed": 12}},
-        {"archetype": "hex_adept", "overrides": {"max_hp": 10, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}},
-        {"archetype": "hex_adept", "overrides": {"max_hp": 10, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}
+        {"archetype": "goblin", "overrides": {"max_hp": 10, "actions": {"slash": {"power": 3}}, "speed": 12}},
+        {"archetype": "goblin", "overrides": {"max_hp": 10, "actions": {"slash": {"power": 3}}, "speed": 12}},
+        {"archetype": "hex_adept", "overrides": {"max_hp": 12, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}},
+        {"archetype": "hex_adept", "overrides": {"max_hp": 12, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}
       ]},
       {"battle": 2, "enemies": [
-        {"archetype": "captain", "overrides": {"max_hp": 19, "actions": {"strike": {"power": 4}}, "speed": 11}},
-        {"archetype": "goblin", "overrides": {"max_hp": 8, "actions": {"slash": {"power": 3}}, "speed": 12}},
-        {"archetype": "goblin", "overrides": {"max_hp": 8, "actions": {"slash": {"power": 3}}, "speed": 12}},
-        {"archetype": "hex_adept", "overrides": {"max_hp": 10, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}
+        {"archetype": "captain", "overrides": {"max_hp": 24, "actions": {"strike": {"power": 4}}, "speed": 11}},
+        {"archetype": "goblin", "overrides": {"max_hp": 10, "actions": {"slash": {"power": 3}}, "speed": 12}},
+        {"archetype": "goblin", "overrides": {"max_hp": 10, "actions": {"slash": {"power": 3}}, "speed": 12}},
+        {"archetype": "hex_adept", "overrides": {"max_hp": 12, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}
       ]}
     ],
     "5": [
       {"battle": 1, "enemies": [
-        {"archetype": "goblin", "overrides": {"max_hp": 9, "actions": {"slash": {"power": 3}}, "speed": 12}},
-        {"archetype": "goblin", "overrides": {"max_hp": 9, "actions": {"slash": {"power": 3}}, "speed": 12}},
-        {"archetype": "goblin", "overrides": {"max_hp": 9, "actions": {"slash": {"power": 3}}, "speed": 12}},
-        {"archetype": "hex_adept", "overrides": {"max_hp": 11, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}},
-        {"archetype": "hex_adept", "overrides": {"max_hp": 11, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}
+        {"archetype": "goblin", "overrides": {"max_hp": 11, "actions": {"slash": {"power": 3}}, "speed": 12}},
+        {"archetype": "goblin", "overrides": {"max_hp": 11, "actions": {"slash": {"power": 3}}, "speed": 12}},
+        {"archetype": "goblin", "overrides": {"max_hp": 11, "actions": {"slash": {"power": 3}}, "speed": 12}},
+        {"archetype": "hex_adept", "overrides": {"max_hp": 13, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}},
+        {"archetype": "hex_adept", "overrides": {"max_hp": 13, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}
       ]},
       {"battle": 2, "enemies": [
-        {"archetype": "captain", "overrides": {"max_hp": 24, "actions": {"strike": {"power": 4}}, "speed": 11}},
-        {"archetype": "goblin", "overrides": {"max_hp": 9, "actions": {"slash": {"power": 3}}, "speed": 12}},
-        {"archetype": "goblin", "overrides": {"max_hp": 9, "actions": {"slash": {"power": 3}}, "speed": 12}},
-        {"archetype": "hex_adept", "overrides": {"max_hp": 11, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}},
-        {"archetype": "hex_adept", "overrides": {"max_hp": 11, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}
+        {"archetype": "captain", "overrides": {"max_hp": 29, "actions": {"strike": {"power": 4}}, "speed": 11}},
+        {"archetype": "goblin", "overrides": {"max_hp": 11, "actions": {"slash": {"power": 3}}, "speed": 12}},
+        {"archetype": "goblin", "overrides": {"max_hp": 11, "actions": {"slash": {"power": 3}}, "speed": 12}},
+        {"archetype": "hex_adept", "overrides": {"max_hp": 13, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}},
+        {"archetype": "hex_adept", "overrides": {"max_hp": 13, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}
       ]}
     ]
   }

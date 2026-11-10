@@ -850,13 +850,15 @@ def test_a_weakened_attack_shows_what_it_will_really_deal_on_the_die_and_in_the_
     play.to_roll_prompt()
     play.combat.combatants["h01"].status_instances = [StatusInstance("st900", "weaken", "x", "h01", 1, 2, 0)]
     play.roll_faces(iron_d6=6, oath_d4=1)  # Blank and Jab, with exactly one Weaken stack
+    jab = play.ctrl.engine.die_for("h01", "oath_d4").faces[0].power
+    note = f"Now deals {jab - 1} (Weaken -1)"
     drawn, shortened = record_text(monkeypatch)
     play.app.frame(0)
-    assert "Now deals 0 (Weaken -1)" in drawn and "Now deals 0 (Weaken -1)" not in shortened
+    assert note in drawn and note not in shortened
     play.key(pygame.K_2)
     drawn.clear()
     play.app.frame(0)
-    assert drawn.count("Now deals 0 (Weaken -1)") == 2, "the die card and the plan line both say it"
+    assert drawn.count(note) == 2, "the die card and the plan line both say it"
     assert not [t for t in shortened if t.startswith("Now ")]
 
 

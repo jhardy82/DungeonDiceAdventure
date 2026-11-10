@@ -14,9 +14,9 @@ from tests.conftest import content_with
 
 # (category, power, mana cost, action speed, can_revive) for each physical face, in PRD order.
 EXPECTED_DICE: Mapping[str, Sequence[tuple[object, ...]]] = {
-    "iron_d6": [("attack", 2, 0, 1, False)] * 2 + [("defense", 3, 0, 2, False)] * 2
+    "iron_d6": [("attack", 3, 0, 1, False)] * 2 + [("defense", 3, 0, 2, False)] * 2
     + [("healing", 2, 1, 1, True), ("blank", 0, 0, None, False)],
-    "oath_d4": [("attack", 1, 0, 1, False)] + [("defense", 2, 0, 2, False)] * 2 + [("resource", 1, 0, 3, False)],
+    "oath_d4": [("attack", 2, 0, 1, False)] + [("defense", 2, 0, 2, False)] * 2 + [("resource", 1, 0, 3, False)],
     "arcane_d6": [("attack", 3, 1, 1, False)] * 2
     + [("healing", 3, 2, 1, True), ("status", 1, 0, 2, False), ("resource", 2, 0, 3, False), ("blank", 0, 0, None, False)],
     "focus_d4": [("resource", 2, 0, 3, False)] * 2 + [("defense", 2, 0, 2, False), ("blank", 0, 0, None, False)],
@@ -31,29 +31,28 @@ EXPECTED_DICE: Mapping[str, Sequence[tuple[object, ...]]] = {
 EXPECTED_CLASSES = {
     #             hp  start speed init mana start corr start rerolls dice row
     "squire": (14, 14, 7, 5, 3, 2, 6, 0, 2, ["iron_d6", "oath_d4"], "front", 1),
-    "apprentice": (9, 9, 9, 4, 6, 3, 6, 1, 2, ["arcane_d6", "focus_d4"], "back", 2),
-    "scout": (10, 10, 13, 6, 4, 2, 6, 0, 2, ["striker_d8", "tools_d4"], "back", 2),
+    "apprentice": (12, 12, 9, 4, 6, 3, 6, 1, 2, ["arcane_d6", "focus_d4"], "back", 2),
+    "scout": (9, 9, 10, 6, 4, 2, 6, 0, 2, ["striker_d8", "tools_d4"], "back", 2),
 }
 
-# Shipped encounter table (content 1.2.0, owner-approved per-party-size balance of 2026-11-09).
+# Shipped encounter table (content 1.3.0, owner-approved class balance change of 2026-11-10).
 # party size -> battle -> [(archetype, max HP, speed, damaging action, its power)] in spawn-ID order.
 # Base stats in enemies.json: goblin 6 HP / speed 10 / Slash 2; hex adept 7 / 8 / Shadow Bolt 3;
-# captain 12 / 9 / Strike 3. Every size gets damage +1; HP is +50% for sizes 1 and 5 and +33% for
-# sizes 2-4 (applied to the 1.1.0 per-size captain HP of 9 / 10 / 12 / 14 / 16); speed is +2 for
-# sizes 3-5.
+# captain 12 / 9 / Strike 3. Damage (+1) and speed (+2 for sizes 3-5) are as in content 1.2.0; enemy
+# health was raised per party size in 1.3.0, together with the class changes (decision log D-21).
 G, H, C = "goblin", "hex_adept", "captain"
 EXPECTED_ENCOUNTERS = {
-    1: {1: [(G, 9, 10, "slash", 3)],
-        2: [(C, 14, 9, "strike", 3)]},
-    2: {1: [(G, 8, 10, "slash", 3), (H, 10, 8, "shadow_bolt", 4)],
-        2: [(C, 14, 9, "strike", 4), (G, 8, 10, "slash", 3)]},
-    3: {1: [(G, 8, 12, "slash", 3), (G, 8, 12, "slash", 3), (H, 10, 10, "shadow_bolt", 4)],
-        2: [(C, 16, 11, "strike", 4), (G, 8, 12, "slash", 3), (H, 10, 10, "shadow_bolt", 4)]},
-    4: {1: [(G, 8, 12, "slash", 3), (G, 8, 12, "slash", 3), (H, 10, 10, "shadow_bolt", 4), (H, 10, 10, "shadow_bolt", 4)],
-        2: [(C, 19, 11, "strike", 4), (G, 8, 12, "slash", 3), (G, 8, 12, "slash", 3), (H, 10, 10, "shadow_bolt", 4)]},
-    5: {1: [(G, 9, 12, "slash", 3)] * 3 + [(H, 11, 10, "shadow_bolt", 4)] * 2,
-        2: [(C, 24, 11, "strike", 4), (G, 9, 12, "slash", 3), (G, 9, 12, "slash", 3), (H, 11, 10, "shadow_bolt", 4),
-            (H, 11, 10, "shadow_bolt", 4)]},
+    1: {1: [(G, 12, 10, "slash", 3)],
+        2: [(C, 18, 9, "strike", 3)]},
+    2: {1: [(G, 14, 10, "slash", 3), (H, 18, 8, "shadow_bolt", 4)],
+        2: [(C, 25, 9, "strike", 4), (G, 14, 10, "slash", 3)]},
+    3: {1: [(G, 10, 12, "slash", 3), (G, 10, 12, "slash", 3), (H, 13, 10, "shadow_bolt", 4)],
+        2: [(C, 22, 11, "strike", 4), (G, 10, 12, "slash", 3), (H, 13, 10, "shadow_bolt", 4)]},
+    4: {1: [(G, 10, 12, "slash", 3), (G, 10, 12, "slash", 3), (H, 12, 10, "shadow_bolt", 4), (H, 12, 10, "shadow_bolt", 4)],
+        2: [(C, 24, 11, "strike", 4), (G, 10, 12, "slash", 3), (G, 10, 12, "slash", 3), (H, 12, 10, "shadow_bolt", 4)]},
+    5: {1: [(G, 11, 12, "slash", 3)] * 3 + [(H, 13, 10, "shadow_bolt", 4)] * 2,
+        2: [(C, 29, 11, "strike", 4), (G, 11, 12, "slash", 3), (G, 11, 12, "slash", 3), (H, 13, 10, "shadow_bolt", 4),
+            (H, 13, 10, "shadow_bolt", 4)]},
 }
 
 
@@ -79,7 +78,7 @@ def test_die_faces_match_the_authored_tables(content, die_id):
 
 def test_specific_face_rules_text(content):
     iron = content.die("iron_d6")
-    assert describe_face(iron.faces[0]) == "2 melee damage"
+    assert describe_face(iron.faces[0]) == "3 melee damage"
     assert describe_face(iron.faces[4]) == "heal 2 (revives to 2 HP); costs 1 mana"
     assert describe_face(iron.faces[5]) == "No action"
     arcane = content.die("arcane_d6")
@@ -163,7 +162,7 @@ def test_balance_changes_live_only_in_the_encounter_table(content):
     base = {k: (v["max_hp"], v["speed"]) for k, v in content.enemies.items()}
     assert base == {"goblin": (6, 10), "hex_adept": (7, 8), "captain": (12, 9)}
     assert content.balance["ai"] == {"priority_lethal": 100, "priority_setup": 20, "priority_default": 10}
-    assert content.reactions["disrupt"]["mana_cost"] == 1
+    assert content.reactions["disrupt"]["mana_cost"] == 2
     # Only damaging actions are raised; setup and area actions keep their authored power.
     for size in EXPECTED_ENCOUNTERS:
         for battle in (1, 2):
@@ -232,8 +231,8 @@ def test_missing_document_is_reported():
 def test_versions_and_owner_rule_changes_of_1_1_0(content):
     from battle_dice import RULES_VERSION
 
-    assert RULES_VERSION == "1.1.1" and content.content_version == "1.2.1"
-    assert {doc["content_version"] for doc in content.documents.values()} == {"1.2.1"}
+    assert RULES_VERSION == "1.1.1" and content.content_version == "1.3.0"
+    assert {doc["content_version"] for doc in content.documents.values()} == {"1.3.0"}
     assert content.classes["squire"]["passive"]["type"] == "defense_die_bonus"
     assert content.balance["upgrades"]["max_swaps_per_hero"] == 1
     assert "max_swaps_per_run" not in content.balance["upgrades"]

@@ -14,7 +14,9 @@ import pygame  # noqa: E402
 import pytest  # noqa: E402
 
 from battle_dice.app.controller import AppController, Screen  # noqa: E402
+from battle_dice.core import commands as cmd  # noqa: E402
 from battle_dice.core.events import state_hash  # noqa: E402
+from battle_dice.core.models import CombatPhase  # noqa: E402
 from battle_dice.sim.policies import HeuristicPolicy  # noqa: E402
 from battle_dice.ui.animation import Animator  # noqa: E402
 from battle_dice.ui.app import GameApp  # noqa: E402
@@ -252,9 +254,9 @@ def test_fast_mode_shortens_animations():
 def test_animation_never_changes_rules_state_or_random_streams(tmp_path):
     app, controller = start_battle(tmp_path)
     engine = controller.engine
-    while not engine.needs_input():
-        engine.do("AdvancePhase")
-    engine.do("RollDice")
+    while engine.combat.phase != CombatPhase.HERO_ROLL:  # an enemy may act first: skip its reaction windows
+        assert engine.do(cmd.SKIP_REACTION_STAGE if engine.needs_input() else cmd.ADVANCE_PHASE).accepted
+    assert engine.do(cmd.ROLL_DICE).accepted
     controller.refresh()
     before = (state_hash(engine.state), len(engine.events), len(engine.command_log),
               {name: stream.draws for name, stream in engine.state.rng.items()})
