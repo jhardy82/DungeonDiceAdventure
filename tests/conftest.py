@@ -8,10 +8,12 @@ directly; determinism tests use the real BD-PCG32-v1 streams.
 Two content sets are used on purpose:
 
 * **Mechanics content** (``mechanics_content()``, the default for ``start()``): the shipped
-  classes, dice, enemies, upgrades and balance, with the encounter table frozen at the
-  rules-1.1.0 values in ``tests/golden/encounters_mechanics.json``. Rule fixtures assert exact
-  arithmetic (a Slash for 2 against 6 HP, and so on); freezing the encounter numbers keeps them
-  about the *rules*, so a balance retune of enemy HP, damage or speed does not rewrite them.
+  enemies, upgrades and balance, with the numbers a balance retune moves frozen in
+  ``tests/golden/``: the encounter table at its rules-1.1.0 values
+  (``encounters_mechanics.json``) and the classes and dice at their content-1.2.1 values
+  (``classes_mechanics.json``, ``dice_mechanics.json``). Rule fixtures assert exact arithmetic
+  (a Strike for 2 against 6 HP, a Scout acting at speed 13, and so on); freezing these numbers
+  keeps them about the *rules*, so a retune of health, damage or speed does not rewrite them.
 * **Shipped content** (the ``content`` fixture / ``packaged_content()``): exactly what players
   get. The content tables, party-scaling, full-run, replay, simulator and UI tests use it.
 """
@@ -32,7 +34,10 @@ from battle_dice.core.models import STATE_DOWNED, Combatant, CombatPhase, Status
 
 _CONTENT: Content | None = None
 _MECHANICS: Content | None = None
-_MECHANICS_ENCOUNTERS = Path(__file__).parent / "golden" / "encounters_mechanics.json"
+_GOLDEN = Path(__file__).parent / "golden"
+_MECHANICS_ENCOUNTERS = _GOLDEN / "encounters_mechanics.json"
+#: Documents frozen for rule fixtures: document name -> file in tests/golden.
+_MECHANICS_FROZEN = {"classes": "classes_mechanics.json", "dice": "dice_mechanics.json"}
 
 
 def packaged_content() -> Content:
@@ -49,6 +54,10 @@ def mechanics_documents() -> dict[str, Any]:
     encounters = json.loads(_MECHANICS_ENCOUNTERS.read_text(encoding="utf-8"))
     encounters["content_version"] = documents["balance"]["content_version"]
     documents["encounters"] = encounters
+    for name, file_name in _MECHANICS_FROZEN.items():
+        frozen = json.loads((_GOLDEN / file_name).read_text(encoding="utf-8"))
+        frozen["content_version"] = documents["balance"]["content_version"]
+        documents[name] = frozen
     return documents
 
 
