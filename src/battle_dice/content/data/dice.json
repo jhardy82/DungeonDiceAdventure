@@ -1,10 +1,10 @@
 {
-  "content_version": "1.2.1",
+  "content_version": "1.3.0",
   "face_library": {
     "blank": {"name": "Blank", "category": "blank", "power": 0, "target_scope": "none", "range_type": "none", "action_speed": null, "mana_cost": 0, "effects": [], "can_revive": false, "tags": []},
 
-    "sq_strike_2": {"name": "Strike", "category": "attack", "power": 2, "target_scope": "single_enemy", "range_type": "melee", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}], "can_revive": false, "tags": ["melee"]},
-    "sq_jab_1": {"name": "Jab", "category": "attack", "power": 1, "target_scope": "single_enemy", "range_type": "melee", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}], "can_revive": false, "tags": ["melee"]},
+    "sq_strike_3": {"name": "Strike", "category": "attack", "power": 3, "target_scope": "single_enemy", "range_type": "melee", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}], "can_revive": false, "tags": ["melee"]},
+    "sq_jab_2": {"name": "Jab", "category": "attack", "power": 2, "target_scope": "single_enemy", "range_type": "melee", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "damage", "target": "target"}], "can_revive": false, "tags": ["melee"]},
     "sq_guard_3": {"name": "Guard", "category": "defense", "power": 3, "target_scope": "single_ally", "range_type": "ally", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "shield", "target": "target"}], "can_revive": false, "tags": []},
     "sq_guard_2": {"name": "Brace", "category": "defense", "power": 2, "target_scope": "single_ally", "range_type": "ally", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "shield", "target": "target"}], "can_revive": false, "tags": []},
     "sq_rally": {"name": "Rally", "category": "healing", "power": 2, "target_scope": "single_ally", "range_type": "ally", "action_speed": 1, "mana_cost": 1, "effects": [{"type": "heal", "target": "target"}], "can_revive": true, "tags": ["revival"]},
@@ -29,9 +29,9 @@
   },
   "dice": {
     "iron_d6": {"name": "Iron d6", "affinity_class": "squire", "size": 6, "role": "starting", "definition_version": 1,
-      "faces": ["sq_strike_2", "sq_strike_2", "sq_guard_3", "sq_guard_3", "sq_rally", "blank"]},
+      "faces": ["sq_strike_3", "sq_strike_3", "sq_guard_3", "sq_guard_3", "sq_rally", "blank"]},
     "oath_d4": {"name": "Oath d4", "affinity_class": "squire", "size": 4, "role": "starting", "definition_version": 1,
-      "faces": ["sq_jab_1", "sq_guard_2", "sq_guard_2", "sq_resolve"]},
+      "faces": ["sq_jab_2", "sq_guard_2", "sq_guard_2", "sq_resolve"]},
     "bulwark_d4": {"name": "Bulwark d4", "affinity_class": "squire", "size": 4, "role": "sidegrade", "definition_version": 1,
       "faces": ["sq_guard_2", "sq_guard_2", "sq_tend_1", "blank"]},
 

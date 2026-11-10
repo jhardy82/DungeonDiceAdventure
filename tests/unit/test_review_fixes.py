@@ -517,7 +517,7 @@ def test_the_content_hash_changes_when_any_one_document_changes():
     hashes = {
         "balance": changed(lambda d: d["balance"]["shield"].__setitem__("cap", 11)),
         "classes": changed(lambda d: d["classes"]["classes"]["squire"].__setitem__("max_hp", 15)),
-        "dice": changed(lambda d: d["dice"]["face_library"]["sq_strike_2"].__setitem__("name", "Slice")),
+        "dice": changed(lambda d: d["dice"]["face_library"]["sq_strike_3"].__setitem__("name", "Slice")),
         "enemies": changed(lambda d: d["enemies"]["enemies"]["goblin"].__setitem__("max_hp", 7)),
         "encounters": changed(lambda d: d["encounters"]["encounters"]["1"][0]["enemies"][0]["overrides"].__setitem__("max_hp", 10)),
         "upgrades": changed(lambda d: d["upgrades"]["kinds"]["sharpen"].__setitem__("name", "Hone")),
@@ -525,7 +525,7 @@ def test_the_content_hash_changes_when_any_one_document_changes():
     assert reference not in hashes.values() and len(set(hashes.values())) == len(hashes)
 
 
-def _face(documents, name="sq_strike_2"):
+def _face(documents, name="sq_strike_3"):
     return documents["dice"]["face_library"][name]
 
 

@@ -222,3 +222,43 @@ scenario that found it.
 - New strings were checked at 1280x720 and 960x540 under three fonts; the forecast line steps its
   size down, and takes the place of the face details when the rules text needs two lines.
 
+## 9. Personas on content 1.3.0 (2026-11-10)
+
+The class balance change (decision log D-21) made the game harder for the informed player, so the
+personas were run again: same six parties, seeds 0-79, 480 runs per persona.
+
+| Persona | 1.2.1 win rate | Against informed | 1.3.0 win rate | Against informed |
+|---------|---------------:|-----------------:|---------------:|-----------------:|
+| informed | 90.2% | | 82.1% | |
+| newcomer | 7.7% | -82.5 | 8.8% | -73.3 |
+| uninformed (random) | 15.6% | -74.6 | 6.7% | -75.4 |
+| no_reroll | 41.5% | -48.7 | 16.2% | -65.9 |
+| no_reaction | 65.8% | -24.4 | 29.2% | -52.9 |
+| random_target | 83.3% | -6.9 | 54.2% | -27.9 |
+| worst_upgrade | 89.0% | -1.2 | 74.6% | -7.5 |
+| attacker | 73.1% | -17.1 | 31.0% | -51.1 |
+| defender | 66.2% | -24.0 | 54.0% | -28.1 |
+| gambler | 86.2% | -4.0 | 59.6% | -22.5 |
+| bench_swapper | 90.0% | -0.2 | 82.9% | +0.8 |
+| main_die_swapper | 69.2% | -21.0 | 39.2% | -42.9 |
+
+| Formation (informed) | Suggested rows | Rows inverted |
+|----------------------|---------------:|--------------:|
+| Trio | 98.8% | 31.2% |
+| Four | 81.2% | 2.5% |
+| Five | 81.2% | 10.0% |
+
+What this changes in the findings:
+
+- **Finding 3, upgrade choice: resolved by the retune.** Taking the worst upgrade now costs 7.5
+  points (was 1.2, inside the noise).
+- **Finding 3, bench die: still open.** Swapping the bench d4 in still changes nothing (+0.8).
+  The owner asked for options to be measured (Stream C).
+- **Finding 6, risk-free rerolls: resolved by the retune.** Rerolling without thought now costs
+  22.5 points (was 4.0).
+- **Finding 2, newcomer: unchanged at about 9%.** The hints added in section 8 are not something
+  a persona can read; this still needs the human session in section 6.
+- Every habit matters more on 1.3.0: aiming is worth 27.9 points (was 6.9), reactions 52.9 (was
+  24.4), and formation decides the run for the trio (98.8% against 31.2%). The newcomer now beats
+  random play, as first predicted.
+

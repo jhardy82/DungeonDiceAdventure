@@ -1,5 +1,5 @@
 {
-  "content_version": "1.2.1",
+  "content_version": "1.3.0",
   "classes": {
     "squire": {
       "name": "Squire",
@@ -26,7 +26,7 @@
     },
     "apprentice": {
       "name": "Apprentice",
-      "max_hp": 9, "start_hp": 9,
+      "max_hp": 12, "start_hp": 12,
       "speed": 9, "base_initiative": 4,
       "max_mana": 6, "start_mana": 3,
       "max_corruption": 6, "start_corruption": 1,
@@ -52,8 +52,8 @@
     },
     "scout": {
       "name": "Scout",
-      "max_hp": 10, "start_hp": 10,
-      "speed": 13, "base_initiative": 6,
+      "max_hp": 9, "start_hp": 9,
+      "speed": 10, "base_initiative": 6,
       "max_mana": 4, "start_mana": 2,
       "max_corruption": 6, "start_corruption": 0,
       "rerolls": 2,
@@ -98,7 +98,7 @@
       "summary": "One targeted ally loses up to 1 corruption; the Apprentice gains 1 mana."
     },
     "disrupt": {
-      "name": "Disrupt", "stage": "interrupt", "mana_cost": 1, "priority": 10,
+      "name": "Disrupt", "stage": "interrupt", "mana_cost": 2, "priority": 10,
       "requires_row": null,
       "trigger": "hostile_interruptible",
       "target": "intent",

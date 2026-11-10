@@ -70,7 +70,7 @@ def test_t13_offers_are_seeded_and_can_be_forced_for_fixtures():
     assert sharpen["after"]["power"] == 4
 
 
-def test_t13_upgrade_creates_a_versioned_die_for_that_hero_only(content):
+def test_t13_upgrade_creates_a_versioned_die_for_that_hero_only():
     engine = _won("squire", "squire")
     offer = engine.state.upgrade_offers["h01"]["iron_d6"][0]
     ok(engine.do(cmd.CHOOSE_UPGRADE, hero_id="h01", die_id="iron_d6", offer_id=offer["offer_id"]))
@@ -78,7 +78,8 @@ def test_t13_upgrade_creates_a_versioned_die_for_that_hero_only(content):
     upgraded = engine.die_for("h01", "iron_d6")
     assert upgraded.definition_version == 2 and upgraded.size == 6 and len(upgraded.faces) == 6
     assert upgraded.faces[offer["face_index"]].id == offer["after"]["id"]
-    changed = [i for i in range(6) if upgraded.faces[i].signature() != content.die("iron_d6").faces[i].signature()]
+    base = engine.content.die("iron_d6")  # the engine's own catalog: rule fixtures use frozen dice numbers
+    changed = [i for i in range(6) if upgraded.faces[i].signature() != base.faces[i].signature()]
     assert changed == [offer["face_index"]]
     assert engine.die_for("h02", "iron_d6") is engine.content.die("iron_d6")  # the other Squire is untouched
     assert engine.content.die("iron_d6").definition_version == 1  # the catalog definition is never mutated

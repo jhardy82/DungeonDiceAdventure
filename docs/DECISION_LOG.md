@@ -1,13 +1,13 @@
 # Battle Dice MVP: Decision Log
 
-Contract: **BD-PRD-MVP-001 v1.0.0** (2026-11-09). Rules version `1.1.1`, content version `1.2.1`,
+Contract: **BD-PRD-MVP-001 v1.0.0** (2026-11-09). Rules version `1.1.1`, content version `1.3.0`,
 RNG `BD-PCG32-v1`.
 
 This log records (1) how gaps and contradictions between *delegated default* (DD) statements in
 the PRD were resolved, (2) implementation choices the PRD left open, and (3) measured evidence.
 No **approved (A)** requirement was altered. Every numeric value lives in
 `src/battle_dice/content/data/*.json`, not in engine code. DD values are as authored in the PRD
-except where an owner decision below says otherwise (D-01, D-08, D-10, D-18, D-19).
+except where an owner decision below says otherwise (D-01, D-08, D-10, D-18, D-19, D-21).
 
 Changing any entry below is a content/rules change: bump the version, rerun the acceptance
 tests, and add an entry here.
@@ -36,6 +36,7 @@ tests, and add an entry here.
 | D-17 | 9.4 enemy mana | Mana costs are charged to heroes only. Enemies have no mana pool. | 9.4: "Enemies in the initial fixtures do not use player mana pools". |
 | D-18 | 13 runtime | **Python 3.15 or newer is required** (`requires-python = ">=3.15"`), replacing the PRD's delegated default of "Python 3.12+". CI, the lint target and the type-check target are pinned to the 3.15 line, so new 3.15.x patches are picked up but 3.16 is not adopted automatically. | Owner direction (2026-11-09): use the newest stable Python. 3.15.2 was the newest stable build in GitHub's `actions/python-versions` manifest on that date; 3.16 was alpha only. |
 | D-19 | 12.2 encounter scaling | **Owner decision, 2026-11-09 (content 1.2.0):** the per-party-size encounter table is retuned so the scripted informed player wins 70-85% of runs at every party size. See section 7.1 for the exact changes and measurements. | The PRD calls the 12.2 tables "initial balance fixtures" to be adjusted after simulation. Informed play won 95-100% before the change. |
+| D-21 | 8.1-8.3 class fixtures, 12.2 encounter scaling | **Owner decision, 2026-11-10 (content 1.3.0):** class balance change. Squire Strike 2 to 3 and Jab 1 to 2; Apprentice health 9 to 12; Scout speed 13 to 10 and health 10 to 9; Disrupt mana cost 1 to 2; enemy health raised per party size. The owner's gate was: every party size inside 70-85% on a block of seeds not used for tuning. See section 7.8. | Under simulated player version 2 the 1.2.1 table was outside the band (95.6% at party size 2), all-Squire parties won 0-1% at sizes 3 to 5 and parties with two or more Scouts about 100% (sections 7.2 and 7.6). |
 
 ## 2. Content authored under delegation
 
@@ -362,6 +363,95 @@ U-25; re-test in `docs/PLAYTEST.md` section 8); measure options for findings 3 a
 class balance retune and propose them. Still an owner decision: whether Interpose should be
 offered at the shield cap (a rule change).
 
+### 7.8 Owner decision D-21: class balance change (content 1.3.0, 2026-11-10)
+
+**What changed** (`classes.json`, `dice.json`, `encounters.json`; damage and speed of enemies are
+unchanged):
+
+| Class or reaction | Value | 1.2.1 | 1.3.0 |
+|-------------------|-------|------:|------:|
+| Squire | Strike damage (Iron d6, two faces) | 2 | 3 |
+| Squire | Jab damage (Oath d4) | 1 | 2 |
+| Apprentice | Health | 9 | 12 |
+| Scout | Speed | 13 | 10 |
+| Scout | Health | 10 | 9 |
+| Disrupt | Mana cost | 1 | 2 |
+
+| Party size | Battle 1 enemy health | Battle 2 enemy health |
+|-----------:|-----------------------|-----------------------|
+| 1 | goblin 9 to 12 | captain 14 to 18 |
+| 2 | goblin 8 to 14, hex adept 10 to 18 | captain 14 to 25, goblin 8 to 14 |
+| 3 | goblins 8 to 10, hex adept 10 to 13 | captain 16 to 22, goblin 8 to 10, hex adept 10 to 13 |
+| 4 | goblins 8 to 10, hex adepts 10 to 12 | captain 19 to 24, goblins 8 to 10, hex adept 10 to 12 |
+| 5 | goblins 9 to 11, hex adepts 11 to 13 | captain 24 to 29, goblins 9 to 11, hex adepts 11 to 13 |
+
+The face ids `sq_strike_2` and `sq_jab_1` became `sq_strike_3` and `sq_jab_2`. Heavy Blow stays
+at damage 3: at 4, party size 3 measured 91.0% and 87.8% on the two report blocks and size 4
+88.5% and 84.0% (the owner's condition was that every size stays in the band).
+
+**Result** (simulated player version 2, official runner, 55 compositions, 40 seeds per block).
+Seeds 100-139 were used for tuning and are not reported. Seeds 300-339 were used for nothing
+before this table; they are the owner's gate.
+
+| Party size | Seeds 300-339 (gate) | Seeds 0-39 | Seeds 40-79 | All three (120 runs per party) | 1.2.1 under the same player |
+|-----------:|---------------------:|-----------:|------------:|-------------------------------:|----------------------------:|
+| 1 | 79.2% | 76.7% | 77.5% | 77.8% | 80.4% |
+| 2 | 73.8% | 77.9% | 75.8% | 75.8% | 95.6% |
+| 3 | 79.0% | 82.8% | 77.2% | 79.7% | 79.6% |
+| 4 | 76.5% | 81.0% | 79.7% | 79.1% | 80.8% |
+| 5 | 78.1% | 82.1% | 80.2% | 80.2% | 83.3% |
+
+- **Gate: passed.** Every party size is inside 70-85% on every block.
+- **Spread between compositions** (120 runs each): one composition at or below 40% (five
+  Squires, 16%) and one at 100% (one Squire + three Scouts). Content 1.2.1 under the same player
+  had 8 and 33.
+
+| Single-class party, sizes 1 to 5 | 1.2.1 | 1.3.0 |
+|----------------------------------|-------|-------|
+| All Squire | 100 / 96 / 1 / 0 / 0 | 93 / 88 / 62 / 53 / 16 |
+| All Apprentice | 41 / 78 / 26 / 28 / 34 | 65 / 80 / 52 / 56 / 81 |
+| All Scout | 100 / 100 / 100 / 100 / 100 | 75 / 62 / 91 / 99 / 98 |
+
+**Five Squires: a preregistered test of why they lose** (owner's instruction: use the reasoning
+skills; 80 runs per cell; hypotheses, thresholds and the decision rule were fixed before running;
+a difference under 10 points counted as noise, 20 or more as support).
+
+- Already known from existing results: 66 of 67 five-Squire defeats were in Battle 2, where two
+  back-row hex adepts cannot be reached until 51 health of front row is cleared.
+- Validity check passed: the unchanged candidate reproduced 13 of 80 exactly, and four Squires
+  stayed at 45 of 80 in every variant that did not touch size 4.
+
+| Hypothesis | Test | Five Squires | Verdict |
+|------------|------|-------------:|---------|
+| Baseline | | 16% | |
+| The scripted player plays them badly | Other habits: always attack 30%, shield weight 0.5 29%, shield weight 1.0 18%, never react 0%, always defend 0% | 30% at best | Inconclusive (+14) |
+| Battle 2 front-row wall | Captain 29 to 23 at size 5 | 45% | Survived |
+| Attrition from Battle 1 | Full recovery between battles | 86% | Survived |
+| Weaken keeps damage too low | Weaken penalty 0 | 100% | Survived |
+| Captain's area attack scales with party size | Blight Wave power 0 | 22% | Refuted |
+
+- **Reading.** Weaken is the dominant mechanism, attrition second, the front-row wall third.
+  The first two are rule changes and were outside this change.
+- **The front-row fix was tried and not adopted.** Moving health from the captain to the hex
+  adepts at size 5 (captain 25, hex adepts 15, same total) lifted five Squires to 42% on the
+  tuning seeds, but it made every other party stronger too: size 5 measured 85.1%, 88.8% and
+  86.4% on the three blocks, outside the band. Variants that added health back dropped five
+  Squires to 32-38%. The rule fixed beforehand required both, so the fix was dropped.
+- **Known limit:** a party of five Squires wins about 16%. Options for the owner later: a rule
+  change to Weaken (for example a shorter duration on slow heroes) or to recovery between battles.
+
+**Confirmation.** The official runner on the packaged content reproduces the table above
+party by party on all three blocks. Engine latency in those runs: median 0.17-0.18 ms, p95
+0.27-0.30 ms, maximum 97 ms.
+
+**Effect on the playtest findings** (personas on 1.3.0, `docs/PLAYTEST.md` section 9): the
+upgrade choice is now worth 7.5 points (was 1.2) and careless rerolling costs 22.5 (was 4.0); the
+bench die still changes nothing (+0.8). A newcomer still wins about 9%.
+
+**Margins are thin.** One enemy health point moved five Squires by 20 points in tuning. Rule
+fixtures are unaffected by this change: they use class, dice and encounter numbers frozen in
+`tests/golden/`.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one
@@ -383,7 +473,7 @@ checked here. Each needs an owner decision or a real Windows display.
 | A back-row Squire can never Interpose | By data (`requires_row: front`); the panel says so when it applies. |
 | A kept die can be un-kept before a later reroll | "Keep" is a per-reroll mark, as the Keep tooltip states. |
 | Key meanings change when the outcome screen appears | `M` toggles animation in battle and is Modify Party on the outcome screen; there is no input pause between them. |
-| Class balance | Parties with two or more Scouts win about 100%; all-Squire parties win 0% at size 3 and above (sections 7.2 and 7.6). Under simulated player version 2 the shipped table is also above the 70-85% band at party size 2. The owner chose a class change set on 2026-11-10; it is being retuned against version 2 and nothing changes without owner approval of the new numbers. |
+| Class balance | Changed in content 1.3.0 (D-21, section 7.8): every party size is at 74-83% and one composition is at or below 40%. Still weak: five Squires (16%), and all-Apprentice parties at sizes 3 and 4 (52-56%). Still strong: Scout-heavy parties at sizes 4 and 5 (98-100%). All figures are for the scripted player. |
 | Windows display | Never launched on a physical Windows display. Window resize while dragging, font rendering and behaviour at 125% or 150% scaling are unverified. |
 | Python install manager | Whether its `py` command downloads a missing Python on request is `<UNKNOWN>` here; the launcher itself never downloads or installs Python. |
 | Type checking | Closed on 2026-11-10: `mypy` now covers the whole package (including `ui/`), `tools/` and `tests/` with no findings, and CI runs it that way. The one relaxation is for tests only: `union-attr` is off there, because a test that reads optional engine state fails with an AttributeError when it is None, which is the signal wanted. |
