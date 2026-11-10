@@ -12,11 +12,13 @@ SMOKE_PARTY = ("squire", "apprentice", "scout")
 
 
 def run_smoke_test(report_path: str | None = None) -> int:
-    """Headless self-check: play one full seeded run through the real UI and exit 0 on success.
+    """Headless self-check: play one full seeded run and exit 0 on success. It never opens a window.
 
-    It loads the bundled content, starts pygame without a display, draws every screen the run
-    passes through, and writes a JSONL log. Packaged builds run this to prove that content,
-    pygame-ce and fonts were bundled correctly. It never opens a window.
+    What it exercises: the bundled content and sprites load; the menus are driven by real key
+    events; the pause menu opens and closes; every frame of the run is drawn; the event log is
+    written. Battle decisions come from the built-in heuristic policy (sent straight to the rules
+    engine), so the run reliably reaches the upgrade and outcome screens. Any frame whose drawing
+    raised, or any visit to the error screen, fails the check.
     """
     import os
 
@@ -37,12 +39,23 @@ def run_smoke_test(report_path: str | None = None) -> int:
             controller = AppController(fixed_seed=1, log_dir=log_dir)
             app = GameApp(controller, headless=True)
             seen = {controller.screen}
-            controller.new_run()
-            for class_id in SMOKE_PARTY:
-                controller.add_hero(class_id)
-            app.frame(0)
-            seen.add(controller.screen)
-            controller.begin_run()
+
+            def check_frame() -> None:
+                seen.add(controller.screen)
+                if app.render_faults or controller.screen == Screen.ERROR:
+                    raise RuntimeError(f"a screen failed to draw or an input raised:\n{controller.error_text}")
+
+            def press(key: int) -> None:
+                app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key, mod=0, unicode=""))
+                app.frame(0)
+                check_frame()
+
+            press(pygame.K_n)  # New Run
+            for key in (pygame.K_1, pygame.K_2, pygame.K_3):  # Squire, Apprentice, Scout
+                press(key)
+            if [member["class_id"] for member in controller.party] != list(SMOKE_PARTY):
+                raise RuntimeError(f"party setup by hotkeys produced {controller.party}")
+            press(pygame.K_RETURN)  # Begin Encounter (the default button)
             engine = controller.engine
             if engine is None:
                 raise RuntimeError(f"the run did not start: {controller.message}")
@@ -51,19 +64,31 @@ def run_smoke_test(report_path: str | None = None) -> int:
             sprites = app.ui.assets.load_all()
             if sprites == 0 or app.ui.assets.missing:
                 raise RuntimeError(f"sprites failed to load: {sorted(app.ui.assets.missing) or 'none found'}")
+            press(pygame.K_ESCAPE)  # pause menu ...
+            if not controller.paused:
+                raise RuntimeError("Esc did not open the pause menu")
+            press(pygame.K_ESCAPE)  # ... and back
+            if controller.paused:
+                raise RuntimeError("Esc did not close the pause menu")
             while not engine.finished():
                 if engine.needs_input():
                     policy.act(engine)
                 else:
                     engine.do("AdvancePhase")
                 controller.refresh()
+                if frames % 25 == 0:  # point at a unit card now and then, so the inspect panel is drawn too
+                    card = next((w for w in app.ui.widgets if w.key.startswith("unit:")), None)
+                    if card is not None:
+                        app.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=card.rect.center, rel=(0, 0), buttons=(0, 0, 0)))
                 app.frame(40)
                 frames += 1
-                seen.add(controller.screen)
+                check_frame()
                 if frames > 20000:
                     raise RuntimeError("the run did not finish")
             if controller.screen != Screen.OUTCOME:
                 raise RuntimeError(f"expected the outcome screen, got {controller.screen}: {controller.error_text}")
+            if Screen.BATTLE not in seen:
+                raise RuntimeError(f"the battle screen was never drawn; saw {sorted(seen)}")
             if controller.log_path is None or not controller.log_path.exists():
                 raise RuntimeError(f"the event log was not written: {controller.log_error}")
             lines.append(
@@ -94,7 +119,15 @@ def main(argv: list[str] | None = None) -> int:
                         help="run a headless self-check (no window) and exit 0 on success")
     parser.add_argument("--smoke-out", default=None, metavar="FILE",
                         help="with --smoke-test: also write the result text to FILE")
+    parser.add_argument("--version", action="store_true", help="print the rules and content versions and exit")
     args = parser.parse_args(argv)
+
+    if args.version:
+        from battle_dice import RULES_VERSION
+        from battle_dice.content.loader import load_content
+
+        print(f"Battle Dice: rules {RULES_VERSION}, content {load_content().content_version}, Python {sys.version.split()[0]}")
+        return 0
 
     if args.smoke_test:
         return run_smoke_test(args.smoke_out)
@@ -110,7 +143,21 @@ def main(argv: list[str] | None = None) -> int:
     from battle_dice.ui.app import GameApp
 
     controller = AppController(fixed_seed=args.seed, log_dir=args.log_dir)
-    GameApp(controller, size=(width, height), animations=not args.no_animation).run()
+    try:
+        GameApp(controller, size=(width, height), animations=not args.no_animation).run()
+    except Exception:  # noqa: BLE001 - a windowed build has no console: leave the reason in a file
+        report = traceback.format_exc()
+        print(report, file=sys.stderr)
+        try:
+            import time
+
+            controller.log_dir.mkdir(parents=True, exist_ok=True)
+            crash_file = controller.log_dir / f"crash-{time.strftime('%Y%m%d-%H%M%S')}.txt"
+            crash_file.write_text(report, encoding="utf-8")
+            print(f"Battle Dice stopped unexpectedly. Details were saved to {crash_file}", file=sys.stderr)
+        except OSError:
+            pass
+        return 1
     return 0
 
 

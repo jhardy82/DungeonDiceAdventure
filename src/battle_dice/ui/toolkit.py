@@ -20,6 +20,11 @@ from battle_dice.ui.artwork import PLACEHOLDER_COLOUR, AssetStore
 LOGICAL_W, LOGICAL_H = 1280, 720
 MIN_W, MIN_H = 960, 540
 FONT_CANDIDATES = ("segoeui", "arial", "liberationsans", "dejavusans", "helvetica", "freesans")
+KEYPAD_DIGITS = {
+    pygame.K_KP1: pygame.K_1, pygame.K_KP2: pygame.K_2, pygame.K_KP3: pygame.K_3, pygame.K_KP4: pygame.K_4,
+    pygame.K_KP5: pygame.K_5, pygame.K_KP6: pygame.K_6, pygame.K_KP7: pygame.K_7, pygame.K_KP8: pygame.K_8,
+    pygame.K_KP9: pygame.K_9,
+}
 
 
 class Theme:
@@ -76,6 +81,9 @@ class UI:
         self.assets = AssetStore()
         self.anim = Animator()
         self._backdrops: dict[tuple[int, int, int], pygame.Surface] = {}
+        # Status bar: a fresh controller message stays visible until the pointer or focus moves on.
+        self.message_serial = -1
+        self.message_pin: tuple[str | None, str | None] | None = None
 
     # -- frame lifecycle ---------------------------------------------------------------------
 
@@ -146,6 +154,22 @@ class UI:
             else:
                 high = mid - 1
         return text[:low] + ellipsis
+
+    def text_width(self, text: str, size: int = 16, bold: bool = False) -> float:
+        """Width of ``text`` in logical units at the current scale."""
+        return self.font(size, bold).size(text)[0] / self.scale
+
+    def fit_name(self, text: str, size: int, bold: bool, max_width: float) -> str:
+        """Shorten a name but keep a trailing number, so "Goblin Skirmisher 2" never loses its 2."""
+        font = self.font(size, bold)
+        limit = self.px(max_width)
+        if font.size(text)[0] <= limit:
+            return text
+        head, _, tail = text.rpartition(" ")
+        if head and tail.isdigit():
+            room = limit - font.size(" " + tail)[0]
+            return f"{self.fit(head, font, max(1, room))} {tail}"
+        return self.fit(text, font, limit)
 
     def text(
         self, x: float, y: float, text: str, size: int = 16, color: tuple[int, int, int] = Theme.TEXT,
@@ -385,7 +409,8 @@ class UI:
     # -- input -------------------------------------------------------------------------------
 
     def activate(self, widget: Widget) -> None:
-        self.focus_key = widget.key
+        """Run a widget's action. Focus is never changed here: only Tab and the arrow keys move it,
+        so Enter after a hotkey or a click reaches the screen's default control."""
         if not widget.enabled:
             if self.on_disabled is not None:
                 self.on_disabled(widget.reason or "That is not available right now.")
@@ -410,6 +435,7 @@ class UI:
             return False
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             self.mouse_pos = event.pos
+            self.focus_key = None  # the pointer takes over; Enter goes back to the default control
             for widget in reversed(self.widgets):
                 if widget.rect.collidepoint(event.pos):
                     self.activate(widget)
@@ -417,7 +443,7 @@ class UI:
             return False
         if event.type != pygame.KEYDOWN:
             return False
-        key = event.key
+        key = KEYPAD_DIGITS.get(event.key, event.key)
         shift = bool(getattr(event, "mod", 0) & pygame.KMOD_SHIFT)
         if key == pygame.K_TAB:
             self.move_focus(-1 if shift else 1)
@@ -428,12 +454,19 @@ class UI:
         if key in (pygame.K_UP, pygame.K_LEFT):
             self.move_focus(-1)
             return True
-        if key == pygame.K_ESCAPE and self.escape_action is not None:
-            self.escape_action()
-            return True
+        if key == pygame.K_ESCAPE:
+            if self.escape_action is not None:
+                self.focus_key = None
+                self.escape_action()
+                return True
+            if self.focus_key is not None:
+                self.focus_key = None
+                return True
+            return False
         if key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
             focused = self.widget(self.focus_key) if self.focus_key else None
-            if focused is not None:
+            # A focused control with nothing to do (a unit card outside targeting) does not swallow Enter.
+            if focused is not None and (focused.action is not None or not focused.enabled):
                 self.activate(focused)
                 return True
             if key != pygame.K_SPACE:
@@ -444,9 +477,31 @@ class UI:
             return False
         for widget in self.widgets:
             if key in widget.hotkeys:
+                self.focus_key = None  # a hotkey is a direct command, not a move of the focus ring
                 self.activate(widget)
                 return True
         return False
+
+    def status_line(self, message: str, is_error: bool, serial: int) -> tuple[str, bool]:
+        """What the status bar shows: a new controller message first, then help for the hot control.
+
+        A message that arrived since the last frame is pinned until the pointer or the focus moves
+        to a different control. Without this, the tooltip of the control that was just used would
+        hide the answer to using it (for example the reason a click was refused).
+        """
+        # The pointer may have moved since the last frame ended, so look it up among the widgets
+        # of the frame being built (the status bar is drawn after them).
+        hover = next((w.key for w in reversed(self._building) if w.rect.collidepoint(self.mouse_pos)), None)
+        hot = (hover, self.focus_key)
+        if serial != self.message_serial:
+            self.message_serial = serial
+            self.message_pin = hot if message else None
+        if self.message_pin is not None:
+            if self.message_pin == hot and message:
+                return message, is_error
+            self.message_pin = None
+        hint = self.status_text()
+        return hint if hint is not None else (message, is_error)
 
     def status_text(self) -> tuple[str, bool] | None:
         """Help or disabled-reason text for the focused/hovered widget."""

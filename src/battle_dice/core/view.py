@@ -142,6 +142,16 @@ def die_view(die: DieDefinition) -> dict[str, Any]:
 # --------------------------------------------------------------------------------------------
 
 
+def status_effect_text(kind: str, stacks: int, balance: dict[str, Any]) -> str:
+    """What one status instance does, generated from the balance data."""
+    rules = balance["statuses"][kind]
+    if kind == STATUS_POISON:
+        return f"{rules['damage_per_stack'] * stacks} damage at the start of its activation (ignores shields)"
+    if kind == STATUS_WEAKEN:
+        return f"-{rules['damage_penalty_per_stack'] * stacks} to the damage it deals"
+    return f"+{stacks} speed"
+
+
 def combatant_view(engine: Engine, c: Combatant) -> dict[str, Any]:
     balance = engine.content.balance
     view: dict[str, Any] = {
@@ -165,7 +175,8 @@ def combatant_view(engine: Engine, c: Combatant) -> dict[str, Any]:
         "reaction_charges": c.reaction_charges,
         "statuses": [
             {"id": s.id, "kind": s.kind, "label": STATUS_LABELS[s.kind], "glyph": STATUS_GLYPHS[s.kind],
-             "stacks": s.stacks, "remaining": s.remaining_target_activations}
+             "stacks": s.stacks, "remaining": s.remaining_target_activations,
+             "effect": status_effect_text(s.kind, s.stacks, balance)}
             for s in c.status_instances
         ],
     }
@@ -336,11 +347,14 @@ def snapshot(engine: Engine) -> dict[str, Any]:
 # --------------------------------------------------------------------------------------------
 
 
-def describe_event(event: CombatEvent, names: dict[str, str]) -> str | None:
+def describe_event(event: CombatEvent, names: dict[str, str], die_names: dict[str, str] | None = None) -> str | None:
     """Player-facing log line for an event, or ``None`` for purely technical events."""
 
     def name(cid: str | None) -> str:
         return names.get(cid or "", cid or "?")
+
+    def die(die_id: str) -> str:
+        return (die_names or {}).get(die_id, die_id)
 
     d = event.delta
     kind = event.type
@@ -358,14 +372,14 @@ def describe_event(event: CombatEvent, names: dict[str, str]) -> str | None:
     if kind == EventType.HERO_REVIVED:
         return f"{name(d['id'])} is revived at {d['hp']} HP (gauge reset to 0)."
     if kind == EventType.DICE_ROLLED:
-        return f"{actor} rolls {d['die_id']}: {d['face_name']} (face {d['face']}/{d['die_size']})."
+        return f"{actor} rolls {die(d['die_id'])}: {d['face_name']} (face {d['face']}/{d['die_size']})."
     if kind == EventType.DICE_REROLLED:
-        return f"{actor} rerolls {d['die_id']}: {d['face_name']} (face {d['face']}/{d['die_size']}); {d['rerolls_remaining']} reroll(s) left."
+        return f"{actor} rerolls {die(d['die_id'])}: {d['face_name']} (face {d['face']}/{d['die_size']}); {d['rerolls_remaining']} reroll(s) left."
     if kind == EventType.HERO_PASSED:
         return f"{actor} passes."
     if kind == EventType.PLAN_COMMITTED and d["actions"]:
         plan = ", then ".join(a["name"] for a in d["actions"])
-        discarded = f" Discarded: {', '.join(d['discarded_dice'])}." if d["discarded_dice"] else ""
+        discarded = f" Discarded: {', '.join(die(x) for x in d['discarded_dice'])}." if d["discarded_dice"] else ""
         return f"{actor} commits: {plan}.{discarded}"
     if kind == EventType.ACTION_RESOLVED:
         parts = []
@@ -438,9 +452,9 @@ def describe_event(event: CombatEvent, names: dict[str, str]) -> str | None:
     if kind == EventType.RECOVERY_APPLIED:
         return "Recovery: HP partly restored, mana refilled, shields and statuses cleared. Corruption persists."
     if kind == EventType.UPGRADE_APPLIED:
-        return f"Upgrade: {d['kind'].capitalize()} on {name(d['hero_id'])}'s {d['die_id']} face {d['face_index'] + 1}: {d['before']['name']} -> {d['after']['name']}."
+        return f"Upgrade: {d['kind'].capitalize()} on {name(d['hero_id'])}'s {die(d['die_id'])} face {d['face_index'] + 1}: {d['before']['name']} -> {d['after']['name']}."
     if kind == EventType.DIE_SWAPPED:
-        return f"{name(d['hero_id'])} swaps {d['out_die_id']} for {d['in_die_id']}."
+        return f"{name(d['hero_id'])} swaps {die(d['out_die_id'])} for {die(d['in_die_id'])}."
     if kind == EventType.FORMATION_CHANGED:
         return f"{actor} moves to the {d['to']} row."
     return None
@@ -451,5 +465,6 @@ def combat_log(engine: Engine, limit: int | None = None) -> list[str]:
     for event in engine.events:
         if event.type == EventType.BATTLE_STARTED:
             names.update({entry["id"]: entry["name"] for entry in event.delta["roster"]})
-    lines = [line for line in (describe_event(e, names) for e in engine.events) if line]
+    die_names = {die_id: entry["name"] for die_id, entry in engine.content.documents["dice"]["dice"].items()}
+    lines = [line for line in (describe_event(e, names, die_names) for e in engine.events) if line]
     return lines if limit is None else lines[-limit:]
