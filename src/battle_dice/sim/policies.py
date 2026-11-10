@@ -67,6 +67,7 @@ class HeuristicPolicy:
     lookahead = True
     real_amounts = True
     value_upgrades = True
+    shield_weight = 1.0
     #: Used only when ``lookahead`` is off: the version 1 rule (keep the best plan's dice if it scores this much).
     keep_threshold = 2.0
 
@@ -150,7 +151,7 @@ class HeuristicPolicy:
                             amount += shield_bonus(engine, hero, face, target, intent)
                         gained = min(amount, shield_cap - target_shields)
                         urgency = 1.0 if target_hp * 2 <= target.max_hp else 0.5
-                        score += gained * urgency * (0.3 if target_shields >= 4 else 1.0)
+                        score += gained * urgency * (0.3 if target_shields >= 4 else 1.0) * self.shield_weight
                         if self.real_amounts:
                             shields[target.id] = target_shields + gained
                     elif kind == "heal":
