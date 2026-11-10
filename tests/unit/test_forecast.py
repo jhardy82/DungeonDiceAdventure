@@ -30,7 +30,15 @@ from tests.conftest import (
 
 
 def die_forecast(engine: Engine, die_id: str) -> dict:
-    return next(d["forecast"] for d in hero_turn_view(engine)["dice"] if d["die_id"] == die_id)
+    turn = hero_turn_view(engine)
+    assert turn is not None
+    return next(d["forecast"] for d in turn["dice"] if d["die_id"] == die_id)
+
+
+def intent_forecast(engine: Engine) -> dict:
+    view = intent_view(engine)
+    assert view is not None
+    return view["forecast"]
 
 
 def resolved(engine: Engine, kind: str) -> list[dict]:
@@ -103,8 +111,10 @@ def test_a_weakened_enemy_intent_is_forecast():
     goblin = enemies(engine)[0]
     add_status(engine, goblin.id, "weaken")
     begin_enemy(engine, goblin.id)
-    forecast = intent_view(engine)["forecast"]
-    printed = engine.intent_face(engine.combat.committed_intent).power
+    forecast = intent_forecast(engine)
+    committed = engine.combat.committed_intent
+    assert committed is not None
+    printed = engine.intent_face(committed).power
     assert forecast["weaken"] == 1 and forecast["damage"] == printed - 1
     skip_reactions(engine)
     finish_activation(engine)
@@ -124,9 +134,9 @@ def test_a_resisted_disrupt_is_forecast_on_the_enemy_intent():
         unit(engine, "h01").mana = unit(engine, "h01").max_mana
     else:
         raise AssertionError("the captain never used Strike with Disrupt available")
-    before = intent_view(engine)["forecast"]["damage"]
+    before = intent_forecast(engine)["damage"]
     ok(engine.do(cmd.USE_REACTION, hero_id="h01", target_id=None))
-    after = intent_view(engine)["forecast"]
+    after = intent_forecast(engine)
     assert after["damage"] == max(0, before - 2) and "Disrupt -2" in after["note"]
     skip_reactions(engine)
     finish_activation(engine)

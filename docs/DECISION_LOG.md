@@ -119,7 +119,8 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 
 500 automated tests pass on the reference environment (Linux container, Python 3.15.2,
 pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 240 unit, 78 fixture, 49 integration,
-133 headless UI and graphics. `ruff` 0.17.4 and `mypy` 2.4.1 are clean with their 3.15 targets.
+133 headless UI and graphics, with warnings treated as errors. `ruff` 0.17.4 is clean, and
+`mypy` 2.4.1 is clean over the whole package, the tools and the tests (75 files).
 
 Line coverage of the rules engine, content loader and random numbers (`battle_dice.core`,
 `battle_dice.content`, `battle_dice.rng`) is 97% against the PRD target of at least 80%. CI fails
@@ -161,6 +162,31 @@ in `unit/test_review_fixes.py`; the result of re-running those bugs is in sectio
 Not verified here: the game has not been launched on a physical Windows display. The engine,
 content and headless UI tests run on a Windows CI runner; interactive feel, font rendering and
 window behaviour on Windows remain to be confirmed by the owner.
+
+### 6.1 Validation sweep (2026-11-10)
+
+Every check that can run in the reference container was run against `main` plus this change, and
+each finding was fixed, not suppressed:
+
+| Check | Result |
+|-------|--------|
+| `mypy` over the whole package, `tools/` and `tests/` (75 files) | Clean. 22 findings fixed in `ui/screens.py` and `tools/update_replay_pin.py` (default-argument lambdas replaced by `functools.partial`, two variables typed as float, one colour tuple); 24 in tests (missing None checks, annotations). Two `type: ignore` comments in the rules engine were removed by narrowing the types instead. |
+| `ruff check` over the repository | Clean. |
+| `pytest -W error` (500 tests, warnings are errors) | Pass. |
+| Coverage of engine, content loader and random numbers | 97.27% (floor 90%). Whole package: 96%. |
+| Random-play fuzz: 2,200 runs (`battle-dice-sim --policy random --seeds 40`) | No engine fault, no negative resource, every run ends. |
+| Wheel and source archive built; wheel installed in a clean environment | `battle-dice --smoke-test`, `--version`, `battle-dice-sim` and `battle-dice-replay` all run from the installed copy; content, schema, sprites and credits are in the wheel. |
+| Workflow files and all 11 JSON data files | Parse; content also passes schema and cross-reference validation at load. |
+| Documented versions, test counts and the replay pin | Match the code (rules 1.1.1, content 1.2.1, player 2, 500 tests). |
+| Latest runs on `main` | CI and the Windows package workflow both green. |
+
+CI now enforces the wider checks: `mypy src/battle_dice tools tests`, `pytest -W error`, and a
+step that builds the wheel and runs the game from the installed copy on Linux and Windows.
+
+Not checkable in this container, and so still resting on the Windows workflow or the owner:
+the PowerShell launcher (linted and exercised only on the Windows runner), the PyInstaller build
+(Windows runner), and a real display. `ruff format` is not adopted by this project (the code is
+hand-formatted at 110 columns), so its report is not a finding.
 
 ## 7. Measured balance and latency (not balance claims)
 
@@ -360,4 +386,4 @@ checked here. Each needs an owner decision or a real Windows display.
 | Class balance | Parties with two or more Scouts win about 100%; all-Squire parties win 0% at size 3 and above (sections 7.2 and 7.6). Under simulated player version 2 the shipped table is also above the 70-85% band at party size 2. The owner chose a class change set on 2026-11-10; it is being retuned against version 2 and nothing changes without owner approval of the new numbers. |
 | Windows display | Never launched on a physical Windows display. Window resize while dragging, font rendering and behaviour at 125% or 150% scaling are unverified. |
 | Python install manager | Whether its `py` command downloads a missing Python on request is `<UNKNOWN>` here; the launcher itself never downloads or installs Python. |
-| Type checking | `mypy` covers the engine, content, simulator, controller and replay tool, not `ui/` (20 findings in `ui/screens.py`, all about lambda and float-versus-int inference). |
+| Type checking | Closed on 2026-11-10: `mypy` now covers the whole package (including `ui/`), `tools/` and `tests/` with no findings, and CI runs it that way. The one relaxation is for tests only: `union-attr` is off there, because a test that reads optional engine state fails with an AttributeError when it is None, which is the signal wanted. |

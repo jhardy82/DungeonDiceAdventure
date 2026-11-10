@@ -326,4 +326,5 @@ def test_unselected_results_never_carry_to_a_later_activation():
     assert engine.combat.turn is None
     make_ready(engine, "h01")
     run_until_input(engine)
+    assert engine.combat.turn is not None
     assert engine.combat.turn.rolled == {} and engine.combat.phase == CombatPhase.HERO_ROLL

@@ -155,7 +155,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ```bash
 python -m pytest                 # 500 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
 python -m ruff check src tests tools packaging
-python -m mypy src/battle_dice/core src/battle_dice/rng.py src/battle_dice/content src/battle_dice/sim src/battle_dice/app src/battle_dice/replay_cli.py
+python -m mypy src/battle_dice tools tests
 ```
 
 UI tests run headless (`SDL_VIDEODRIVER=dummy` is set by the tests). CI runs the same checks on
@@ -163,7 +163,7 @@ Linux and Windows, and fails if line coverage of the rules engine, content loade
 numbers drops below 90% (measured: 97%; PRD target: at least 80%):
 
 ```bash
-python -m pytest --cov=battle_dice.core --cov=battle_dice.content --cov=battle_dice.rng --cov-fail-under=90
+python -m pytest -W error --cov=battle_dice.core --cov=battle_dice.content --cov=battle_dice.rng --cov-fail-under=90
 ```
 
 | Folder | Contents |
