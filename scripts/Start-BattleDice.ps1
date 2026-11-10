@@ -4,13 +4,18 @@
 
 .DESCRIPTION
     Idempotent launcher. Each run it:
-      1. Finds a Python 3.15 interpreter (py launcher first, then python on PATH).
+      1. Finds a Python 3.15 interpreter: the py launcher, python on PATH, the standard
+         install folders, then the registry. Use -Python to point at one directly.
       2. Creates the .venv virtual environment if it is missing or built on another Python.
       3. Installs the game into .venv only when pyproject.toml changed since the last install.
       4. Starts the game.
 
     It never installs Python itself and never changes machine-wide settings. Everything it
     creates lives in the .venv folder inside the repository.
+
+.PARAMETER Python
+    Full path to a Python 3.15 python.exe to use. Only needed when the launcher cannot find
+    Python 3.15 by itself, for example when an older Python comes first on PATH.
 
 .PARAMETER Seed
     Root seed for every run, so dice and enemy choices repeat exactly. Unsigned integer.
@@ -33,11 +38,16 @@
 .EXAMPLE
     .\scripts\Start-BattleDice.ps1 -Seed 123 -Size 960x540
 
+.EXAMPLE
+    .\scripts\Start-BattleDice.ps1 -Python "$env:LOCALAPPDATA\Programs\Python\Python315\python.exe"
+
 .NOTES
     Works in Windows PowerShell 5.1 and PowerShell 7+.
 #>
 [CmdletBinding()]
 param(
+    [string]$Python,
+
     [ValidatePattern('^\d{1,20}$')]
     [string]$Seed,
 
@@ -63,6 +73,10 @@ $VenvPython = Join-Path $VenvDir 'Scripts\python.exe'
 $StampFile = Join-Path $VenvDir '.battle-dice-install-stamp'
 $VersionProbe = "import sys; print('%d.%d.%d' % sys.version_info[:3])"
 $DownloadPage = 'https://www.python.org/downloads/windows/'
+$VersionTag = "$($RequiredVersion.Major)$($RequiredVersion.Minor)"        # 315
+$VersionDotted = "$($RequiredVersion.Major).$($RequiredVersion.Minor)"    # 3.15
+# Other Python versions seen while searching; reported if the required one is not found.
+$OtherPythons = New-Object System.Collections.Generic.List[string]
 #endregion VARIABLES
 
 #region FUNCTIONS
@@ -105,18 +119,94 @@ function Test-RequiredVersion {
     return ($null -ne $Version) -and ($Version.Major -eq $RequiredVersion.Major) -and ($Version.Minor -eq $RequiredVersion.Minor)
 }
 
+function Get-KnownPythonPath {
+    <# Returns existing python.exe paths for the required version: install folders, then registry. #>
+    $paths = @()
+
+    $folders = @()
+    if ($env:LOCALAPPDATA) {
+        $folders += Join-Path $env:LOCALAPPDATA "Programs\Python\Python$VersionTag\python.exe"
+        $folders += Join-Path $env:LOCALAPPDATA "Python\pythoncore-$VersionDotted-64\python.exe"
+        $folders += Join-Path $env:LOCALAPPDATA "Python\bin\python$VersionDotted.exe"
+        $folders += Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\python$VersionDotted.exe"
+    }
+    if ($env:ProgramFiles) {
+        $folders += Join-Path $env:ProgramFiles "Python$VersionTag\python.exe"
+    }
+    foreach ($folder in $folders) {
+        if (Test-Path -LiteralPath $folder) {
+            $paths += $folder
+        }
+    }
+
+    # PEP 514 registration: HK*\Software\Python\<Company>\<Tag>\InstallPath, as the py launcher reads it.
+    foreach ($root in @('HKCU:\Software\Python', 'HKLM:\SOFTWARE\Python', 'HKLM:\SOFTWARE\WOW6432Node\Python')) {
+        if (-not (Test-Path -Path $root)) {
+            continue
+        }
+        foreach ($company in @(Get-ChildItem -Path $root -ErrorAction SilentlyContinue)) {
+            foreach ($tag in @(Get-ChildItem -Path $company.PSPath -ErrorAction SilentlyContinue)) {
+                if ($tag.PSChildName -notlike "$VersionDotted*") {
+                    continue
+                }
+                $installKeyPath = Join-Path $tag.PSPath 'InstallPath'
+                if (-not (Test-Path -Path $installKeyPath)) {
+                    continue
+                }
+                $installKey = Get-Item -Path $installKeyPath -ErrorAction SilentlyContinue
+                if ($null -eq $installKey) {
+                    continue
+                }
+                $executable = $installKey.GetValue('ExecutablePath')
+                if (-not $executable) {
+                    $installFolder = $installKey.GetValue('')
+                    if ($installFolder) {
+                        $executable = Join-Path $installFolder 'python.exe'
+                    }
+                }
+                if ($executable -and (Test-Path -LiteralPath $executable)) {
+                    $paths += $executable
+                }
+            }
+        }
+    }
+    return @($paths | Select-Object -Unique)
+}
+
 function Find-RequiredPython {
-    <# Returns @{ Command; PrefixArguments; Version } for the first Python 3.15 found, or $null. #>
-    $candidates = @(
-        @{ Command = 'py'; PrefixArguments = @('-3.15') },
-        @{ Command = 'py'; PrefixArguments = @('-V:3.15') },
-        @{ Command = 'python'; PrefixArguments = @() },
-        @{ Command = 'python3'; PrefixArguments = @() }
-    )
+    <#
+        Returns @{ Command; PrefixArguments; Version } for the first Python 3.15 found, or $null.
+        Other versions met on the way are recorded in $OtherPythons for the error message.
+    #>
+    param([string]$ExplicitPath)
+
+    $candidates = @()
+    if ($ExplicitPath) {
+        $candidates += @{ Command = $ExplicitPath; PrefixArguments = @(); Label = "-Python '$ExplicitPath'" }
+    }
+    else {
+        $candidates += @{ Command = 'py'; PrefixArguments = @("-$VersionDotted"); Label = "py -$VersionDotted" }
+        $candidates += @{ Command = 'py'; PrefixArguments = @("-V:$VersionDotted"); Label = "py -V:$VersionDotted" }
+        foreach ($name in @("python$VersionDotted", 'python', 'python3')) {
+            $candidates += @{ Command = $name; PrefixArguments = @(); Label = "'$name' on PATH" }
+        }
+        foreach ($path in @(Get-KnownPythonPath)) {
+            $candidates += @{ Command = $path; PrefixArguments = @(); Label = $path }
+        }
+    }
+
     foreach ($candidate in $candidates) {
         $version = Get-PythonVersion -Command $candidate.Command -PrefixArguments $candidate.PrefixArguments
+        if ($null -eq $version) {
+            continue
+        }
         if (Test-RequiredVersion -Version $version) {
+            Write-Verbose "Using $($candidate.Label) (Python $version)."
             return @{ Command = $candidate.Command; PrefixArguments = $candidate.PrefixArguments; Version = $version }
+        }
+        $note = "$($candidate.Label) is Python $version"
+        if (-not $OtherPythons.Contains($note)) {
+            $OtherPythons.Add($note)
         }
     }
     return $null
@@ -154,19 +244,28 @@ try {
     }
 
     if (-not (Test-RequiredVersion -Version $venvVersion)) {
-        $python = Find-RequiredPython
-        if ($null -eq $python) {
-            throw ("Python $RequiredVersion was not found. Install it from $DownloadPage " +
-                "(with the Python install manager you can run: py install $RequiredVersion), " +
-                'then run this launcher again.')
+        $interpreter = Find-RequiredPython -ExplicitPath $Python
+        if ($null -eq $interpreter) {
+            $found = 'No other Python was found either.'
+            if ($OtherPythons.Count -gt 0) {
+                $found = 'Found instead: ' + ($OtherPythons -join '; ') + '.'
+            }
+            if ($Python) {
+                throw "The -Python path is not a working Python $RequiredVersion. $found"
+            }
+            throw ("Python $RequiredVersion was not found. Looked at the py launcher, python on PATH, " +
+                "the standard install folders and the registry. $found " +
+                "If Python $RequiredVersion is installed, pass its python.exe with -Python " +
+                "(run 'py --list' or 'where.exe python' to locate it). " +
+                "Otherwise install it from $DownloadPage and run this launcher again.")
         }
         if (Test-Path -LiteralPath $VenvDir) {
             Write-Status "The existing .venv is not Python $RequiredVersion; rebuilding it."
             Remove-Item -LiteralPath $VenvDir -Recurse -Force
         }
-        Write-Status "Creating .venv with Python $($python.Version)."
-        $venvArguments = @($python.PrefixArguments) + @('-m', 'venv', $VenvDir)
-        Invoke-Native -Command $python.Command -Arguments $venvArguments -Description 'Creating the virtual environment'
+        Write-Status "Creating .venv with Python $($interpreter.Version)."
+        $venvArguments = @($interpreter.PrefixArguments) + @('-m', 'venv', $VenvDir)
+        Invoke-Native -Command $interpreter.Command -Arguments $venvArguments -Description 'Creating the virtual environment'
     }
     else {
         Write-Status "Using the existing .venv (Python $venvVersion)."
