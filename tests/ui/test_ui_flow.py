@@ -291,7 +291,7 @@ def test_every_reaction_control_is_inside_the_panel_with_five_reactors(tmp_path,
     assert title in drawn and title not in shortened, "the enemy's action name is cut off in the intent panel"
     assert "costs 1 mana" in drawn and "costs 1 mana" not in shortened
     panel = play.ui.r(8, 476, 1264, 214)
-    rows = [k for k in play.ui.keys("react:") if k.count(":") == 1 and k != "react:skip"]
+    rows = [k for k in play.ui.keys("react:") if k.count(":") == 1 and k not in ("react:skip", "react:skip_all")]
     assert len(rows) == 5
     for key in play.ui.keys("react:"):
         assert panel.contains(play.ui.widget(key).rect), f"{key} is drawn outside the reaction panel"
@@ -819,3 +819,195 @@ def test_arrow_keys_move_the_focus_ring_and_f_and_m_toggle_pacing(tmp_path):
     animated = play.ui.anim.enabled
     play.key(pygame.K_m)
     assert play.ui.anim.enabled is (not animated) and "Animation" in play.ctrl.message
+
+
+# --------------------------------------------------------------------------------------------
+# Fixes from the scenario playtest (docs/PLAYTEST.md)
+# --------------------------------------------------------------------------------------------
+
+
+def _win_battle_1(play):
+    for enemy in play.combat.side("enemy"):
+        enemy.hp = 1
+    for _ in range(200):
+        play.to_input()
+        if play.ctrl.screen != Screen.BATTLE:
+            break
+        if "plan:roll" in play.ui.keys():
+            play.roll_faces(iron_d6=1, oath_d4=1)
+            play.key(pygame.K_1)
+            play.key(pygame.K_RETURN)
+        else:
+            play.ctrl.skip_stage()
+            play.app.frame(0)
+    assert play.ctrl.screen == Screen.UPGRADE
+
+
+@pytest.mark.parametrize("size", SIZES)
+def test_a_weakened_attack_shows_what_it_will_really_deal_on_the_die_and_in_the_plan(tmp_path, monkeypatch, size, font):
+    play = Play(tmp_path, ["squire"], size=size)
+    play.begin()
+    play.to_roll_prompt()
+    play.combat.combatants["h01"].status_instances = [StatusInstance("st900", "weaken", "x", "h01", 1, 2, 0)]
+    play.roll_faces(iron_d6=6, oath_d4=1)  # Blank and Jab, with exactly one Weaken stack
+    drawn, shortened = record_text(monkeypatch)
+    play.app.frame(0)
+    assert "Now deals 0 (Weaken -1)" in drawn and "Now deals 0 (Weaken -1)" not in shortened
+    play.key(pygame.K_2)
+    drawn.clear()
+    play.app.frame(0)
+    assert drawn.count("Now deals 0 (Weaken -1)") == 2, "the die card and the plan line both say it"
+    assert not [t for t in shortened if t.startswith("Now ")]
+
+
+@pytest.mark.parametrize("size", SIZES)
+def test_class_bonuses_are_shown_where_the_player_plans(tmp_path, monkeypatch, size, font):
+    squire = Play(tmp_path, ["squire"], size=size)
+    squire.begin()
+    squire.to_roll_prompt()
+    squire.roll_faces(iron_d6=3, oath_d4=4)  # Guard
+    drawn, shortened = record_text(monkeypatch)
+    squire.app.frame(0)
+    note = next(t for t in drawn if t.startswith("Now +"))
+    assert note.endswith("shield (Steadfast +1)") and note not in shortened
+
+    apprentice = Play(tmp_path, ["apprentice"], size=size)
+    apprentice.begin()
+    apprentice.to_roll_prompt()
+    apprentice.combat.combatants["h01"].corruption = 3
+    apprentice.combat.combatants["h01"].status_instances = []
+    apprentice.roll_faces(arcane_d6=1, focus_d4=4)  # Arcane Bolt at the Arcane Resonance threshold
+    drawn.clear()
+    apprentice.app.frame(0)
+    note = next(t for t in drawn if t.startswith("Now deals "))
+    assert note.endswith("(Arcane Resonance +1)") and note not in shortened
+
+    scout = Play(tmp_path, ["scout"], size=size)
+    scout.begin()
+    scout.to_roll_prompt()
+    scout.combat.combatants["h01"].status_instances = []
+    scout.roll_faces(striker_d8=4, tools_d4=1)  # Poison, then Quick Shot
+    scout.key(pygame.K_1)
+    scout.key(pygame.K_2)
+    assert scout.ctrl.confirm_problem() is None
+    drawn.clear()
+    scout.app.frame(0)
+    assert "Now deals 2 (Exploit Opening +1)" in drawn, "the combo bonus appears on the plan line"
+    assert not [t for t in shortened if t.startswith("Now ")]
+
+
+def test_a_die_in_the_plan_is_not_labelled_will_reroll(tmp_path, monkeypatch):
+    play = Play(tmp_path, ["squire"])
+    play.begin()
+    play.to_roll_prompt()
+    play.roll_faces(iron_d6=1, oath_d4=4)
+    drawn, _ = record_text(monkeypatch)
+    play.app.frame(0)
+    assert drawn.count("will reroll") == 2
+    play.key(pygame.K_1)
+    drawn.clear()
+    play.app.frame(0)
+    assert drawn.count("will reroll") == 1 and "IN PLAN" in drawn
+
+
+def test_the_reroll_hint_is_given_on_the_first_roll_of_a_run_only(tmp_path):
+    play = Play(tmp_path, ["squire"])
+    play.begin()
+    play.to_roll_prompt()
+    play.key(pygame.K_r)
+    assert play.ctrl.message.startswith("Rolled. Reroll (R) rerolls every die you have not kept")
+    play.key(pygame.K_p)
+    play.to_roll_prompt()
+    play.key(pygame.K_r)
+    assert play.ctrl.message == "Keep dice, reroll the rest, then choose actions."
+
+
+@pytest.mark.parametrize("size", SIZES)
+def test_a_reaction_decision_is_announced_and_skip_all_ends_it(tmp_path, monkeypatch, size, font):
+    play = Play(tmp_path, ["squire", "apprentice", "scout"], seed=21, size=size)
+    play.begin()
+    play.until(lambda: "react:skip" in play.ui.keys())
+    assert play.ctrl.message.startswith("An enemy action is revealed."), "the first prompt explains what a reaction is"
+    drawn, shortened = record_text(monkeypatch)
+    play.app.frame(0)
+    for label in ("Skip", "Skip All", "(S) this stage", "(A) all stages"):
+        assert label in drawn and label not in shortened
+    panel = play.ui.r(8, 476, 1264, 214)
+    assert panel.contains(play.ui.widget("react:skip").rect) and panel.contains(play.ui.widget("react:skip_all").rect)
+    intent_id = play.combat.committed_intent.id
+    windows = len([e for e in play.ctrl.engine.events if e.type == "reaction_stage_opened"])
+    play.key(pygame.K_a)
+    assert "every stage skipped" in play.ctrl.message
+    play.to_input()
+    assert "react:skip" not in play.ui.keys() or play.combat.committed_intent.id != intent_id, \
+        "no further stage of the same enemy action asks again"
+    used = [e for e in play.ctrl.engine.events if e.type == "reaction_used" and e.intent_id == intent_id]
+    assert not used and len([e for e in play.ctrl.engine.events if e.type == "reaction_stage_opened"]) >= windows
+    # The next enemy action asks again, with the shorter reminder.
+    play.until(lambda: "react:skip" in play.ui.keys())
+    assert play.combat.committed_intent.id != intent_id
+    assert play.ctrl.message == "Reaction decision: pick a reaction, Skip Stage (S), or Skip All (A)."
+
+
+def test_swapping_out_the_larger_die_needs_a_second_press(tmp_path, monkeypatch):
+    play = Play(tmp_path, ["squire"])
+    play.begin()
+    play.to_input()
+    _win_battle_1(play)
+    play.click("up:offer:0")
+    play.click("up:apply")
+    assert "up:swap:h01:iron_d6" in play.ui.keys()
+    play.click("up:swap:h01:oath_d4") if "iron_d6" in play.ctrl.engine.state.upgrades[0]["die_id"] else None
+    engine = play.ctrl.engine
+    upgraded = engine.state.upgrades[0]["die_id"]
+    if upgraded == "iron_d6":  # the upgraded die is locked; nothing larger can be given up in this run
+        assert engine.combat.combatants["h01"].equipped_dice_ids.count("bulwark_d4") == 1
+        return
+    play.click("up:swap:h01:iron_d6")
+    assert "iron_d6" in engine.combat.combatants["h01"].equipped_dice_ids, "the first press only warns"
+    assert play.ctrl.message_is_error and "gives up the larger die" in play.ctrl.message
+    drawn, shortened = record_text(monkeypatch)
+    play.app.frame(0)
+    assert "Confirm: give up Iron d6" in drawn and "Confirm: give up Iron d6" not in shortened
+    play.click("up:swap:h01:iron_d6")
+    assert "bulwark_d4" in engine.combat.combatants["h01"].equipped_dice_ids
+    assert "iron_d6" not in engine.combat.combatants["h01"].equipped_dice_ids
+
+
+@pytest.mark.parametrize("size", SIZES)
+def test_the_outcome_screen_gives_a_tip_only_for_a_mechanic_that_went_unused(tmp_path, monkeypatch, size, font):
+    play = Play(tmp_path, ["scout"], seed=3, size=size)
+    play.begin()
+    play.to_input()
+    for hero in play.combat.side("hero"):
+        hero.hp, hero.mana, hero.shields = 1, 0, 0
+    play.until(lambda: False)  # passes every turn and skips every stage
+    assert play.ctrl.screen == Screen.OUTCOME
+    drawn, shortened = record_text(monkeypatch)
+    play.app.frame(0)
+    tips = [t for t in drawn if t.startswith("Tip: ")]
+    assert any("no reroll was used" in t for t in tips)
+    assert not [t for t in shortened if t.startswith("Tip: ")]
+    assert play.ctrl.outcome_tips() == tips
+
+    used = Play(tmp_path, ["scout"], seed=3, size=size)
+    used.begin()
+    used.to_roll_prompt()
+    used.key(pygame.K_r)
+    used.key(pygame.K_r)  # one reroll
+    for hero in used.combat.side("hero"):
+        hero.hp, hero.mana, hero.shields = 1, 0, 0
+    used.until(lambda: False)
+    assert used.ctrl.screen == Screen.OUTCOME
+    assert not any("no reroll was used" in t for t in used.ctrl.outcome_tips())
+
+
+def test_the_status_bar_names_the_rules_and_the_content_version_separately(tmp_path, monkeypatch):
+    from battle_dice import RULES_VERSION
+
+    ctrl = AppController(fixed_seed=1, log_dir=tmp_path / "logs")
+    app = GameApp(ctrl, size=(1280, 720), headless=True, animations=False)
+    drawn, shortened = record_text(monkeypatch)
+    app.frame(0)
+    label = f"rules {RULES_VERSION}   content {ctrl.content.content_version}"
+    assert label in drawn and label not in shortened

@@ -109,12 +109,17 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 | U-18 | **Readable rules text.** Pointing at or focusing a unit card replaces the combat log with an inspect panel: stats, every status stack with what it does, and the full ability list (enemies) or dice, reaction and passive (heroes). Die face rules wrap onto a second line instead of being cut. Unit cards sum status stacks per kind and pick the longest form that fits (`PSN x3 (1-2)`, then `PSN 3(1-2)`, then `P3(1-2)`); the gauge number gives way before the status text can overlap it, and the gauge bar always stays. Names keep their trailing number when shortened. Font widths differ widely between machines (DejaVu Sans is about 40% wider than Liberation Sans), so these layouts are chosen by measuring the text, and the text-fit tests run under the machine's own font, DejaVu Sans where installed, and pygame's bundled font. |
 | U-19 | While a die tumbles the planner shows "Rolling ..." and no face name or rules text, so it never states a face that was not rolled. The buttons act on the real result throughout. |
 | U-20 | A log file name that already exists gets a numeric suffix, so a second session with the same `--seed` does not overwrite the first log. An unexpected crash of the main loop writes `crash-<time>.txt` in the log folder and exits 1. Faults while editing the plan, routing input or animating reach the error screen instead of closing the window. |
+| U-21 | **Forecast line (playtest finding 1).** Where an action will not produce its printed amount, a yellow "Now ..." line says what it will produce and why: "Now deals 0 (Weaken -1)", "Now +4 shield (Steadfast +1)", "Now deals 2 (Exploit Opening +1)". It appears on the rolled die, on the plan line and, for a weakened enemy, in the intent panel. `core/view.py` `action_forecast` calls the engine's own `damage_breakdown` and `shield_bonus`; unit tests compare every forecast with the resolved amount. A combo bonus is forecast on the plan line only, because it depends on the plan and assumes the first action resolves. |
+| U-22 | **One-time guidance (finding 2).** The first roll of a run explains Reroll and Keep; the first reaction prompt explains what a reaction is. The outcome screen adds a tip when no reroll, or no reaction, was used in the whole run. |
+| U-23 | **Skip All (finding 5).** In a reaction window, A declines every remaining stage of the current enemy action; S still skips one stage. The engine is sent the same `SkipReactionStage` commands, so logs and replays are unchanged in kind. |
+| U-24 | **Swap warning (finding 4).** Swapping out a die larger than the bench die warns first and needs a second press. The engine rule (any equipped die may be swapped out) is unchanged. |
+| U-25 | Small fixes (findings 7 to 9): the status bar names rules and content versions separately; a reaction decision sets its own status line; a die in the plan is no longer labelled "will reroll". |
 
 ## 6. Acceptance evidence
 
-465 automated tests pass on the reference environment (Linux container, Python 3.15.2,
-pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 233 unit, 78 fixture, 49 integration,
-105 headless UI and graphics. `ruff` 0.17.4 and `mypy` 2.4.1 are clean with their 3.15 targets.
+500 automated tests pass on the reference environment (Linux container, Python 3.15.2,
+pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 240 unit, 78 fixture, 49 integration,
+133 headless UI and graphics. `ruff` 0.17.4 and `mypy` 2.4.1 are clean with their 3.15 targets.
 
 Line coverage of the rules engine, content loader and random numbers (`battle_dice.core`,
 `battle_dice.content`, `battle_dice.rng`) is 97% against the PRD target of at least 80%. CI fails
@@ -325,6 +330,11 @@ game behaviour. Its nine findings (previews that show base numbers and not the r
 newcomer win rate of 8%, between-battle choices that do not change outcomes, an unguarded die
 swap, reaction-prompt fatigue, risk-free rerolls and three small screen defects) await owner
 decisions. No person has play-tested the game; the document contains a session script for that.
+
+Owner decisions on the findings (2026-11-10): fix findings 1, 2, 4, 5, 7, 8 and 9 (done, U-21 to
+U-25; re-test in `docs/PLAYTEST.md` section 8); measure options for findings 3 and 6 after the
+class balance retune and propose them. Still an owner decision: whether Interpose should be
+offered at the shield cap (a rule change).
 
 ## 8. Known limits after the MVP review (2026-11-10)
 

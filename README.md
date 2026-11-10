@@ -130,7 +130,7 @@ Every screen works with the mouse or with the keyboard alone.
 | Main menu | `N` new run, `C` controls, `Q` quit |
 | Party setup | `1` `2` `3` add Squire / Apprentice / Scout, `B` or `Enter` begin |
 | Hero activation | `R` roll, then reroll unkept; `Z` `X` keep die 1 / 2; `1` `2` plan die 1 / 2; number keys pick a numbered target; `O` swap tie order; `C` clear; `Enter` confirm; `P` pass |
-| Reaction window | a row's number uses that hero's reaction; if it asks for an ally, press the ally's number next; `S` skip stage |
+| Reaction window | a row's number uses that hero's reaction; if it asks for an ally, press the ally's number next; `S` skip stage; `A` skip every remaining stage for this enemy action |
 | Pacing | `F` fast mode, `Space` step now while resolving, `M` animation on / off |
 | During a run | `Esc` menu (cancels a target choice first) |
 | Upgrade | `1` `2` `3` select a card, `A` apply, `Enter` start Battle 2 |
@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 465 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
+python -m pytest                 # 500 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice/core src/battle_dice/rng.py src/battle_dice/content src/battle_dice/sim src/battle_dice/app src/battle_dice/replay_cli.py
 ```
