@@ -13,7 +13,7 @@ from battle_dice.app.controller import AppController, Screen
 from battle_dice.core import replay
 from battle_dice.core.events import events_hash, state_hash
 from battle_dice.replay_cli import main as replay_main
-from battle_dice.sim.policies import HeuristicPolicy
+from battle_dice.sim.policies import POLICY_VERSION, HeuristicPolicy
 
 ROOT = Path(__file__).resolve().parents[2]
 PIN = json.loads((ROOT / "tests" / "golden" / "replay_pin.json").read_text(encoding="utf-8"))
@@ -152,6 +152,9 @@ def test_the_pin_was_made_for_this_rules_and_content_version(content):
     assert (PIN["rules_version"], PIN["content_version"], PIN["content_hash"]) == (
         RULES_VERSION, content.content_version, content.content_hash,
     ), "rules or content changed: run tools/update_replay_pin.py if that was intended"
+    assert PIN["policy_version"] == POLICY_VERSION, (
+        "the scripted player that plays the pinned runs changed: run tools/update_replay_pin.py if that was intended"
+    )
 
 
 @pytest.mark.parametrize("pinned", PIN["runs"], ids=[f"seed{run['seed']}-{len(run['party'])}heroes" for run in PIN["runs"]])

@@ -6,20 +6,25 @@ They use their own PCG stream for any randomness, never the engine's streams.
 
 from __future__ import annotations
 
+import dataclasses
+import itertools
+import time
 from typing import Any
 
 from battle_dice import rng
 from battle_dice.core import commands as cmd
-from battle_dice.core import planning, reactions
-from battle_dice.core.effects import damage_breakdown
+from battle_dice.core import planning, progression, reactions
+from battle_dice.core.effects import damage_breakdown, shield_bonus
 from battle_dice.core.engine import Engine
 from battle_dice.core.models import (
     STATE_DOWNED,
     STATUS_POISON,
     STATUS_WEAKEN,
+    ActionIntent,
     Combatant,
     CombatPhase,
     FaceDefinition,
+    HeroTurn,
     RunPhase,
 )
 
@@ -33,26 +38,68 @@ def _must(result: Any, what: str) -> None:
         raise PolicyError(f"{what} was rejected: {result.reason}")
 
 
+#: Bumped whenever the heuristic player's decisions change, so result files and the replay pin say
+#: which player produced them. 1 = threshold keep rule (to rules 1.1.1); 2 = look-ahead player.
+POLICY_VERSION = 2
+
+#: Score weights for statuses a face applies, and for the same statuses when an enemy applies them to a hero.
+_STATUS_SCORE = {STATUS_POISON: 2.5, STATUS_WEAKEN: 1.8}
+_DOWN_BONUS = 3.0
+_MANA_WORTH = 0.6
+_SHIELD_WORTH = 0.5
+
+
 class HeuristicPolicy:
-    """A simple informed player: keeps useful dice, rerolls the rest, picks the best-scoring plan."""
+    """An informed scripted player.
+
+    - **Keep or reroll:** exact look-ahead. Every possible roll of the hero's dice is scored by its best
+      plan, and the dice to keep are the subset with the highest expected score over the rerolls left.
+    - **Scoring:** the engine's own amounts (weaken, Steadfast, the Scout's combo bonus), applied in
+      resolution order so two actions cannot both claim the same kill.
+    - **Reactions:** used only when they prevent something; mana for a revival is held back while an
+      ally is down.
+    - **Upgrades:** the offer that raises its die's average face value the most.
+
+    It values the current activation only. It is a competent player, not an optimal one.
+    """
 
     name = "heuristic"
+    version = POLICY_VERSION
+    #: Each part can be switched off, to measure what it contributes (decision log 7.6).
+    lookahead = True
+    real_amounts = True
+    selective_reactions = True
+    value_upgrades = True
+    #: Used only when ``lookahead`` is off: the version 1 rule (keep the best plan's dice if it scores this much).
     keep_threshold = 2.0
+
+    def __init__(self) -> None:
+        #: Seconds spent inside engine commands, so the simulator can report engine latency without
+        #: the player's own thinking time.
+        self.engine_seconds = 0.0
+        self._stop_values: dict[tuple[Any, ...], tuple[float, list[dict[str, Any]]]] = {}
+        self._stop_key: tuple[int, int, str] | None = None
+
+    def _send(self, engine: Engine, command_type: str, **params: Any) -> None:
+        started = time.perf_counter()
+        result = engine.do(command_type, **params)
+        self.engine_seconds += time.perf_counter() - started
+        _must(result, command_type)
 
     def act(self, engine: Engine) -> None:
         state = engine.state
         if state.phase == RunPhase.UPGRADE:
             self._upgrade(engine)
         elif state.phase == RunPhase.EQUIPMENT:
-            _must(engine.do(cmd.ADVANCE_PHASE), "AdvancePhase")
+            self._send(engine, cmd.ADVANCE_PHASE)
         elif state.phase == RunPhase.BATTLE:
             phase = engine.combat.phase
             if phase == CombatPhase.HERO_ROLL:
-                _must(engine.do(cmd.ROLL_DICE), "RollDice")
+                self._send(engine, cmd.ROLL_DICE)
             elif phase == CombatPhase.KEEP_REROLL:
                 self._keep_or_plan(engine)
             elif phase == CombatPhase.ACTION_PLAN:
-                _must(engine.do(cmd.COMMIT_ACTION_PLAN), "CommitActionPlan")
+                self._send(engine, cmd.COMMIT_ACTION_PLAN)
             elif phase in (CombatPhase.GUARD_WINDOW, CombatPhase.RESOURCE_WINDOW, CombatPhase.INTERRUPT_WINDOW):
                 self._react(engine)
             else:  # pragma: no cover - callers only invoke policies at decision points
@@ -60,109 +107,356 @@ class HeuristicPolicy:
 
     # -- scoring -----------------------------------------------------------------------------
 
-    def _score_action(self, engine: Engine, hero: Combatant, face: FaceDefinition, target_ids: list[str]) -> float:
+    def _score_plan(self, engine: Engine, hero: Combatant, intents: list[ActionIntent]) -> float:
+        """Value of a plan, with its actions applied in resolution order to projected health and shields."""
         combat = engine.combat
+        shield_cap = engine.content.balance["shield"]["cap"]
+        passive = engine.content.class_def(hero.archetype_id)["passive"]
+        first_category = engine.content.class_def(hero.archetype_id)["scheduling"].get("first_category")
+        hp: dict[str, int] = {}
+        shields: dict[str, int] = {}
+        status_credit: dict[str, float] = {}
+        mana = hero.mana
+        corruption = hero.corruption
         score = 0.0
-        targets = [combat.combatants[t] for t in target_ids] or [hero]
-        for effect in face.effects:
-            recipients = [hero] if effect.get("target", "target") == "self" else targets
-            for target in recipients:
-                kind = effect["type"]
-                amount = face.effect_amount(effect)
-                if kind == "damage":
-                    dealt = damage_breakdown(engine, hero, face, effect, None)["effective"]
-                    hp_damage = max(0, dealt - target.shields)
-                    score += min(hp_damage, target.hp) * 1.0
-                    if hp_damage >= target.hp:
-                        score += 3.0
-                elif kind == "shield":
-                    room = engine.content.balance["shield"]["cap"] - target.shields
-                    urgency = 1.0 if target.hp * 2 <= target.max_hp else 0.5
-                    score += min(amount, room) * urgency * (0.3 if target.shields >= 4 else 1.0)
-                elif kind == "heal":
-                    if target.state == STATE_DOWNED:
-                        score += 8.0 if face.can_revive else 0.0
-                    else:
-                        score += min(amount, target.max_hp - target.hp) * 1.2
-                elif kind == "apply_status":
-                    cap = engine.content.status_cap(effect["status"])
-                    if target.stacks_of(effect["status"]) < cap:
-                        score += {STATUS_POISON: 2.5, STATUS_WEAKEN: 1.8}.get(effect["status"], 1.0)
-                    else:
-                        score += 0.3
-                elif kind == "gain_mana":
-                    score += min(amount, target.max_mana - target.mana) * 0.6
-                elif kind == "gain_corruption":
-                    score -= 0.4 * amount if target.corruption + amount >= 5 else 0.0
-                elif kind == "remove_corruption":
-                    removed = min(amount, target.corruption)
-                    score += removed * (1.5 if target.corruption >= 4 else 0.4)
+        for position, intent in enumerate(intents):
+            face = engine.intent_face(intent)
+            targets = [combat.combatants[t] for t in intent.committed_target_ids] or [hero]
+            mana -= face.mana_cost
+            for effect in face.effects:
+                recipients = [hero] if effect.get("target", "target") == "self" else targets
+                for target in recipients:
+                    kind = effect["type"]
+                    amount = face.effect_amount(effect)
+                    target_hp = hp.get(target.id, target.hp)
+                    target_shields = shields.get(target.id, target.shields)
+                    if kind == "damage":
+                        dealt = damage_breakdown(engine, hero, face, effect, None)["effective"]
+                        if (
+                            self.real_amounts
+                            and passive["type"] == "combo_attack_bonus"
+                            and face.category == "attack"
+                            and len(intents) == 2
+                            and position == 1
+                            and intents[0].category == first_category
+                        ):
+                            dealt += int(passive["amount"])
+                        hp_damage = min(max(0, dealt - target_shields), target_hp)
+                        score += hp_damage * 1.0
+                        if hp_damage >= target_hp > 0:
+                            score += _DOWN_BONUS
+                        if self.real_amounts:
+                            shields[target.id] = max(0, target_shields - dealt)
+                            hp[target.id] = target_hp - hp_damage
+                    elif kind == "shield":
+                        if self.real_amounts:
+                            amount += shield_bonus(engine, hero, face, target, intent)
+                        gained = min(amount, shield_cap - target_shields)
+                        urgency = 1.0 if target_hp * 2 <= target.max_hp else 0.5
+                        score += gained * urgency * (0.3 if target_shields >= 4 else 1.0)
+                        if self.real_amounts:
+                            shields[target.id] = target_shields + gained
+                    elif kind == "heal":
+                        if target.state == STATE_DOWNED:
+                            score += 8.0 if face.can_revive else 0.0
+                        else:
+                            healed = min(amount, target.max_hp - target_hp)
+                            score += healed * 1.2
+                            if self.real_amounts:
+                                hp[target.id] = target_hp + healed
+                    elif kind == "apply_status":
+                        cap = engine.content.status_cap(effect["status"])
+                        credit = _STATUS_SCORE.get(effect["status"], 1.0) if target.stacks_of(effect["status"]) < cap else 0.3
+                        score += credit
+                        status_credit[target.id] = status_credit.get(target.id, 0.0) + credit
+                    elif kind == "gain_mana":
+                        gained = min(amount, target.max_mana - (mana if self.real_amounts else target.mana))
+                        score += gained * 0.6
+                        mana += gained
+                    elif kind == "gain_corruption":
+                        current = corruption if self.real_amounts else target.corruption
+                        score -= 0.4 * amount if current + amount >= 5 else 0.0
+                        corruption += amount
+                    elif kind == "remove_corruption":
+                        removed = min(amount, target.corruption)
+                        score += removed * (1.5 if target.corruption >= 4 else 0.4)
+        if self.real_amounts:
+            # A status on an enemy that the same plan defeats does nothing.
+            score -= sum(credit for target_id, credit in status_credit.items() if hp.get(target_id, 1) <= 0)
         return score
 
-    def _best_plan(self, engine: Engine) -> tuple[list[dict[str, Any]], float]:
-        hero, turn = engine._active_hero()
+    def _best_plan(self, engine: Engine, hero: Combatant, turn: HeroTurn) -> tuple[list[dict[str, Any]], float]:
+        """The best-scoring legal plan for ``turn``'s roll. ``turn`` may be a copy holding a roll that
+        has not happened; nothing in the engine is changed.
+
+        Which dice may act together, and in what order, does not depend on the targets, so each legal
+        set of dice is built once and its target choices are scored on copies of the intents.
+        """
         best: list[dict[str, Any]] = []
         best_score = 0.0
-        for plan in planning.enumerate_plans(engine, hero, turn):
-            intents, problem = engine.preview_plan(plan)
-            if problem:
+        choices = {
+            o["die_id"]: [[]] if o["face"].target_scope in ("all_enemies", "all_allies", "self")
+            else [[t] for t in o["eligible_target_ids"]]
+            for o in planning.die_options(engine, hero, turn)
+        }
+        for shape in planning.enumerate_plans(engine, hero, turn, include_targets=False):
+            try:
+                template = planning.build_plan(engine, hero, turn, shape)
+            except planning.PlanError:  # pragma: no cover - enumerate_plans only returns legal plans
                 continue
-            score = sum(
-                self._score_action(engine, hero, engine.intent_face(i), i.committed_target_ids) for i in intents
-            )
-            if score > best_score + 1e-9:
-                best, best_score = plan, score
+            fixed = {i.source_die_id: i.committed_target_ids for i in template}
+            for targets in itertools.product(*(choices[a["die_id"]] for a in shape)):
+                chosen = {a["die_id"]: t for a, t in zip(shape, targets, strict=True)}
+                intents = [
+                    dataclasses.replace(i, committed_target_ids=chosen[i.source_die_id] or fixed[i.source_die_id])
+                    for i in template
+                ]
+                score = self._score_plan(engine, hero, intents)
+                if score > best_score + 1e-9:
+                    best = [{"die_id": a["die_id"], "target_ids": list(chosen[a["die_id"]])} for a in shape]
+                    best_score = score
         return best, best_score
 
-    # -- decisions ---------------------------------------------------------------------------
+    # -- keep or reroll ----------------------------------------------------------------------
+
+    def _choose_keep(self, engine: Engine, hero: Combatant, turn: HeroTurn) -> tuple[list[str], list[dict[str, Any]]]:
+        """``(dice to keep, plan to submit if nothing is rerolled)`` for the current roll.
+
+        Exact look-ahead: ``value[0]`` of a roll is its best plan's score; ``value[r]`` is the best
+        expected ``value[r - 1]`` over every choice of dice to keep. Every face of a die is equally
+        likely, as in ``Engine._roll_die``.
+        """
+        dice = sorted(turn.rolled)
+        faces = {d: engine.die_for(hero.id, d).faces for d in dice}
+        key = (id(engine), engine.revision, hero.id)
+        if self._stop_key != key:
+            self._stop_values = {}
+
+        def stop(roll: tuple[int, ...]) -> tuple[float, list[dict[str, Any]]]:
+            signature = tuple(faces[d][i].signature() for d, i in zip(dice, roll, strict=True))
+            if signature not in self._stop_values:
+                imagined = dataclasses.replace(turn, rolled=dict(zip(dice, roll, strict=True)), kept=[], plan=[])
+                plan, score = self._best_plan(engine, hero, imagined)
+                self._stop_values[signature] = (score, plan)
+            score, plan = self._stop_values[signature]
+            # The cached plan may come from another roll with the same faces; only its score is shared.
+            return score, plan
+
+        current = tuple(turn.rolled[d] for d in dice)
+        plan, _ = self._best_plan(engine, hero, turn)
+        if turn.rerolls_remaining <= 0:
+            return list(dice), plan
+        rolls = list(itertools.product(*(range(len(faces[d])) for d in dice)))
+        value = {roll: stop(roll)[0] for roll in rolls}
+        subsets = [
+            tuple(d for d, keep in zip(dice, mask, strict=True) if keep)
+            for mask in itertools.product((True, False), repeat=len(dice))
+        ]  # keeps-everything first, so a tie never rerolls
+
+        def expected(roll: tuple[int, ...], kept: tuple[str, ...], table: dict[tuple[int, ...], float]) -> float:
+            options = [(roll[i],) if d in kept else tuple(range(len(faces[d]))) for i, d in enumerate(dice)]
+            outcomes = list(itertools.product(*options))
+            return sum(table[o] for o in outcomes) / len(outcomes)
+
+        best_keep = tuple(dice)
+        for remaining in range(1, turn.rerolls_remaining + 1):
+            table = value
+            if remaining == turn.rerolls_remaining:
+                best_value = -1.0
+                for kept in subsets:
+                    candidate = expected(current, kept, table)
+                    if candidate > best_value + 1e-9:
+                        best_keep, best_value = kept, candidate
+            else:
+                value = {roll: max(expected(roll, kept, table) for kept in subsets) for roll in rolls}
+        self._stop_key = key
+        return list(best_keep), plan
 
     def _keep_or_plan(self, engine: Engine) -> None:
         hero, turn = engine._active_hero()
-        plan, score = self._best_plan(engine)
-        used = sorted(a["die_id"] for a in plan)
-        keep = used if score >= self.keep_threshold else []
+        if self.lookahead:
+            keep, plan = self._choose_keep(engine, hero, turn)
+        else:
+            plan, score = self._best_plan(engine, hero, turn)
+            keep = sorted(a["die_id"] for a in plan) if score >= self.keep_threshold else []
         unkept = [d for d in sorted(turn.rolled) if d not in keep]
         if turn.rerolls_remaining > 0 and unkept:
             if sorted(turn.kept) != keep:
-                _must(engine.do(cmd.SET_KEPT_DICE, die_ids=keep), "SetKeptDice")
-            _must(engine.do(cmd.REROLL_UNKEPT), "RerollUnkept")
+                self._send(engine, cmd.SET_KEPT_DICE, die_ids=keep)
+            self._send(engine, cmd.REROLL_UNKEPT)
+            if self._stop_key is not None:
+                self._stop_key = (id(engine), engine.revision, hero.id)  # the same activation continues
             return
-        _must(engine.do(cmd.SET_ACTION_PLAN, actions=plan), "SetActionPlan")
+        self._send(engine, cmd.SET_ACTION_PLAN, actions=plan)
+
+    # -- reactions ---------------------------------------------------------------------------
+
+    def _harm(self, engine: Engine, intent: ActionIntent, target: Combatant, extra_shield: int = 0,
+              damage_cut: int = 0, magnitude_cut: int = 0) -> float:
+        """How bad the committed enemy action is for one hero, in the same units as plan scores.
+
+        Lost health counts in full. Lost shields count at half, because shields last until they are
+        spent: a hit they absorb still costs the party something.
+        """
+        combat = engine.combat
+        enemy = combat.combatants[intent.actor_id]
+        face = engine.intent_face(intent)
+        shields = target.shields + extra_shield
+        harm = -_SHIELD_WORTH * extra_shield
+        for effect in face.effects:
+            if effect.get("target", "target") == "self":
+                continue
+            kind = effect["type"]
+            if kind == "damage":
+                dealt = max(0, damage_breakdown(engine, enemy, face, effect, intent)["effective"] - damage_cut)
+                absorbed = min(dealt, shields)
+                lost = min(dealt - absorbed, target.hp)
+                shields -= absorbed
+                harm += lost + _SHIELD_WORTH * absorbed + (_DOWN_BONUS if lost >= target.hp > 0 else 0.0)
+            elif kind == "apply_status":
+                magnitude = max(0, face.effect_amount(effect) - magnitude_cut)
+                room = engine.content.status_cap(effect["status"]) - target.stacks_of(effect["status"])
+                harm += min(magnitude, max(0, room)) * _STATUS_SCORE.get(effect["status"], 1.0)
+                harm += 0.3 if magnitude and room <= 0 else 0.0
+            elif kind == "gain_corruption":
+                amount = max(0, face.effect_amount(effect) - magnitude_cut)
+                harm += amount * (1.5 if target.corruption + amount >= 4 else 0.4)
+        return harm
+
+    def _reaction_choice(self, engine: Engine, option: dict[str, Any]) -> tuple[float, str | None]:
+        """``(value, target)`` of one eligible reaction: the harm it prevents plus what it grants."""
+        combat = engine.combat
+        intent = combat.committed_intent
+        assert intent is not None
+        hero = combat.combatants[option["hero_id"]]
+        reaction = engine.content.reactions[option["reaction_id"]]
+        shield_cap = engine.content.balance["shield"]["cap"]
+        candidates = [combat.combatants[t] for t in option["target_ids"]] if option["needs_target"] else [hero]
+        best_value, best_target = 0.0, None
+        for target in sorted(candidates, key=lambda c: c.id):
+            value = 0.0
+            for effect in reaction["effects"]:
+                kind = effect["type"]
+                if kind == "shield":
+                    gained = min(effect["amount"], shield_cap - target.shields)
+                    value += self._harm(engine, intent, target) - self._harm(engine, intent, target, extra_shield=gained)
+                elif kind == "remove_corruption":
+                    removed = min(effect["amount"], target.corruption)
+                    value += removed * (1.5 if target.corruption >= 4 else 0.4)
+                elif kind == "gain_mana":
+                    value += min(effect["amount"], hero.max_mana - hero.mana) * _MANA_WORTH
+                elif kind == "interrupt":
+                    struck = [combat.combatants[t] for t in intent.committed_target_ids if combat.combatants[t].standing]
+                    before = sum(self._harm(engine, intent, t) for t in struck)
+                    if "elite_resistant" not in intent.tags:
+                        value += before
+                    elif engine.intent_face(intent).has_effect("damage"):
+                        cut = effect["resisted_damage_reduction"]
+                        value += before - sum(self._harm(engine, intent, t, damage_cut=cut) for t in struck)
+                    else:
+                        cut = effect["resisted_magnitude_reduction"]
+                        value += before - sum(self._harm(engine, intent, t, magnitude_cut=cut) for t in struck)
+            if value > best_value + 1e-9:
+                best_value, best_target = value, target.id if option["needs_target"] else None
+        return best_value, best_target
+
+    def _revival_reserve(self, engine: Engine, hero: Combatant) -> int:
+        """Mana to hold back for a revival face while an ally is down (0 when none is down or the hero has none)."""
+        if all(ally.state != STATE_DOWNED for ally in engine.combat.side("hero")):
+            return 0
+        costs = [
+            face.mana_cost
+            for die_id in hero.equipped_dice_ids
+            for face in engine.die_for(hero.id, die_id).faces
+            if face.can_revive
+        ]
+        return min(costs) if costs else 0
 
     def _react(self, engine: Engine) -> None:
         combat = engine.combat
         assert combat.reaction_stage is not None
         options = reactions.eligible_options(engine, combat.reaction_stage)
         if not options:  # pragma: no cover - the engine only opens a window with an eligible option
-            _must(engine.do(cmd.SKIP_REACTION_STAGE), "SkipReactionStage")
+            self._send(engine, cmd.SKIP_REACTION_STAGE)
             return
-        option = options[0]
-        target_id = None
-        if option["needs_target"]:
-            candidates = [combat.combatants[t] for t in option["target_ids"]]
-            if option["reaction_id"] == "grounding":
-                candidates.sort(key=lambda c: (-c.corruption, c.id))
-            else:
-                candidates.sort(key=lambda c: (c.hp + c.shields, c.id))
-            target_id = candidates[0].id
-        _must(engine.do(cmd.USE_REACTION, hero_id=option["hero_id"], target_id=target_id), "UseReaction")
+        if not self.selective_reactions:
+            option = options[0]
+            target_id = None
+            if option["needs_target"]:
+                candidates = [combat.combatants[t] for t in option["target_ids"]]
+                if option["reaction_id"] == "grounding":
+                    candidates.sort(key=lambda c: (-c.corruption, c.id))
+                else:
+                    candidates.sort(key=lambda c: (c.hp + c.shields, c.id))
+                target_id = candidates[0].id
+            self._send(engine, cmd.USE_REACTION, hero_id=option["hero_id"], target_id=target_id)
+            return
+        best: tuple[float, dict[str, Any], str | None] | None = None
+        for option in options:
+            value, target_id = self._reaction_choice(engine, option)
+            hero = combat.combatants[option["hero_id"]]
+            if value <= option["mana_cost"] * _MANA_WORTH + 1e-9:
+                continue  # prevents nothing, or less than the mana is worth
+            if hero.mana - option["mana_cost"] < self._revival_reserve(engine, hero) and value < _DOWN_BONUS:
+                continue
+            if best is None or value > best[0] + 1e-9:
+                best = (value, option, target_id)
+        if best is None:
+            self._send(engine, cmd.SKIP_REACTION_STAGE)
+            return
+        self._send(engine, cmd.USE_REACTION, hero_id=best[1]["hero_id"], target_id=best[2])
+
+    # -- upgrades ----------------------------------------------------------------------------
+
+    def _face_value(self, engine: Engine, hero: Combatant, face: FaceDefinition) -> float:
+        """A face's worth outside any particular battle, for comparing upgrade offers."""
+        if face.is_blank:
+            return 0.0
+        passive = engine.content.class_def(hero.archetype_id)["passive"]
+        spread = 2.0 if face.target_scope in ("all_enemies", "all_allies") else 1.0
+        value = -0.6 * face.mana_cost
+        for effect in face.effects:
+            kind = effect["type"]
+            amount = face.effect_amount(effect)
+            if kind == "damage":
+                value += amount * spread
+            elif kind == "shield":
+                bonus = passive["amount"] if passive["type"] == "defense_die_bonus" and face.category == "defense" else 0
+                value += (amount + bonus) * 0.5 * spread
+            elif kind == "heal":
+                value += amount * 0.8 * spread + (1.0 if face.can_revive else 0.0)
+            elif kind == "apply_status":
+                value += (_STATUS_SCORE.get(effect["status"], 1.0) + 0.6 * (effect.get("duration", 2) - 2)) * spread
+            elif kind == "gain_mana":
+                value += amount * 0.6
+            elif kind == "remove_corruption":
+                value += amount * 0.4
+            elif kind == "gain_corruption":
+                value -= amount * 0.2
+        return value
 
     def _upgrade(self, engine: Engine) -> None:
         offers = engine.state.upgrade_offers
+        ranked: list[tuple[float, str, str, str]] = []
         for hero_id in sorted(offers):
+            hero = engine.combat.combatants[hero_id]
             for die_id in sorted(offers[hero_id]):
-                ranked = sorted(
-                    offers[hero_id][die_id],
-                    key=lambda o: (0 if o["kind"] == "reforge" else 1 if o["kind"] == "sharpen" else 2, o["offer_id"]),
-                )
-                if ranked:
-                    offer = ranked[0]
-                    _must(
-                        engine.do(cmd.CHOOSE_UPGRADE, hero_id=hero_id, die_id=die_id, offer_id=offer["offer_id"]),
-                        "ChooseUpgrade",
-                    )
-                    return
-        raise PolicyError("No upgrade offer is available.")
+                size = engine.die_for(hero_id, die_id).size
+                for offer in offers[hero_id][die_id]:
+                    if self.value_upgrades:
+                        before = self._face_value(engine, hero, progression.face_from_plain(offer["before"]))
+                        after = self._face_value(engine, hero, progression.face_from_plain(offer["after"]))
+                        merit = -(after - before) / size
+                    else:
+                        merit = {"reforge": 0.0, "sharpen": 1.0}.get(offer["kind"], 2.0)
+                    ranked.append((merit, hero_id, die_id, offer["offer_id"]))
+        if not ranked:
+            raise PolicyError("No upgrade offer is available.")
+        if not self.value_upgrades:
+            first = min((hero_id, die_id) for _, hero_id, die_id, _ in ranked)
+            ranked = [r for r in ranked if (r[1], r[2]) == first]
+        _, hero_id, die_id, offer_id = min(ranked)
+        self._send(engine, cmd.CHOOSE_UPGRADE, hero_id=hero_id, die_id=die_id, offer_id=offer_id)
 
 
 class RandomPolicy:

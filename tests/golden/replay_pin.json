@@ -5,6 +5,7 @@
   "content_hash": "995e41c1324fdf9262fe1112bc4141251f520d2cded52c787eac4e1eba9e07d9",
   "rng_algorithm": "BD-PCG32-v1",
   "policy": "heuristic",
+  "policy_version": 2,
   "runs": [
     {
       "seed": 1,
@@ -14,10 +15,10 @@
         "scout"
       ],
       "outcome": "victory",
-      "commands": 664,
-      "events": 812,
-      "events_hash": "147c0eab5fd35814625e421ce44c53bee6fec89988d8f1492315179df5e64ea8",
-      "final_state_hash": "ff8b6a4d13b6710b6fc7e45742209301df0143de4df3ebb1d7d1d260bd69e3d9"
+      "commands": 486,
+      "events": 608,
+      "events_hash": "fd77cc7bb222035c0348dacd30953d70969bd839d95b70f598d6bfa95695f25d",
+      "final_state_hash": "9009aaebd0c6398e99047fc88bc025c70da357c9060265a3cf69fa6381583e8c"
     },
     {
       "seed": 2,
@@ -25,10 +26,10 @@
         "scout"
       ],
       "outcome": "victory",
-      "commands": 188,
-      "events": 224,
-      "events_hash": "3665dea751ac46b59868cf2ea688789c3f1b63658d6099b28838c0718c2d6fa0",
-      "final_state_hash": "25a07032ca39fd979288f45520dd77fe9f8d653dfcebf2b0aa546cc66eecca5a"
+      "commands": 158,
+      "events": 197,
+      "events_hash": "0086d021030b52f837a7b50f456e49c757d5aa1ce82da4c6c7cb9b8ca427ae49",
+      "final_state_hash": "3d76ff676183ccd74a3d05c5a000f36d8610762b3dd33c9cb564367b19271795"
     },
     {
       "seed": 3,
@@ -40,10 +41,10 @@
         "scout"
       ],
       "outcome": "victory",
-      "commands": 1218,
-      "events": 1445,
-      "events_hash": "72a3bd57d25683ff7e9381306f1a5fcf2f6974edaf04ead0ca691710c4338c0c",
-      "final_state_hash": "2ff2576c785aac8f53b643b12e4b410bf463363da4eaf4adb598d408e67d7844"
+      "commands": 1014,
+      "events": 1187,
+      "events_hash": "0225e0cb68a032fa0a7a063333540ee18948b7dddb7608bc172a04fe6a23798c",
+      "final_state_hash": "92b294da8d6e04d52f992f071996782a9e970f6df905c03a476f862cf3f7d606"
     }
   ]
 }
