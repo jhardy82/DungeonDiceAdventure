@@ -316,7 +316,9 @@ try {
     #endregion Launch
 }
 catch {
-    Write-Error -Message "[Battle Dice] $($_.Exception.Message)" -ErrorAction Continue
+    # One plain line on stderr. Write-Error would wrap the message in a PowerShell error record
+    # (script path, "At line", CategoryInfo), which buries the part the player needs to read.
+    [Console]::Error.WriteLine("[Battle Dice] $($_.Exception.Message)")
     exit 1
 }
 #endregion MAIN

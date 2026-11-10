@@ -96,15 +96,19 @@ jobs:
       - name: Launcher explains what it found when Python 3.15 is missing
         shell: powershell
         run: |
-          # The child writes its error to stderr on purpose; do not let that stop this step early.
-          $ErrorActionPreference = 'Continue'
           $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
-          $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Start-BattleDice.ps1 -Python 'C:\no\such\python.exe' -Reinstall -NoLaunch 2>&1 | Out-String
+          # cmd merges the child's stderr into plain text, so the message is compared as the player sees it.
+          $output = cmd /c "powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Start-BattleDice.ps1 -Python C:\no\such\python.exe -Reinstall -NoLaunch 2>&1" | Out-String
           $code = $LASTEXITCODE
           Write-Output $output
           if ($code -ne 1) { Write-Error "Expected exit code 1, got $code."; exit 1 }
           $flat = $output -replace '\s+', ' '
-          if ($flat -notmatch 'not a working Python 3\.15') { Write-Error 'The failure message should say the -Python path is not a working Python 3.15.'; exit 1 }
+          if ($flat -notmatch '\[Battle Dice\] The -Python path is not a working Python 3\.15\. No other Python was found either\.') {
+            Write-Error 'The failure message should be one plain line saying the -Python path is not a working Python 3.15.'; exit 1
+          }
+          if ($flat -match 'CategoryInfo|FullyQualifiedErrorId') {
+            Write-Error 'The failure message should not be wrapped in a PowerShell error record.'; exit 1
+          }
           exit 0
 
       - name: Double-click wrapper runs the launcher
