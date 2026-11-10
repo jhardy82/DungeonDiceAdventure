@@ -5,7 +5,11 @@ content. ``tests/integration/test_replay_logs.py`` compares every build against 
 in rules behaviour, content or random-number use that was not meant to happen fails a test on
 every platform.
 
-Run this only when such a change is intended (and bump RULES_VERSION or content_version first):
+The runs are played by the scripted heuristic player, so a change to that player's decisions
+changes them too; ``POLICY_VERSION`` is recorded for that reason.
+
+Run this only when such a change is intended (and bump RULES_VERSION, content_version or
+POLICY_VERSION first):
 
     python tools/update_replay_pin.py
 """
@@ -20,7 +24,7 @@ from battle_dice.content.loader import load_content
 from battle_dice.core import commands as cmd
 from battle_dice.core.engine import Engine
 from battle_dice.core.events import events_hash, state_hash
-from battle_dice.sim.policies import HeuristicPolicy, play_run
+from battle_dice.sim.policies import POLICY_VERSION, HeuristicPolicy, play_run
 
 RUNS = [
     {"seed": 1, "party": ["squire", "apprentice", "scout"]},
@@ -57,6 +61,7 @@ def build() -> dict[str, object]:
         "content_hash": content.content_hash,
         "rng_algorithm": RNG_ALGORITHM,
         "policy": "heuristic",
+        "policy_version": POLICY_VERSION,
         "runs": [play(run["seed"], run["party"]) for run in RUNS],
     }
 

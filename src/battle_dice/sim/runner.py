@@ -23,7 +23,7 @@ from battle_dice.content.loader import Content, load_content
 from battle_dice.core import commands as cmd
 from battle_dice.core.engine import Engine
 from battle_dice.core.events import state_hash, summarize
-from battle_dice.sim.policies import HeuristicPolicy, RandomPolicy
+from battle_dice.sim.policies import POLICY_VERSION, HeuristicPolicy, RandomPolicy
 
 DEFAULT_ROWS = {"squire": "front", "apprentice": "back", "scout": "back"}
 
@@ -61,10 +61,13 @@ def simulate(content: Content, seed: int, class_ids: list[str], policy: Any, tim
         if engine.needs_input():
             before = len(engine.command_log)
             started = time.perf_counter()
+            in_engine = getattr(policy, "engine_seconds", None)
             policy.act(engine)
             if timings is not None:
                 made = max(1, len(engine.command_log) - before)
-                timings.extend([(time.perf_counter() - started) / made] * made)
+                # A player that reports its own engine time is charged for that only, not for its thinking.
+                spent = time.perf_counter() - started if in_engine is None else policy.engine_seconds - in_engine
+                timings.extend([spent / made] * made)
         else:
             send(cmd.ADVANCE_PHASE)
     state = engine.state
@@ -144,6 +147,7 @@ def run_matrix(
             total[key] += value
     return {
         "policy": policy_name,
+        "policy_version": POLICY_VERSION if policy_name == "heuristic" else None,
         "content_version": content.content_version,
         "content_hash": content.content_hash,
         "content_dir": content_dir,
