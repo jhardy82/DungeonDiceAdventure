@@ -162,7 +162,7 @@ def test_full_victory_run_through_every_screen(tmp_path, size, keyboard):
 
     # Mandatory upgrade: Start Battle 2 is disabled, with a reason, until a card is applied.
     start = driver.app.ui.widget("up:start")
-    assert not start.enabled and "upgrade must be applied" in start.reason
+    assert not start.enabled and "upgrade must be applied" in (start.reason or "")
     driver.press("up:start")
     assert driver.ctrl.message_is_error and driver.ctrl.screen == Screen.UPGRADE
     driver.press("up:hero:h02")
@@ -170,13 +170,13 @@ def test_full_victory_run_through_every_screen(tmp_path, size, keyboard):
     driver.press("up:die:oath_d4")
     driver.press("up:die:iron_d6")
     apply = driver.app.ui.widget("up:apply")
-    assert not apply.enabled and "Select one" in apply.reason
+    assert not apply.enabled and "Select one" in (apply.reason or "")
     driver.press("up:offer:0")
     driver.press("up:apply")
     assert len(driver.ctrl.engine.state.upgrades) == 1
 
     locked = driver.app.ui.widget("up:swap:h01:iron_d6")
-    assert not locked.enabled and "locked" in locked.reason
+    assert not locked.enabled and "locked" in (locked.reason or "")
     driver.press("up:swap:h01:oath_d4")
     assert driver.ctrl.engine.combat.combatants["h01"].equipped_dice_ids == ["iron_d6", "bulwark_d4"]
     driver.press("up:row:h03")
@@ -257,12 +257,14 @@ def test_disabled_controls_explain_why(tmp_path):
     assert driver.ctrl.screen == Screen.PARTY_SETUP
     assert driver.ctrl.message_is_error and "at least 1 hero" in driver.ctrl.message
     driver.app.frame(0)
-    text, is_error = driver.app.ui.status_text()
+    status = driver.app.ui.status_text()
+    assert status is not None
+    text, is_error = status
     assert is_error and text.startswith("Unavailable: Add at least 1 hero")
     for _ in range(5):
         driver.press("add:squire")
     add = driver.app.ui.widget("add:squire")
-    assert not add.enabled and "already has 5 heroes" in add.reason
+    assert not add.enabled and "already has 5 heroes" in (add.reason or "")
 
 
 def test_window_never_goes_below_the_minimum_size(tmp_path):

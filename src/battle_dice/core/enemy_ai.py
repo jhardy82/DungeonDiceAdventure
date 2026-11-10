@@ -89,8 +89,8 @@ def _choose_targets(ctx: Engine, enemy: Combatant, choice: dict[str, Any]) -> tu
     if face.has_effect("damage"):
         def key(t: Combatant) -> tuple:
             return (-predicted_hp_damage(ctx, enemy, face, t), hp_fraction(t), t.id)
-    elif face.status_effect() is not None:
-        kind = face.status_effect()["status"]  # type: ignore[index]
+    elif (status := face.status_effect()) is not None:
+        kind = status["status"]
 
         def key(t: Combatant) -> tuple:
             return (0 if t.stacks_of(kind) == 0 else 1, hp_fraction(t), t.id)

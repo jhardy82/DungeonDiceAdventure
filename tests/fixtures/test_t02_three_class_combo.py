@@ -30,12 +30,14 @@ def test_t02_each_class_schedules_differently_in_one_battle():
 def test_t02_seeded_dice_are_identical_across_runs():
     def first_rolls(seed):
         engine = start("squire", "apprentice", "scout", seed=seed)
-        rolls = {}
+        rolls: dict[str, dict[str, int]] = {}
         while len(rolls) < 3:
             run_until_input(engine)
             if engine.combat.phase == CombatPhase.HERO_ROLL:
                 ok(engine.do(cmd.ROLL_DICE))
-                rolls.setdefault(engine.combat.active_combatant_id, dict(engine.combat.turn.rolled))
+                active = engine.combat.active_combatant_id
+                assert active is not None
+                rolls.setdefault(active, dict(engine.combat.turn.rolled))
                 ok(engine.do(cmd.SET_ACTION_PLAN, actions=[]))
                 ok(engine.do(cmd.COMMIT_ACTION_PLAN))
             else:

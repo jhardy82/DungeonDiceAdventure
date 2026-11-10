@@ -29,7 +29,7 @@ from tests.conftest import (
 )
 
 
-def variant(**switches: bool) -> HeuristicPolicy:
+def variant(**switches: bool | float) -> HeuristicPolicy:
     """The player with some of its parts switched off."""
     return type("Variant", (HeuristicPolicy,), switches)()
 

@@ -8,6 +8,7 @@ Status is always shown as text or shape as well as color (HP numbers, "DOWNED", 
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 
 import pygame
@@ -142,7 +143,7 @@ def draw_party_setup(ui: UI, ctrl: AppController) -> None:
 
     ui.panel(16, 60, 430, 470, "Party (click a hero to inspect)")
     for index in range(maximum):
-        y = 90 + index * 86
+        y: float = 90 + index * 86
         if index < len(ctrl.party):
             member = ctrl.party[index]
             cls = ctrl.content.class_def(member["class_id"])
@@ -150,13 +151,13 @@ def draw_party_setup(ui: UI, ctrl: AppController) -> None:
             ui.panel(26, y, 410, 78, fill=Theme.PANEL_ALT, border=Theme.ACCENT if selected else Theme.BORDER, width=2 if selected else 1)
             ui.sprite(ui.assets.combatant_key(member["class_id"]), 30, y + 11, 56, 56)
             ui.button(f"slot:{index}:select", 90, y + 8, 124, 62, f"{index + 1}. {cls['name']}",
-                      lambda i=index: setattr(ctrl, "selected_slot", i), selected=selected,
+                      partial(setattr, ctrl, "selected_slot", index), selected=selected,
                       sublabel=f"HP {cls['max_hp']}  SPD {cls['speed']}",
                       tooltip=f"Inspect {cls['name']}: stats, abilities and dice.")
             ui.button(f"slot:{index}:row", 222, y + 8, 110, 62, f"Row: {member['row'].capitalize()}",
-                      lambda i=index: ctrl.toggle_party_row(i), sublabel="toggle",
+                      partial(ctrl.toggle_party_row, index), sublabel="toggle",
                       tooltip="Front-row heroes shield the back row from melee. Click to switch rows.")
-            ui.button(f"slot:{index}:remove", 340, y + 8, 88, 62, "Remove", lambda i=index: ctrl.remove_hero(i),
+            ui.button(f"slot:{index}:remove", 340, y + 8, 88, 62, "Remove", partial(ctrl.remove_hero, index),
                       tooltip="Remove this hero from the party.")
         else:
             ui.panel(26, y, 410, 78, fill=(24, 27, 35))
@@ -167,7 +168,7 @@ def draw_party_setup(ui: UI, ctrl: AppController) -> None:
     for position, class_id in enumerate(class_ids):
         cls = ctrl.content.class_def(class_id)
         ui.button(f"add:{class_id}", 16 + position * 146, 540, 138, 50, f"+ {cls['name']} ({position + 1})",
-                  lambda c=class_id: ctrl.add_hero(c), enabled=not full,
+                  partial(ctrl.add_hero, class_id), enabled=not full,
                   reason=f"The party already has {maximum} heroes.", hotkeys=(NUMBER_KEYS[position],),
                   tooltip=f"Add a {cls['name']} ({cls['scheduling']['label']}). Suggested row: {cls['suggested_row']}.")
 
@@ -263,7 +264,7 @@ def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float
     hotkeys: tuple[int, ...] = ()
     if targeting is not None:
         if c["id"] in targeting["eligible_target_ids"]:
-            action = lambda cid=c["id"]: ctrl.choose_target(cid)  # noqa: E731
+            action = partial(ctrl.choose_target, c["id"])
             number = target_numbers.get(c["id"])
             if number is not None and number <= len(NUMBER_KEYS):
                 hotkeys = (NUMBER_KEYS[number - 1],)
@@ -281,7 +282,8 @@ def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float
     fill = Theme.PANEL_ALT if standing else (26, 26, 30)
     if active:
         glow = ui.anim.pulse()  # the acting card's border breathes between accent and white
-        border = tuple(int(a + (255 - a) * 0.55 * glow) for a in Theme.ACCENT)
+        red, green, blue = (int(a + (255 - a) * 0.55 * glow) for a in Theme.ACCENT)
+        border = (red, green, blue)
     else:
         border = side_color if standing else Theme.FAINT
     ui.panel(x, y, w, h, fill=fill, border=border, width=3 if active else 1)
@@ -536,11 +538,11 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
                 ui.text(x + 8, 612, "CHOOSE A TARGET", 13, Theme.ACCENT, bold=True)
         keep_key = (pygame.K_z, pygame.K_x)[index]
         ui.button(f"die:{die['die_id']}:keep", x + 8, 628, 112, 48, "Unkeep" if die["kept"] else "Keep",
-                  lambda d=die["die_id"]: ctrl.toggle_keep(d), selected=die["kept"], hotkeys=(keep_key,),
+                  partial(ctrl.toggle_keep, die["die_id"]), selected=die["kept"], hotkeys=(keep_key,),
                   sublabel=f"({'ZX'[index]})", tooltip="Kept dice are not rerolled. You can unkeep before a later reroll.")
         use_hotkeys = () if ctrl.targeting_die is not None else (NUMBER_KEYS[index],)
         ui.button(f"die:{die['die_id']}:use", x + 128, 628, 112, 48, "Remove" if in_plan else "Cancel" if awaiting else "Use",
-                  (lambda d=die["die_id"]: ctrl.use_die(d)) if not awaiting else ctrl.cancel_targeting,
+                  partial(ctrl.use_die, die["die_id"]) if not awaiting else ctrl.cancel_targeting,
                   enabled=die["selectable"] or in_plan, reason=die["reason"], selected=in_plan or awaiting,
                   hotkeys=use_hotkeys, sublabel=f"({index + 1})",
                   tooltip=f"Plan {face['name']}: {face['text']}." if die["selectable"] else None)
@@ -627,7 +629,7 @@ def draw_reactions(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
         row_hotkeys = (NUMBER_KEYS[number - 1],) if picking is None and number <= len(NUMBER_KEYS) else ()
         follow_up = " Then choose the ally." if len(targets) > 1 else ""
         ui.button(row_key, 20, y, 228, 28, f"{number}. {option['name']} ({option['hero_name']})",
-                  lambda h=hero_id, n=option["needs_target"], t=targets: ctrl.pick_reaction(h, n, t),
+                  partial(ctrl.pick_reaction, hero_id, option["needs_target"], targets),
                   enabled=option["eligible"], reason=option["reason"], hotkeys=row_hotkeys, selected=selected, size=14,
                   tooltip=f"{option['expected']} Cost: {option['mana_cost']} mana, 1 charge.{follow_up}")
         # Cost only: the reaction charge is on the hero's card ("React 1") and in the tooltip.
@@ -641,7 +643,7 @@ def draw_reactions(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
                 target_hotkeys = (NUMBER_KEYS[position - 1],) if selected and position <= len(NUMBER_KEYS) else ()
                 label = f"{position}. {names[target_id]}" if selected else names[target_id]
                 ui.button(target_key, 366 + (position - 1) * 134, y, 130, 28, label,
-                          lambda h=hero_id, t=target_id: ctrl.use_reaction(h, t), hotkeys=target_hotkeys, size=13,
+                          partial(ctrl.use_reaction, hero_id, target_id), hotkeys=target_hotkeys, size=13,
                           tooltip=f"{option['name']} on {names[target_id]}. {option['expected']} Cost: {option['mana_cost']} mana, 1 charge.")
                 hot = hot or ui.is_hot(target_key)
         else:
@@ -732,14 +734,14 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
     ui.panel(12, 56, 300, 420, "Heroes after recovery")
     for index, hero in enumerate(upgrade["heroes"]):
         c = by_id[hero["hero_id"]]
-        y = 84 + index * 76
+        y: float = 84 + index * 76
         selected = hero["hero_id"] == ctrl.upgrade_hero
         ui.button(f"up:hero:{hero['hero_id']}", 20, y, 196, 68, hero["hero_name"],
-                  lambda h=hero["hero_id"]: ctrl.select_upgrade_hero(h), selected=selected,
+                  partial(ctrl.select_upgrade_hero, hero["hero_id"]), selected=selected,
                   sublabel=f"HP {c['hp']}/{c['max_hp']}  MP {c['mana']}  CR {c['corruption']}",
                   tooltip="Show this hero's dice. HP partly recovered, mana refilled, shields and statuses cleared, corruption kept.")
         ui.button(f"up:row:{hero['hero_id']}", 222, y, 82, 68, c["row"].capitalize(),
-                  lambda h=hero["hero_id"]: ctrl.toggle_formation(h), sublabel="row",
+                  partial(ctrl.toggle_formation, hero["hero_id"]), sublabel="row",
                   tooltip="Move this hero to the other row for Battle 2.")
 
     hero_view = next((h for h in upgrade["heroes"] if h["hero_id"] == ctrl.upgrade_hero), upgrade["heroes"][0])
@@ -748,7 +750,7 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
         die = entry["die"]
         label = die["name"] + ("  [UPGRADED]" if entry["locked"] else "")
         ui.button(f"up:die:{die['id']}", 20, 512 + index * 56, 284, 48, label,
-                  lambda d=die["id"]: ctrl.select_upgrade_die(d), selected=die["id"] == ctrl.upgrade_die,
+                  partial(ctrl.select_upgrade_die, die["id"]), selected=die["id"] == ctrl.upgrade_die,
                   sublabel=f"d{die['size']}  v{die['definition_version']}" + ("  locked against swapping" if entry["locked"] else ""),
                   tooltip="Show the three upgrade cards for this die.")
 
@@ -766,7 +768,7 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
         x = 334 + index * 198
         selected = offer["offer_id"] == ctrl.upgrade_offer
         preview = ctrl.offer_preview(offer)
-        ui.button(f"up:offer:{index}", x, 84, 190, 44, f"{index + 1}. {offer['kind_name']}", lambda o=offer["offer_id"]: ctrl.select_offer(o),
+        ui.button(f"up:offer:{index}", x, 84, 190, 44, f"{index + 1}. {offer['kind_name']}", partial(ctrl.select_offer, offer["offer_id"]),
                   selected=selected, hotkeys=(NUMBER_KEYS[index],), tooltip=offer["summary"])
         ui.panel(x, 132, 190, 172, fill=Theme.PANEL_ALT, border=Theme.ACCENT if selected else Theme.BORDER, width=2 if selected else 1)
         ui.text(x + 8, 138, f"Face {offer['face_index'] + 1} of {preview['before']['size']}", 13, Theme.DIM, bold=True)
@@ -801,7 +803,7 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
             ui.button(f"up:swap:{hero_view['hero_id']}:{swap['out_die_id']}", 952, y, 306, 38,
                       ("Confirm: give up " if ctrl.swap_confirm == request else "Swap out ")
                       + die_names.get(swap["out_die_id"], swap["out_die_id"]),
-                      lambda h=hero_view["hero_id"], o=swap["out_die_id"], i=bench["die"]["id"]: ctrl.swap_die(h, o, i),
+                      partial(ctrl.swap_die, hero_view["hero_id"], swap["out_die_id"], bench["die"]["id"]),
                       enabled=swap["allowed"], reason=swap["reason"], selected=ctrl.swap_confirm == request,
                       tooltip=f"Equip {bench['die']['name']} in place of {die_names.get(swap['out_die_id'], swap['out_die_id'])} for Battle 2.")
             y += 44

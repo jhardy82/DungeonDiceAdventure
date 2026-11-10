@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from battle_dice import RNG_ALGORITHM, RULES_VERSION
 from battle_dice.content.loader import load_content
@@ -26,7 +27,7 @@ from battle_dice.core.engine import Engine
 from battle_dice.core.events import events_hash, state_hash
 from battle_dice.sim.policies import POLICY_VERSION, HeuristicPolicy, play_run
 
-RUNS = [
+RUNS: list[dict[str, Any]] = [
     {"seed": 1, "party": ["squire", "apprentice", "scout"]},
     {"seed": 2, "party": ["scout"]},
     {"seed": 3, "party": ["squire", "squire", "apprentice", "scout", "scout"]},

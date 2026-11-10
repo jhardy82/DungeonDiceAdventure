@@ -27,6 +27,7 @@ def finished_run(tmp_path, seed=5, party=("squire", "apprentice", "scout")) -> A
         controller.add_hero(class_id)
     controller.begin_run()
     engine, policy = controller.engine, HeuristicPolicy()
+    assert engine is not None
     while not engine.finished():
         if engine.needs_input():
             policy.act(engine)
@@ -35,6 +36,12 @@ def finished_run(tmp_path, seed=5, party=("squire", "apprentice", "scout")) -> A
     controller.refresh()
     assert controller.screen == Screen.OUTCOME and controller.log_path is not None, controller.log_error
     return controller
+
+
+def log_of(controller) -> Path:
+    """The run log the controller wrote."""
+    assert controller.log_path is not None, controller.log_error
+    return controller.log_path
 
 
 def rewrite(path: Path, change) -> Path:
@@ -49,10 +56,10 @@ def rewrite(path: Path, change) -> Path:
 def test_the_log_file_alone_replays_the_run_exactly(tmp_path):
     controller = finished_run(tmp_path)
     engine = controller.engine
-    header, events = replay.read_log(controller.log_path)
+    header, events = replay.read_log(log_of(controller))
     assert header["command_count"] == len(header["commands"]) == len(engine.command_log)
     assert len(events) == len(engine.events)
-    result = replay.verify_log(controller.content, controller.log_path)
+    result = replay.verify_log(controller.content, log_of(controller))
     assert result == {
         "run_id": engine.state.run_id,
         "seed": str(engine.state.seed),
@@ -70,7 +77,7 @@ def test_a_changed_event_line_is_detected(tmp_path):
         event["delta"]["face"] = event["delta"]["face"] % event["delta"]["die_size"] + 1
 
     with pytest.raises(replay.ReplayError, match=r"Event \d+ in the file differs"):
-        replay.verify_log(controller.content, rewrite(controller.log_path, change))
+        replay.verify_log(controller.content, rewrite(log_of(controller), change))
 
 
 def test_a_changed_command_is_detected(tmp_path):
@@ -81,24 +88,24 @@ def test_a_changed_command_is_detected(tmp_path):
         start["params"]["seed"] = int(start["params"]["seed"]) + 1
 
     with pytest.raises(replay.ReplayError):
-        replay.verify_log(controller.content, rewrite(controller.log_path, change))
+        replay.verify_log(controller.content, rewrite(log_of(controller), change))
 
 
 def test_a_missing_event_line_is_detected(tmp_path):
     controller = finished_run(tmp_path)
     with pytest.raises(replay.ReplayError, match="events but the replay produced"):
-        replay.verify_log(controller.content, rewrite(controller.log_path, lambda records: records.pop()))
+        replay.verify_log(controller.content, rewrite(log_of(controller), lambda records: records.pop()))
 
 
 def test_logs_from_other_rules_or_without_commands_say_so(tmp_path):
     controller = finished_run(tmp_path)
-    old_rules = rewrite(controller.log_path, lambda records: records[0].__setitem__("rules_version", "0.9.0"))
+    old_rules = rewrite(log_of(controller), lambda records: records[0].__setitem__("rules_version", "0.9.0"))
     with pytest.raises(replay.ReplayError, match=f"written by rules 0.9.0; this build is rules {RULES_VERSION}"):
         replay.verify_log(controller.content, old_rules)
-    no_commands = rewrite(controller.log_path, lambda records: records[0].pop("commands"))
+    no_commands = rewrite(log_of(controller), lambda records: records[0].pop("commands"))
     with pytest.raises(replay.ReplayError, match="before commands were recorded"):
         replay.verify_log(controller.content, no_commands)
-    other_content = rewrite(controller.log_path, lambda records: records[0].__setitem__("content_hash", "0" * 64))
+    other_content = rewrite(log_of(controller), lambda records: records[0].__setitem__("content_hash", "0" * 64))
     with pytest.raises(replay.ReplayError, match="Content hash differs"):
         replay.verify_log(controller.content, other_content)
     garbage = controller.log_path.with_name("garbage.jsonl")
@@ -108,7 +115,7 @@ def test_logs_from_other_rules_or_without_commands_say_so(tmp_path):
 
 
 def test_the_replay_command_reports_each_log_and_sets_the_exit_code(tmp_path, capsys):
-    good = finished_run(tmp_path).log_path
+    good = log_of(finished_run(tmp_path))
     assert replay_main([str(good)]) == 0
     assert capsys.readouterr().out.startswith("OK")
     bad = rewrite(good, lambda records: records.pop())
@@ -143,6 +150,7 @@ def test_retry_after_a_finished_run_starts_clean(tmp_path):
 
 def _pin_tool():
     spec = importlib.util.spec_from_file_location("update_replay_pin", ROOT / "tools" / "update_replay_pin.py")
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

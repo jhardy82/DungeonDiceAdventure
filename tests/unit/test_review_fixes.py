@@ -300,10 +300,15 @@ def test_sharpen_stops_at_the_face_power_cap(content):
 def test_sharpen_stops_at_the_cap_for_status_durations_too(content):
     cap = content.balance["upgrades"]["face_power_cap"]
     face = copy.deepcopy(next(f for f in content.die("striker_d8").faces if f.id == "sc_poison"))
-    seen = [face.status_effect()["duration"]]
+    def duration(of) -> int:
+        effect = of.status_effect()
+        assert effect is not None
+        return effect["duration"]
+
+    seen = [duration(face)]
     while (sharper := progression.sharpened(face, cap)) is not None:
         face = sharper
-        seen.append(face.status_effect()["duration"])
+        seen.append(duration(face))
     assert seen == list(range(2, cap + 1)) and face.power == 1, "duration grows to the cap; stack size never does"
 
 

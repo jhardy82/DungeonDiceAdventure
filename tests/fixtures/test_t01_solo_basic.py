@@ -17,7 +17,7 @@ def test_t01_roster_is_one_goblin_for_a_solo_party():
 
 def test_t01_gauge_sequence_and_melee_exchange():
     engine = start("squire")
-    activations = []
+    activations: list[tuple[int, str]] = []
     while len(activations) < 4:
         run_until_input(engine)
         phase = engine.combat.phase

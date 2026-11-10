@@ -49,6 +49,7 @@ def play_checked(engine: Engine, policy, limit: int = 20000) -> str:
         else:
             ok(engine.do(cmd.ADVANCE_PHASE))
         check_invariants(engine)
+    assert engine.state.outcome is not None
     return engine.state.outcome
 
 

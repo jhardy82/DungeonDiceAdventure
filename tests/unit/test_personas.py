@@ -70,11 +70,10 @@ def test_the_gambler_keeps_only_a_die_showing_its_best_face():
     begin_hero(engine, "h01", iron_d6=1, oath_d4=1)  # Strike is not the Iron d6's best face by value; Jab is not the Oath d4's
     policy = make_persona("gambler", 0)
     hero = engine.combat.combatants["h01"]
-    best = {
-        die_id: max(range(len(faces)), key=lambda i, f=faces: policy._face_value(engine, hero, f[i]))
-        for die_id in hero.equipped_dice_ids
-        for faces in [engine.die_for("h01", die_id).faces]
-    }
+    best = {}
+    for die_id in hero.equipped_dice_ids:
+        values = [policy._face_value(engine, hero, face) for face in engine.die_for("h01", die_id).faces]
+        best[die_id] = values.index(max(values))
     policy.act(engine)
     turn = engine.combat.turn
     assert turn.rerolls_used == 1
@@ -100,6 +99,7 @@ def test_the_bench_swapper_swaps_a_die_in_before_battle_2():
 
 def test_the_playtest_tool_measures_a_run_from_its_event_log():
     spec = importlib.util.spec_from_file_location("playtest_scenarios", ROOT / "tools" / "playtest_scenarios.py")
+    assert spec is not None and spec.loader is not None
     tool = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(tool)
     runs = [tool.play(None, "informed", [("squire", "front"), ("scout", "back")], seed) for seed in (1, 2)]

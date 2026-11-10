@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Mapping, Sequence
 
 import pytest
 
@@ -12,7 +13,7 @@ from battle_dice.core.view import describe_face, die_view
 from tests.conftest import content_with
 
 # (category, power, mana cost, action speed, can_revive) for each physical face, in PRD order.
-EXPECTED_DICE = {
+EXPECTED_DICE: Mapping[str, Sequence[tuple[object, ...]]] = {
     "iron_d6": [("attack", 2, 0, 1, False)] * 2 + [("defense", 3, 0, 2, False)] * 2
     + [("healing", 2, 1, 1, True), ("blank", 0, 0, None, False)],
     "oath_d4": [("attack", 1, 0, 1, False)] + [("defense", 2, 0, 2, False)] * 2 + [("resource", 1, 0, 3, False)],

@@ -49,3 +49,9 @@ ignore = ["E501"]
 python_version = "3.15"
 ignore_missing_imports = true
 check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+# Tests read optional engine state directly (engine.combat.turn.rolled): if it is None the test
+# fails with an AttributeError, which is the signal wanted. Every other check applies to tests too.
+module = "tests.*"
+disable_error_code = ["union-attr"]

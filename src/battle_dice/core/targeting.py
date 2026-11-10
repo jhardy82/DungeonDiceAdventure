@@ -109,8 +109,8 @@ def resolve_targets(
 
     if scope == "single_enemy":
         original_id = committed[0] if committed else None
-        if original_id in eligible:
-            return TargetResolution([original_id])  # type: ignore[list-item]
+        if original_id is not None and original_id in eligible:
+            return TargetResolution([original_id])
         if not eligible:
             return TargetResolution([], cancelled=True, reason="no legal target remains")
         original = combat.combatants.get(original_id) if original_id else None
