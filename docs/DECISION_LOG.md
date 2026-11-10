@@ -71,7 +71,7 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 | E-14 | **Stricter content validation (content 1.2.1).** The loader now rejects, before a run can start: a reaction-only effect (`interrupt`) on a die face or enemy action; a Poison or Weaken stack cap below 1; the same die listed twice on a class; a revival that restores 0 HP; a tag the engine does not know (a misspelled `interruptible` used to make an action silently unreactable); an executable face with target scope `none`; a reaction effect that reactions do not implement, or one missing its amount or its resisted values; encounter overrides that leave an enemy with no weighted action; a `power` override on an action whose effect has its own `amount`; and inverted speed or party-size limits. Each case has a test. |
 | E-15 | **Keys nothing read were removed (content 1.2.1).** `statuses.*.default_duration` is gone: durations live on the faces that apply a status. `statuses.speed_up.stack_cap` is fixed at 1 in the schema, because Speed Up never stacks (D-13). `upgrades.mandatory_upgrades_per_run` was already fixed at 1 in the schema. |
 | E-16 | **Run logs are replayable (PRD 14.5).** The JSONL header carries the ordered commands, so the file alone reproduces the run. `battle-dice-replay LOG` (or `python -m battle_dice.replay_cli`) replays it on a fresh engine and checks the rules version, the content hash, the event-log hash, the final-state hash and every event line. Logs written before this change have no commands and say so when verified. |
-| E-17 | **Pinned runs.** `tests/golden/replay_pin.json` records the hashes of three fixed-seed heuristic runs on the shipped content. Every test run on Linux and Windows compares against it, so unintended drift in rules, content or random-number use fails. An intended change bumps a version and regenerates the pin with `python tools/update_replay_pin.py`. |
+| E-17 | **Pinned runs.** `tests/golden/replay_pin.json` records the hashes of three fixed-seed heuristic runs on the shipped content. Every test run on Linux and Windows compares against it, so unintended drift in rules, content or random-number use fails. An intended change bumps a version and regenerates the pin with `python tools/update_replay_pin.py`. The pinned runs are played by the heuristic player, so the pin also records `policy_version` and is regenerated when that player's decisions change (section 7.6); rules and content versions are not bumped for that. |
 | E-18 | Status follow-up events (`status_applied`, `status_refreshed`) carry the affected combatant in `id`, as every other follow-up event does, and the stack in `status_id`. Before, the stack id overwrote `id`, so the event's after-state was empty. |
 
 ## 4. Deviations from the plan
@@ -112,8 +112,8 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 
 ## 6. Acceptance evidence
 
-432 automated tests pass on the reference environment (Linux container, Python 3.15.2,
-pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 200 unit, 78 fixture, 49 integration,
+446 automated tests pass on the reference environment (Linux container, Python 3.15.2,
+pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 214 unit, 78 fixture, 49 integration,
 105 headless UI and graphics. `ruff` 0.17.4 and `mypy` 2.4.1 are clean with their 3.15 targets.
 
 Line coverage of the rules engine, content loader and random numbers (`battle_dice.core`,
@@ -161,9 +161,11 @@ window behaviour on Windows remain to be confirmed by the owner.
 
 Command: `battle-dice-sim --seeds 40 --policy <policy> --jobs 4`. Seeds 0-39, every class
 composition for each party size (55 compositions, 2,200 runs per policy), heroes in their
-suggested rows. **Heuristic policy:** keeps the dice in its best-scoring plan, rerolls the rest,
-always reacts when it can. **Random policy:** uniformly random legal decisions. Both are scripted
-players, not human playtesting.
+suggested rows. **Heuristic policy, version 1** (used for sections 7.1 to 7.5): keeps the dice in
+its best-scoring plan if that plan scores at least 2.0, otherwise rerolls everything; always reacts
+when it can. **Version 2** (section 7.6) replaced it on 2026-11-10. **Random policy:** uniformly
+random legal decisions. All are scripted players, not human playtesting. Result files record
+`policy_version`.
 
 ### 7.1 Owner decision D-19: per-party-size encounter table (content 1.2.0, 2026-11-09)
 
@@ -227,7 +229,8 @@ median 0.18 ms, p95 0.40 ms, maximum 96 ms on the reference container, against t
 target of under 100 ms. The per-size win rates of that run are identical to section 7.1, so the
 1.1.1 rule fixes did not move the measured balance.
 
-- The figure includes the policy's own decision time averaged over the commands it sent.
+- The figure includes the policy's own decision time averaged over the commands it sent. From
+  player version 2 on, the simulator counts time inside engine commands only (section 7.6).
 - The maximum is a single transition and depends on what else the machine is doing: an
   independent rerun under load recorded 290 ms. The median and p95 are the stable figures.
 - It was not measured on the Windows target machine.
@@ -236,6 +239,82 @@ target of under 100 ms. The per-size win rates of that run are identical to sect
 
 On rules 1.0.0 (20 seeds) the heuristic won 60/60, 119/120, 187/200, 293/300 and 407/420 for
 sizes 1-5 and the random policy won 41/60, 58/120, 103/200, 159/300 and 212/420.
+
+### 7.6 Simulated player version 2 (2026-11-10, owner decision: fix the player before retuning)
+
+**Why.** The review of class balance found that version 1 played some classes badly, so its win
+rates understated them:
+
+- It threw away usable dice. A weakened Strike or a Guard on a healthy ally scored under its keep
+  threshold of 2.0, so the whole roll was rerolled and could come up blank.
+- It ignored the Squire's Steadfast +1 and the Scout's combo bonus when scoring a plan.
+- It chose upgrades by kind (reforge, then sharpen, then imbue), so imbue faces were almost
+  never taken.
+
+**What version 2 does** (`src/battle_dice/sim/policies.py`, `POLICY_VERSION = 2`):
+
+| Part | Rule |
+|------|------|
+| Keep or reroll | Exact look-ahead. Every possible roll of the hero's dice is scored by its best plan; the dice kept are the subset with the highest expected score over the rerolls left. Scoring a roll that has not happened uses a copy of the turn and changes nothing in the engine. |
+| Scoring | The engine's own amounts (Steadfast, combo bonus), applied in resolution order, so two actions are not both credited with one kill and a status on an enemy the same plan defeats counts for nothing. Shield value is weighted 0.75. |
+| Upgrades | The offer that raises its die's average face value the most, whatever its kind. |
+| Reactions | Unchanged from version 1: always react, on the most pressed target. |
+
+It still values the current activation only. It is a better player, not an optimal one, and it is
+not human play.
+
+**Acceptance rule, fixed before measuring.** Version 2 against version 1 on seeds 0-79, all 55
+compositions (4,400 runs per content set), on the shipped content and on the class set proposed
+to the owner ("REC": Strike 3, Apprentice health 11, Scout speed 10 and health 9, Disrupt cost 2,
+more enemy health). Pass = overall win rate higher on both; no party size lower by more than 3
+points; no composition lower by more than 15 points.
+
+| Party size | Shipped 1.2.1, v1 | Shipped 1.2.1, v2 | REC, v1 | REC, v2 |
+|-----------:|------------------:|------------------:|--------:|--------:|
+| 1 | 75.0% | 80.4% | 77.5% | 90.8% |
+| 2 | 82.9% | 95.6% | 79.2% | 94.2% |
+| 3 | 74.0% | 79.6% | 78.9% | 91.9% |
+| 4 | 74.5% | 80.8% | 76.2% | 88.5% |
+| 5 | 75.1% | 83.3% | 76.3% | 92.1% |
+| **All** | **75.6%** | **83.1%** | **77.1%** | **91.2%** |
+
+- **Result: pass.** The largest drop for any composition is 10 points (one Squire + three
+  Apprentices on shipped content, 84% to 74%); the largest gains are 60 points or more (two
+  Squires, 36% to 96%; four Squires + one Scout, 26% to 89%).
+- With every new part switched off, the rewritten code reproduces version 1 exactly on all 55
+  compositions, so the comparison measures the parts and not the rewrite.
+
+**Each part alone** (others off, seeds 0-39, change in overall win rate):
+
+| Part | Shipped | REC | Kept |
+|------|--------:|----:|------|
+| Look-ahead keep rule | +2.9 | +5.8 | Yes |
+| Engine amounts in scoring | +0.5 | +6.9 | Yes, with shield weight 0.75 |
+| Upgrades by value | +3.1 | +6.1 | Yes |
+| Reactions by value (react only when it prevents more than the mana is worth; hold mana for a revival) | +0.6 | -0.5 | **No** |
+
+- **Reactions by value was removed.** Inside the full player it changed the overall rate by +0.2
+  (shipped) and -0.6 (REC), both within the noise of about 1.3 points. The rule said a part that
+  does not raise the win rate is removed. Consequence: the player still spends Interpose at the
+  shield cap (section 8).
+- **Shield weight.** With shields scored at their old weight, counting Steadfast made the player
+  guard too much: five Squires on REC fell from 51% (v1) to 35%, a 16-point drop that failed the
+  rule. Weights measured on all 55 compositions: 1.0 gave 83.2% / 91.4% overall, 0.75 gave
+  83.1% / 91.2% with five Squires at 61%, and 0.5 (seeds 0-39 only) was lower overall and cost
+  two Squires + two Apprentices 28 points. 0.75 is used.
+
+**What this says about balance.**
+
+- Shipped content is now **outside the owner's 70-85% band at party size 2** (95.6%) under the
+  better player, and near its top at sizes 4 and 5. The retune in progress will bring it back.
+- All-Squire parties still win 0-1% at sizes 3, 4 and 5 on shipped content, and parties with two
+  or more Scouts still win about 100%. Those are class weaknesses, not player flaws.
+- The REC set wins about 91% under version 2, so its enemy health figures are too low and are
+  being re-derived.
+
+**Latency under version 2.** 2,143,188 engine transitions in the 40-seed run on shipped content:
+median 0.17 ms, p95 0.31 ms, maximum 110 ms, counting time inside engine commands only. The run
+takes about 3.3 minutes with four workers (version 1: about 2.5).
 
 ## 8. Known limits after the MVP review (2026-11-10)
 
@@ -254,11 +333,11 @@ checked here. Each needs an owner decision or a real Windows display.
 |------|-------|
 | Intent, reaction and status ids restart in Battle 2 | Event `seq` is continuous (E-05); a log reader must key on `seq` or on battle plus id. |
 | Two Scouts can both Disrupt one elite action | The reductions add. The PRD does not say whether the reduction is per intent or per reaction. |
-| Interpose is offered when the ally is already at the shield cap | It then costs mana and the charge for no gain. Grounding has a "must change something" guard; Interpose does not. |
+| Interpose is offered when the ally is already at the shield cap | It then costs mana and the charge for no gain. Grounding has a "must change something" guard; Interpose does not. The simulated player takes it anyway (section 7.6). |
 | A back-row Squire can never Interpose | By data (`requires_row: front`); the panel says so when it applies. |
 | A kept die can be un-kept before a later reroll | "Keep" is a per-reroll mark, as the Keep tooltip states. |
 | Key meanings change when the outcome screen appears | `M` toggles animation in battle and is Modify Party on the outcome screen; there is no input pause between them. |
-| Class balance | Parties with two or more Scouts win about 100%; all-Squire parties win 0% at size 3 and above (section 7.2). A tuning proposal is being measured; nothing changes without owner approval. |
+| Class balance | Parties with two or more Scouts win about 100%; all-Squire parties win 0% at size 3 and above (sections 7.2 and 7.6). Under simulated player version 2 the shipped table is also above the 70-85% band at party size 2. The owner chose a class change set on 2026-11-10; it is being retuned against version 2 and nothing changes without owner approval of the new numbers. |
 | Windows display | Never launched on a physical Windows display. Window resize while dragging, font rendering and behaviour at 125% or 150% scaling are unverified. |
 | Python install manager | Whether its `py` command downloads a missing Python on request is `<UNKNOWN>` here; the launcher itself never downloads or installs Python. |
 | Type checking | `mypy` covers the engine, content, simulator, controller and replay tool, not `ui/` (20 findings in `ui/screens.py`, all about lambda and float-versus-int inference). |

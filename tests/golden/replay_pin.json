@@ -15,10 +15,10 @@
         "scout"
       ],
       "outcome": "victory",
-      "commands": 486,
-      "events": 608,
-      "events_hash": "fd77cc7bb222035c0348dacd30953d70969bd839d95b70f598d6bfa95695f25d",
-      "final_state_hash": "9009aaebd0c6398e99047fc88bc025c70da357c9060265a3cf69fa6381583e8c"
+      "commands": 548,
+      "events": 682,
+      "events_hash": "cffa7926e4aa7bfa9b1b3ccbd6de24d80082588cd7a360d7afa8bae99ee281d2",
+      "final_state_hash": "49f723f2c993606b9c56861b928728d5d50ef6b4d47fbb7377313882308a6448"
     },
     {
       "seed": 2,
@@ -41,10 +41,10 @@
         "scout"
       ],
       "outcome": "victory",
-      "commands": 1021,
-      "events": 1192,
-      "events_hash": "c0a2f2ccad2f0ea0ce8fb24c849cb887134526b5bc54f3686a9befe39910c8ee",
-      "final_state_hash": "1de49b58206d59824ea38640dcfccc100d59d49e94b3f67f030175180218b2ee"
+      "commands": 943,
+      "events": 1110,
+      "events_hash": "9c0ba7009844035be9aa5b4cb5bdf4a29647b6f4496e453746953770e58d497c",
+      "final_state_hash": "37b99d01c518430affe4e3272c06ba83bae8d7387a61e824b26f4daa27ad30c2"
     }
   ]
 }

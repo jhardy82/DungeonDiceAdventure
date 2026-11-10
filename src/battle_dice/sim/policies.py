@@ -67,7 +67,10 @@ class HeuristicPolicy:
     lookahead = True
     real_amounts = True
     value_upgrades = True
-    shield_weight = 1.0
+    #: Shields are scored at this fraction of their old per-point weight. With the Steadfast bonus
+    #: counted at 1.0 the player guarded too much: five Squires won less often than under version 1.
+    #: 0.75 gives the same overall win rate and no party that does clearly worse (decision log 7.6).
+    shield_weight = 0.75
     #: Used only when ``lookahead`` is off: the version 1 rule (keep the best plan's dice if it scores this much).
     keep_threshold = 2.0
 

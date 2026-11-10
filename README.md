@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 432 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
+python -m pytest                 # 446 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice/core src/battle_dice/rng.py src/battle_dice/content src/battle_dice/sim src/battle_dice/app src/battle_dice/replay_cli.py
 ```
@@ -168,7 +168,7 @@ python -m pytest --cov=battle_dice.core --cov=battle_dice.content --cov=battle_d
 
 | Folder | Contents |
 |--------|----------|
-| `tests/unit` | RNG golden vectors, content tables and validation, command envelope, timeline, dice, planning, targeting, effects, enemy AI, purity, regression tests from the MVP review |
+| `tests/unit` | RNG golden vectors, content tables and validation, command envelope, timeline, dice, planning, targeting, effects, enemy AI, purity, regression tests from the MVP review, forced-roll tests of the simulated player |
 | `tests/fixtures` | One module per PRD fixture, `test_t01_solo_basic.py` to `test_t16_seed_replay.py` |
 | `tests/integration` | Full two-battle runs for every party size, invariants after every command, both outcomes; run-log replay and three runs pinned by hash |
 | `tests/ui` | Scripted mouse run at 1280x720 and keyboard-only run at 960x540 through every screen; every documented key; reaction panel, pause menu and readable text at both sizes; sprite manifest, licences, whole-number scaling and animation |
@@ -182,7 +182,8 @@ battle-dice-sim --seeds 20 --policy random
 
 The simulator plays complete runs for every class composition of the requested party sizes and
 reports wins and losses by party size and composition plus engine transition latency. Its output
-is a measurement, not a balance claim. `--content-dir PATH` measures a candidate fixture set
+is a measurement, not a balance claim: the heuristic policy is a scripted player (its version is
+recorded in the output as `policy_version`), not human play. `--content-dir PATH` measures a candidate fixture set
 from a folder without touching the shipped content. See `docs/DECISION_LOG.md` section 7 for the
 recorded results and the per-party-size table chosen from them.
 

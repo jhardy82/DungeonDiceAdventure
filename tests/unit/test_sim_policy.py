@@ -35,7 +35,7 @@ def variant(**switches: bool) -> HeuristicPolicy:
 
 
 def version_1() -> HeuristicPolicy:
-    return variant(lookahead=False, real_amounts=False, value_upgrades=False)
+    return variant(lookahead=False, real_amounts=False, value_upgrades=False, shield_weight=1.0)
 
 
 def settle(engine: Engine, hero_id: str) -> None:
