@@ -112,8 +112,8 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 
 ## 6. Acceptance evidence
 
-446 automated tests pass on the reference environment (Linux container, Python 3.15.2,
-pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 214 unit, 78 fixture, 49 integration,
+465 automated tests pass on the reference environment (Linux container, Python 3.15.2,
+pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 233 unit, 78 fixture, 49 integration,
 105 headless UI and graphics. `ruff` 0.17.4 and `mypy` 2.4.1 are clean with their 3.15 targets.
 
 Line coverage of the rules engine, content loader and random numbers (`battle_dice.core`,
@@ -315,6 +315,16 @@ points; no composition lower by more than 15 points.
 **Latency under version 2.** 2,143,188 engine transitions in the 40-seed run on shipped content:
 median 0.17 ms, p95 0.31 ms, maximum 110 ms, counting time inside engine commands only. The run
 takes about 3.3 minutes with four workers (version 1: about 2.5).
+
+### 7.7 Scenario-based playtest (2026-11-10)
+
+`docs/PLAYTEST.md` records a scenario-based playtest of rules 1.1.1 and content 1.2.1: twelve
+scripted personas (`src/battle_dice/sim/personas.py`, run by `tools/playtest_scenarios.py`), one
+first session played through the real screens, and five forced tactical situations. It changed no
+game behaviour. Its nine findings (previews that show base numbers and not the real ones, a
+newcomer win rate of 8%, between-battle choices that do not change outcomes, an unguarded die
+swap, reaction-prompt fatigue, risk-free rerolls and three small screen defects) await owner
+decisions. No person has play-tested the game; the document contains a session script for that.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 
