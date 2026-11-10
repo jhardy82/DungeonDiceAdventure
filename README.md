@@ -21,6 +21,10 @@ python -m pip install -e ".[dev]"
 python -m battle_dice
 ```
 
+If PowerShell refuses to run `Activate.ps1` ("running scripts is disabled on this system"), skip
+that line and call the environment's Python directly: `.\.venv\Scripts\python.exe -m pip install -e ".[dev]"`,
+then `.\.venv\Scripts\python.exe -m battle_dice`. Or use the launcher below, which needs no policy change.
+
 macOS / Linux:
 
 ```bash
@@ -38,40 +42,52 @@ Options:
 | `--size 1280x720` | Window size. Minimum supported is `960x540`; the window is resizable. |
 | `--log-dir PATH` | Folder for JSONL event logs (default `./logs`, or `BATTLE_DICE_LOG_DIR`). |
 | `--no-animation` | Start with animation off (reduced motion). `M` toggles it during a battle. |
-| `--smoke-test` | Play one hidden, seeded run through the real UI and exit 0 on success. No window opens. |
+| `--smoke-test` | Hidden self-check: one seeded run with every frame drawn, exit 0 on success. No window opens. |
+| `--version` | Print the rules and content versions. |
 
 ## Play on Windows
 
 Two routes. Neither has been launched on a physical Windows display by the author of this
 repository; both are built and smoke-tested on a Windows CI runner.
 
-**1. Launcher (from a checkout, needs Python 3.15).** Double-click `Play-BattleDice.cmd`, or run:
+**1. Launcher (from a checkout, needs Python 3.15 or newer).** Double-click `Play-BattleDice.cmd`.
+It needs no PowerShell policy change. Or, from a PowerShell prompt:
 
 ```powershell
 .\scripts\Start-BattleDice.ps1
 ```
 
-The launcher finds Python 3.15 (the `py` launcher, `python` on PATH, the standard install
-folders, then the registry), creates `.venv` on first run, installs the game only when
-`pyproject.toml` has changed, then starts it. It never installs Python or changes machine
-settings. If it cannot find Python 3.15, for example because an older Python comes first on
-PATH, it lists what it did find; pass the interpreter directly with
-`-Python C:\path\to\python.exe`. Other options: `-Seed 123`, `-Size 960x540`, `-LogDir PATH`,
-`-Reinstall`, `-NoLaunch`.
+If PowerShell answers "running scripts is disabled on this system", use the `.cmd` file, or run
+`powershell -ExecutionPolicy Bypass -File .\scripts\Start-BattleDice.ps1` (the bypass applies to
+that one process only).
+
+What the launcher does:
+
+- Finds Python 3.15 or newer (3.15 first): the `py` launcher, `python` on PATH, the standard
+  install folders, then the registry. If an older Python comes first on PATH it lists what it
+  found; pass the interpreter directly with `-Python C:\path\to\python.exe`.
+- Creates `.venv` on first run and installs the game. It installs again only when
+  `pyproject.toml` changed, the checkout was moved or renamed, or the game is missing from `.venv`.
+- Starts the game. It does not download or install Python and changes no machine settings.
+- `-Reinstall` rebuilds `.venv`. If no usable Python is found, the existing `.venv` is kept.
+
+Other options: `-Seed 123`, `-Size 960x540`, `-LogDir PATH`, `-NoLaunch`, and `-SmokeTest`
+(runs the hidden self-check instead of opening a window).
 
 Tip: keep the checkout outside OneDrive or other synced folders. Syncing the thousands of files
 in `.venv` is slow and can lock files while the game is being installed.
 
 **2. Standalone app (no Python needed).** Open the latest successful **Package (Windows)** run
-under the repository's Actions tab, download the `BattleDice-windows-x64` artifact, unzip it, and
-run `BattleDice\BattleDice.exe`.
+under the repository's Actions tab (you must be signed in to GitHub), download the
+`BattleDice-windows-x64` artifact, unzip it once, and run `BattleDice\BattleDice.exe`.
 
 - The app is **unsigned**, so Windows SmartScreen will warn on first run ("More info", then
   "Run anyway").
 - Workflow artifacts expire (90 days by default); re-run the workflow to rebuild.
 - Event logs go to `%LOCALAPPDATA%\BattleDice\logs`.
 - `BattleDice.exe --smoke-test --smoke-out result.txt` plays one hidden run and writes the result,
-  which is how the build is verified.
+  which is how the build is verified. The app has no console window, so `--version` and argument
+  errors print nothing; an unexpected crash leaves `crash-<time>.txt` in the log folder.
 
 To build it yourself: `python -m pip install ".[package]"`, then
 `python -m PyInstaller packaging/battle_dice.spec --noconfirm` (output in `dist\BattleDice`).
@@ -84,7 +100,8 @@ To build it yourself: `python -m pip install ".[package]"`, then
 3. On a hero's activation: **Roll**, mark dice to **Keep**, **Reroll** the rest (2 rerolls),
    choose actions and targets, then **Confirm** the whole plan. Unused dice are discarded.
 4. On an enemy's activation its action and targets are revealed first. Eligible heroes may react
-   in three stages: **Guard**, **Resource**, **Interrupt**. Then the enemy action resolves.
+   in three stages: **Guard**, **Resource**, **Interrupt**. Each reacting hero has one row; click
+   the ally to protect on that row. Then the enemy action resolves.
 5. Win Battle 1, apply one required **dice upgrade**, optionally swap one die per hero and change rows,
    then win Battle 2.
 
@@ -96,19 +113,30 @@ To build it yourself: `python -m pip install ".[package]"`, then
 
 ### Controls
 
-Every screen works with the mouse or with the keyboard alone. `Tab` / `Shift+Tab` or the arrow
-keys move focus, `Enter` or `Space` activates, `Esc` goes back or cancels. Hover or focus a
-control to read what it does; a disabled control shows why it is unavailable.
+Every screen works with the mouse or with the keyboard alone.
+
+- **Hotkeys** act at once (the table below). **Enter** activates the screen's main button:
+  Roll, Confirm, Skip Stage, Begin, Start Battle 2.
+- **Tab / Shift+Tab or the arrow keys** move a focus ring from control to control. While a
+  control has the ring, Enter or Space activates that control instead. Hotkeys and clicks never
+  move the ring; Esc clears it.
+- **Esc** goes back or cancels. During a run it opens a menu: resume, controls, or abandon the run.
+- Point at or focus a control to read what it does; a disabled control shows why it is unavailable.
+- Point at or focus a **unit card** to list that unit in the centre panel: every enemy ability,
+  every status and what it does, and a hero's dice, reaction and passive.
 
 | Where | Keys |
 |-------|------|
 | Main menu | `N` new run, `C` controls, `Q` quit |
-| Party setup | `1` `2` `3` add Squire / Apprentice / Scout, `B` begin |
+| Party setup | `1` `2` `3` add Squire / Apprentice / Scout, `B` or `Enter` begin |
 | Hero activation | `R` roll, then reroll unkept; `Z` `X` keep die 1 / 2; `1` `2` plan die 1 / 2; number keys pick a numbered target; `O` swap tie order; `C` clear; `Enter` confirm; `P` pass |
-| Reaction window | number keys use a listed reaction, `S` skip stage |
-| Pacing | `F` fast mode, `Space` (nothing focused) step now, `M` animation on / off |
+| Reaction window | a row's number uses that hero's reaction; if it asks for an ally, press the ally's number next; `S` skip stage |
+| Pacing | `F` fast mode, `Space` step now while resolving, `M` animation on / off |
+| During a run | `Esc` menu (cancels a target choice first) |
 | Upgrade | `1` `2` `3` select a card, `A` apply, `Enter` start Battle 2 |
 | Outcome | `R` retry same party, `M` modify party |
+
+The number row and the numeric keypad both work for number keys.
 
 ## Art
 
@@ -125,20 +153,25 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 295 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
-python -m ruff check src tests
-python -m mypy src/battle_dice/core src/battle_dice/rng.py src/battle_dice/content src/battle_dice/sim src/battle_dice/app
+python -m pytest                 # 405 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
+python -m ruff check src tests tools packaging
+python -m mypy src/battle_dice/core src/battle_dice/rng.py src/battle_dice/content src/battle_dice/sim src/battle_dice/app src/battle_dice/replay_cli.py
 ```
 
-UI tests run headless (`SDL_VIDEODRIVER=dummy` is set by the tests). CI runs the same three
-commands on Linux and Windows.
+UI tests run headless (`SDL_VIDEODRIVER=dummy` is set by the tests). CI runs the same checks on
+Linux and Windows, and fails if line coverage of the rules engine, content loader and random
+numbers drops below 90% (measured: 97%; PRD target: at least 80%):
+
+```bash
+python -m pytest --cov=battle_dice.core --cov=battle_dice.content --cov=battle_dice.rng --cov-fail-under=90
+```
 
 | Folder | Contents |
 |--------|----------|
-| `tests/unit` | RNG golden vectors, content tables, command envelope, timeline, dice, planning, targeting, effects, enemy AI, purity |
+| `tests/unit` | RNG golden vectors, content tables and validation, command envelope, timeline, dice, planning, targeting, effects, enemy AI, purity, regression tests from the MVP review |
 | `tests/fixtures` | One module per PRD fixture, `test_t01_solo_basic.py` to `test_t16_seed_replay.py` |
-| `tests/integration` | Full two-battle runs for every party size, invariants after every command, both outcomes |
-| `tests/ui` | Scripted mouse run at 1280x720 and keyboard-only run at 960x540 through every screen; sprite manifest, licences, whole-number scaling and animation |
+| `tests/integration` | Full two-battle runs for every party size, invariants after every command, both outcomes; run-log replay and three runs pinned by hash |
+| `tests/ui` | Scripted mouse run at 1280x720 and keyboard-only run at 960x540 through every screen; every documented key; reaction panel, pause menu and readable text at both sizes; sprite manifest, licences, whole-number scaling and animation |
 
 ## Headless simulation and replay
 
@@ -153,9 +186,21 @@ is a measurement, not a balance claim. `--content-dir PATH` measures a candidate
 from a folder without touching the shipped content. See `docs/DECISION_LOG.md` section 7 for the
 recorded results and the per-party-size table chosen from them.
 
-Every finished run writes a JSONL event log (header line, then one event per line with sequence
-number, tick, actor, before/delta/after, RNG stream and draw index). A run is fully reproducible
-from its seed, content version and ordered command log; see `battle_dice.core.replay`.
+Every finished run writes a JSONL event log: a header line (seed, rules and content identity,
+the ordered commands, the final hashes), then one event per line with sequence number, tick,
+actor, before/delta/after, RNG stream and draw index. The file alone reproduces the run:
+
+```bash
+battle-dice-replay logs/run-123-1.jsonl      # or: python -m battle_dice.replay_cli LOG [LOG ...]
+```
+
+It replays the commands on a fresh rules engine and checks the rules version, the content hash,
+the event-log hash, the final-state hash and every event line. Exit code 0 means every log
+reproduced exactly. Logs written before version 1.1.1 carry no commands and cannot be replayed.
+
+Three fixed-seed runs are pinned by hash in `tests/golden/replay_pin.json`, so unintended drift
+between builds or platforms fails a test. After an intended rules or content change, bump the
+version and run `python tools/update_replay_pin.py`.
 
 ## Project layout
 
@@ -174,18 +219,20 @@ src/battle_dice/
     progression.py      encounters, recovery, upgrade offers, bench swap
     view.py             read-only snapshots and generated rules text
     replay.py           export and verify deterministic replays
-  app/controller.py   application state machine (menus, drafts, feedback), no pygame
+  app/controller.py   application state machine (menus, drafts, pause menu, feedback), no pygame
+  replay_cli.py       battle-dice-replay: verify finished-run logs
   sim/                heuristic and random policies, seed-matrix runner
   ui/                 pygame-ce presentation: toolkit, screens, app shell
   ui/assets/          16x16 pixel-art sprites, manifest.json, CREDITS.md
 tools/                build_sprites.py: rebuilds the sprite set from Kenney's Tiny Dungeon pack
+                      update_replay_pin.py: regenerates the pinned-run hashes after an intended change
 scripts/              Start-BattleDice.ps1 launcher (Windows)
 packaging/            PyInstaller entry point and spec for the standalone app
 docs/DECISION_LOG.md  interpretations, authored catalogs, deviations, measured evidence
 ```
 
 Changing balance means editing `src/battle_dice/content/data/*.json` (bump `content_version`,
-rerun the tests, add a decision-log entry). No numeric balance value is hard-coded in the engine.
+run `python tools/update_replay_pin.py`, rerun the tests, add a decision-log entry). No numeric balance value is hard-coded in the engine.
 
 ## Scope
 

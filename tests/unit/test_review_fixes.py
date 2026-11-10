@@ -633,3 +633,32 @@ def test_an_unreactable_action_and_a_non_interruptible_one_say_why():
     begin_enemy(plain, enemies(plain)[0].id)
     assert _reason(plain, "interrupt", "h02") == "The enemy action is not interruptible."
     assert _reason(plain, "guard", "h01") is None, "it still deals damage, so Interpose is allowed"
+
+
+# --------------------------------------------------------------------------------------------
+# Class scheduling is its own rule, not a side effect of action speed (AC-02, AC-07)
+# --------------------------------------------------------------------------------------------
+
+
+def test_class_order_wins_even_when_action_speed_says_the_opposite():
+    """In the shipped data the two orders happen to agree, so reverse the speeds to tell them apart."""
+
+    def mutate(documents):
+        faces = documents["dice"]["face_library"]
+        faces["sc_poison"]["action_speed"] = 1  # the Status is now the "slower" action ...
+        faces["sc_shot_1"]["action_speed"] = 3  # ... and the Attack the "faster" one
+
+    engine = start("scout", "squire", content=content_with(mutate))
+    foe = enemies(engine)[0]
+    begin_hero(engine, "h01", striker_d8=4, tools_d4=1)  # Poison and Quick Shot
+    for drafted in ([action("tools_d4", foe.id), action("striker_d8", foe.id)],
+                    [action("striker_d8", foe.id), action("tools_d4", foe.id)]):
+        intents, problem = engine.preview_plan(drafted)
+        assert problem is None
+        assert [i.category for i in intents] == ["status", "attack"], "Exploit Combo: Status first, then Attack"
+    hp = foe.hp
+    resolve_hero(engine, action("tools_d4", foe.id), action("striker_d8", foe.id))
+    resolved = [e.delta for e in events_of(engine, EventType.ACTION_RESOLVED)][-2:]
+    assert [r["name"] for r in resolved] == ["Poison", "Quick Shot"]
+    damage = resolved[1]["results"][0]
+    assert damage["bonus"] == 1 and unit(engine, foe.id).hp == hp - 2, "Exploit Opening: +1 because the Status resolved first"
