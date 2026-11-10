@@ -1,0 +1,221 @@
+"""Class action scheduling, plan validation and action-speed ordering (sections 5.5 and 5.6).
+
+A plan is validated as a whole: dice availability, class policy, target legality and a mana
+projection in resolution order. The same function serves previews (UI) and the authoritative
+``SetActionPlan`` / ``CommitActionPlan`` commands, so both always agree.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+from battle_dice.core.models import ActionIntent, Combatant, FaceDefinition, HeroTurn
+from battle_dice.core.targeting import eligible_targets, protected_targets
+
+if TYPE_CHECKING:  # pragma: no cover
+    from battle_dice.core.engine import Engine
+
+
+class PlanError(ValueError):
+    """The submitted plan is not legal. The message is shown to the player."""
+
+
+def describe_policy(scheduling: dict[str, Any]) -> str:
+    return f"{scheduling['label']}: {scheduling['summary']}"
+
+
+def order_actions(entries: list[tuple[FaceDefinition, int]], scheduling: dict[str, Any]) -> list[int]:
+    """Return resolution order as indices into ``entries`` (``(face, player_order)`` pairs).
+
+    A class-defined dependency (Resource then cast, Status then Attack) always comes first.
+    Otherwise higher ``action_speed`` resolves earlier and the player's order breaks ties.
+    """
+    indices = list(range(len(entries)))
+    if scheduling["policy"] == "sequence" and len(entries) == 2:
+        first = scheduling["first_category"]
+        return sorted(indices, key=lambda i: (0 if entries[i][0].category == first else 1, entries[i][1]))
+    return sorted(indices, key=lambda i: (-(entries[i][0].action_speed or 0), entries[i][1]))
+
+
+def _check_policy(faces: list[FaceDefinition], scheduling: dict[str, Any]) -> None:
+    count = len(faces)
+    if count > scheduling["max_actions"]:
+        raise PlanError(f"{scheduling['label']} allows at most {scheduling['max_actions']} action(s) per activation.")
+    if scheduling["policy"] == "sequence" and count == 2:
+        first = scheduling["first_category"]
+        seconds = scheduling["second_categories"]
+        categories = [f.category for f in faces]
+        firsts = [c for c in categories if c == first]
+        others = [c for c in categories if c != first]
+        if len(firsts) != 1 or len(others) != 1 or others[0] not in seconds:
+            allowed = " or ".join(s.capitalize() for s in seconds)
+            raise PlanError(
+                f"{scheduling['label']}: two actions are only allowed as {first.capitalize()} first, then {allowed}."
+            )
+
+
+def build_plan(ctx: Engine, hero: Combatant, turn: HeroTurn, actions: list[dict[str, Any]]) -> list[ActionIntent]:
+    """Validate ``actions`` (``[{die_id, target_ids}]`` in the player's order) and return ordered intents."""
+    combat = ctx.combat
+    scheduling = ctx.content.class_def(hero.archetype_id)["scheduling"]
+    seen: set[str] = set()
+    chosen: list[tuple[FaceDefinition, str, int, list[str]]] = []
+
+    for order, action in enumerate(actions):
+        die_id = action["die_id"]
+        if die_id not in turn.rolled:
+            raise PlanError(f"Die '{die_id}' has not been rolled this activation.")
+        if die_id in seen:
+            raise PlanError(f"Die '{die_id}' already supplies another action this activation.")
+        seen.add(die_id)
+        face_index = turn.rolled[die_id]
+        face = ctx.die_for(hero.id, die_id).faces[face_index]
+        if face.is_blank:
+            raise PlanError(f"{face.name} is a non-action and cannot be committed.")
+        eligible = eligible_targets(combat, hero, face)
+        if not eligible:
+            raise PlanError(f"{face.name} has no legal target.")
+        requested = list(action.get("target_ids", []))
+        if face.target_scope in ("all_enemies", "all_allies"):
+            targets = eligible
+        elif face.target_scope == "self":
+            if requested not in ([], [hero.id]):
+                raise PlanError(f"{face.name} can only target its user.")
+            targets = [hero.id]
+        else:
+            if len(requested) != 1:
+                raise PlanError(f"{face.name} needs exactly one target.")
+            if requested[0] not in eligible:
+                raise PlanError(target_problem(ctx, hero, face, requested[0]))
+            targets = requested
+        chosen.append((face, die_id, order, targets))
+
+    faces = [c[0] for c in chosen]
+    _check_policy(faces, scheduling)
+    resolution_order = order_actions([(c[0], c[2]) for c in chosen], scheduling)
+
+    # Mana projection in resolution order: costs are charged on resolution, gains arrive first.
+    mana = hero.mana
+    intents: list[ActionIntent] = []
+    for position in resolution_order:
+        face, die_id, order, targets = chosen[position]
+        if face.mana_cost > mana:
+            raise PlanError(f"{face.name} needs {face.mana_cost} mana but only {mana} will be available.")
+        mana -= face.mana_cost
+        for effect in face.effects:
+            if effect["type"] == "gain_mana" and effect.get("target", "target") == "self":
+                mana = min(hero.max_mana, mana + face.effect_amount(effect))
+        intents.append(
+            ActionIntent(
+                id=f"a{combat.next_intent_seq + len(intents):05d}",
+                actor_id=hero.id,
+                source_die_id=die_id,
+                ability_id=None,
+                effect_id=f"{die_id}#{turn.rolled[die_id] + 1}",
+                category=face.category,
+                committed_target_ids=list(targets),
+                action_speed=face.action_speed or 0,
+                costs={"mana": face.mana_cost},
+                tags=list(face.tags),
+                name=face.name,
+                power=face.power,
+                face_index=turn.rolled[die_id],
+                plan_order=order,
+            )
+        )
+    return intents
+
+
+def target_problem(ctx: Engine, hero: Combatant, face: FaceDefinition, target_id: str) -> str:
+    combat = ctx.combat
+    target = combat.combatants.get(target_id)
+    if target is None:
+        return f"Unknown target '{target_id}'."
+    if target_id in protected_targets(combat, hero, face):
+        return f"{target.name} is protected: melee must target the standing front row first."
+    if face.target_scope == "single_ally" and target.side == hero.side and not target.standing:
+        return f"{target.name} is downed; only a revival-capable Heal can target a downed ally."
+    if not target.standing:
+        return f"{target.name} is not a valid target."
+    return f"{target.name} is not a legal target for {face.name}."
+
+
+def die_options(ctx: Engine, hero: Combatant, turn: HeroTurn) -> list[dict[str, Any]]:
+    """Per rolled die: the face, whether it can be used on its own, the reason if not, and targets."""
+    combat = ctx.combat
+    options = []
+    for die_id in sorted(turn.rolled):
+        die = ctx.die_for(hero.id, die_id)
+        face_index = turn.rolled[die_id]
+        face = die.faces[face_index]
+        eligible = [] if face.is_blank else eligible_targets(combat, hero, face)
+        reason = None
+        needs_mana = False
+        if face.is_blank:
+            reason = "Blank: no action."
+        elif not eligible:
+            reason = "No legal target."
+        elif face.mana_cost > hero.mana:
+            needs_mana = True
+            reason = f"Needs {face.mana_cost} mana (has {hero.mana})."
+        options.append(
+            {
+                "die_id": die_id,
+                "die_name": die.name,
+                "die_size": die.size,
+                "face_index": face_index,
+                "face": face,
+                "kept": die_id in turn.kept,
+                "usable_alone": reason is None,
+                "needs_mana": needs_mana,
+                "selectable": not face.is_blank and bool(eligible),
+                "reason": reason,
+                "eligible_target_ids": eligible,
+                "protected_target_ids": [] if face.is_blank else protected_targets(combat, hero, face),
+            }
+        )
+    return options
+
+
+def has_legal_action(ctx: Engine, hero: Combatant, turn: HeroTurn) -> bool:
+    """True when at least one legal non-empty plan exists for the current roll."""
+    return bool(enumerate_plans(ctx, hero, turn, include_targets=False))
+
+
+def enumerate_plans(
+    ctx: Engine, hero: Combatant, turn: HeroTurn, include_targets: bool = True
+) -> list[list[dict[str, Any]]]:
+    """All legal non-empty plans (used by the simulator and the 'no legal action' check).
+
+    With ``include_targets=False`` only one representative target per action is tried.
+    """
+    options = [o for o in die_options(ctx, hero, turn) if o["selectable"]]
+    max_actions = ctx.content.class_def(hero.archetype_id)["scheduling"]["max_actions"]
+
+    def target_choices(option: dict[str, Any]) -> list[list[str]]:
+        face = option["face"]
+        if face.target_scope in ("all_enemies", "all_allies", "self"):
+            return [[]]
+        choices = [[t] for t in option["eligible_target_ids"]]
+        return choices if include_targets else choices[:1]
+
+    plans: list[list[dict[str, Any]]] = []
+
+    def extend(start: int, current: list[dict[str, Any]]) -> None:
+        if current:
+            try:
+                build_plan(ctx, hero, turn, current)
+            except PlanError:
+                pass
+            else:
+                plans.append(list(current))
+        if len(current) >= max_actions:
+            return
+        for index in range(start, len(options)):
+            for targets in target_choices(options[index]):
+                current.append({"die_id": options[index]["die_id"], "target_ids": targets})
+                extend(index + 1, current)
+                current.pop()
+
+    extend(0, [])
+    return plans

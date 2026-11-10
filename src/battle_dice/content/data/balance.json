@@ -1,0 +1,16 @@
+{
+  "content_version": "1.2.0",
+  "party": {"min_size": 1, "max_size": 5},
+  "timeline": {"ready_threshold": 100, "min_speed": 1, "max_speed": 30, "start_gauge": 0, "revive_gauge": 0},
+  "shield": {"cap": 12},
+  "statuses": {
+    "poison": {"stack_cap": 3, "damage_per_stack": 1, "default_duration": 2},
+    "weaken": {"stack_cap": 2, "damage_penalty_per_stack": 1, "default_duration": 2},
+    "speed_up": {"stack_cap": 1, "default_duration": 2}
+  },
+  "corruption": {"backlash_threshold": 5, "backlash_damage": 1},
+  "upgrades": {"face_power_cap": 5, "offers_per_die": 3, "mandatory_upgrades_per_run": 1, "max_swaps_per_hero": 1},
+  "recovery": {"standing_heal_percent": 30, "downed_restore_percent": 50},
+  "ai": {"priority_lethal": 100, "priority_setup": 20, "priority_default": 10},
+  "reactions": {"charges_per_activation": 1}
+}

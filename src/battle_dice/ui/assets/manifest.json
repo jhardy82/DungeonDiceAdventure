@@ -1,0 +1,64 @@
+{
+  "tile_size": 16,
+  "sources": {
+    "kenney-tiny-dungeon": {
+      "name": "Tiny Dungeon (1.0)",
+      "author": "Kenney (www.kenney.nl)",
+      "licence": "CC0 1.0",
+      "url": "https://kenney.nl/assets/tiny-dungeon"
+    },
+    "original": {
+      "name": "Original pixel art for Battle Dice",
+      "author": "Battle Dice project (drawn by tools/build_sprites.py)",
+      "licence": "Same as this repository",
+      "url": ""
+    }
+  },
+  "sprites": {
+    "hero_squire": {"file": "hero_squire.png", "source": "kenney-tiny-dungeon", "tile": 96},
+    "hero_apprentice": {"file": "hero_apprentice.png", "source": "kenney-tiny-dungeon", "tile": 84},
+    "hero_scout": {"file": "hero_scout.png", "source": "kenney-tiny-dungeon", "tile": 112},
+    "enemy_goblin": {"file": "enemy_goblin.png", "source": "kenney-tiny-dungeon", "tile": 109, "modified": "skin tones recoloured green"},
+    "enemy_hex_adept": {"file": "enemy_hex_adept.png", "source": "kenney-tiny-dungeon", "tile": 111},
+    "enemy_captain": {"file": "enemy_captain.png", "source": "kenney-tiny-dungeon", "tile": 87},
+    "icon_attack": {"file": "icon_attack.png", "source": "kenney-tiny-dungeon", "tile": 104},
+    "icon_defense": {"file": "icon_defense.png", "source": "kenney-tiny-dungeon", "tile": 102},
+    "icon_healing": {"file": "icon_healing.png", "source": "kenney-tiny-dungeon", "tile": 115},
+    "icon_status": {"file": "icon_status.png", "source": "kenney-tiny-dungeon", "tile": 114},
+    "icon_resource": {"file": "icon_resource.png", "source": "kenney-tiny-dungeon", "tile": 116},
+    "status_poison": {"file": "status_poison.png", "source": "kenney-tiny-dungeon", "tile": 114},
+    "marker_downed": {"file": "marker_downed.png", "source": "kenney-tiny-dungeon", "tile": 65},
+    "chest": {"file": "chest.png", "source": "kenney-tiny-dungeon", "tile": 89},
+    "tile_floor_a": {"file": "tile_floor_a.png", "source": "kenney-tiny-dungeon", "tile": 48},
+    "tile_floor_b": {"file": "tile_floor_b.png", "source": "kenney-tiny-dungeon", "tile": 49},
+    "tile_floor_c": {"file": "tile_floor_c.png", "source": "kenney-tiny-dungeon", "tile": 42},
+    "tile_wall": {"file": "tile_wall.png", "source": "kenney-tiny-dungeon", "tile": 40},
+    "die_d4": {"file": "die_d4.png", "source": "original"},
+    "die_d6": {"file": "die_d6.png", "source": "original"},
+    "die_d8": {"file": "die_d8.png", "source": "original"},
+    "status_weaken": {"file": "status_weaken.png", "source": "original"},
+    "status_speed_up": {"file": "status_speed_up.png", "source": "original"}
+  },
+  "combatants": {
+    "squire": "hero_squire",
+    "apprentice": "hero_apprentice",
+    "scout": "hero_scout",
+    "goblin": "enemy_goblin",
+    "hex_adept": "enemy_hex_adept",
+    "captain": "enemy_captain"
+  },
+  "categories": {
+    "attack": "icon_attack",
+    "defense": "icon_defense",
+    "healing": "icon_healing",
+    "status": "icon_status",
+    "resource": "icon_resource"
+  },
+  "statuses": {
+    "poison": "status_poison",
+    "weaken": "status_weaken",
+    "speed_up": "status_speed_up"
+  },
+  "dice": {"4": "die_d4", "6": "die_d6", "8": "die_d8"},
+  "backdrop": {"floor": ["tile_floor_a", "tile_floor_a", "tile_floor_a", "tile_floor_a", "tile_floor_b", "tile_floor_a", "tile_floor_a", "tile_floor_b", "tile_floor_a", "tile_floor_a", "tile_floor_c"], "wall": "tile_wall"}
+}

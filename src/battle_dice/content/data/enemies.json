@@ -1,0 +1,47 @@
+{
+  "content_version": "1.2.0",
+  "enemies": {
+    "goblin": {
+      "name": "Goblin Skirmisher", "row": "front", "max_hp": 6, "speed": 10, "base_initiative": 4,
+      "actions": {
+        "dirty_trick": {"name": "Dirty Trick", "category": "status", "power": 1, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 0,
+          "effects": [{"type": "apply_status", "target": "target", "status": "weaken", "duration": 2}],
+          "can_revive": false, "tags": ["basic", "interruptible", "hostile"], "weight": 1, "random_target": false},
+        "slash": {"name": "Slash", "category": "attack", "power": 2, "target_scope": "single_enemy", "range_type": "melee", "action_speed": 1, "mana_cost": 0,
+          "effects": [{"type": "damage", "target": "target"}],
+          "can_revive": false, "tags": ["basic", "interruptible", "hostile"], "weight": 3, "random_target": false}
+      }
+    },
+    "hex_adept": {
+      "name": "Hex Adept", "row": "back", "max_hp": 7, "speed": 8, "base_initiative": 3,
+      "actions": {
+        "corrupt_mark": {"name": "Corrupt Mark", "category": "resource", "power": 1, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 0,
+          "effects": [{"type": "gain_corruption", "target": "target"}],
+          "can_revive": false, "tags": ["basic", "interruptible", "hostile"], "weight": 1, "random_target": false},
+        "poison_dart": {"name": "Poison Dart", "category": "status", "power": 1, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 0,
+          "effects": [{"type": "apply_status", "target": "target", "status": "poison", "duration": 2}],
+          "can_revive": false, "tags": ["basic", "interruptible", "hostile"], "weight": 1, "random_target": false},
+        "shadow_bolt": {"name": "Shadow Bolt", "category": "attack", "power": 3, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 0,
+          "effects": [{"type": "damage", "target": "target"}],
+          "can_revive": false, "tags": ["basic", "interruptible", "hostile"], "weight": 2, "random_target": false}
+      }
+    },
+    "captain": {
+      "name": "Blight Captain", "row": "front", "max_hp": 12, "speed": 9, "base_initiative": 5,
+      "actions": {
+        "blight_wave": {"name": "Blight Wave", "category": "attack", "power": 1, "target_scope": "all_enemies", "range_type": "ranged", "action_speed": 1, "mana_cost": 0,
+          "effects": [{"type": "damage", "target": "target"}],
+          "can_revive": false, "tags": ["elite_resistant", "interruptible", "hostile"], "weight": 1, "random_target": false},
+        "corrupt_mark": {"name": "Corrupt Mark", "category": "resource", "power": 1, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 0,
+          "effects": [{"type": "gain_corruption", "target": "target"}],
+          "can_revive": false, "tags": ["elite_resistant", "interruptible", "hostile"], "weight": 1, "random_target": false},
+        "strike": {"name": "Strike", "category": "attack", "power": 3, "target_scope": "single_enemy", "range_type": "melee", "action_speed": 1, "mana_cost": 0,
+          "effects": [{"type": "damage", "target": "target"}],
+          "can_revive": false, "tags": ["elite_resistant", "interruptible", "hostile"], "weight": 3, "random_target": false},
+        "war_cry": {"name": "War Cry", "category": "status", "power": 2, "target_scope": "self", "range_type": "self", "action_speed": 1, "mana_cost": 0,
+          "effects": [{"type": "apply_status", "target": "self", "status": "speed_up", "duration": 2}],
+          "can_revive": false, "tags": ["self_buff", "unreactable"], "weight": 1, "random_target": false}
+      }
+    }
+  }
+}
