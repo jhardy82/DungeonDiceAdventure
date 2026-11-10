@@ -42,11 +42,9 @@ def _must(result: Any, what: str) -> None:
 #: which player produced them. 1 = threshold keep rule (to rules 1.1.1); 2 = look-ahead player.
 POLICY_VERSION = 2
 
-#: Score weights for statuses a face applies, and for the same statuses when an enemy applies them to a hero.
+#: Score weights for the statuses a face applies.
 _STATUS_SCORE = {STATUS_POISON: 2.5, STATUS_WEAKEN: 1.8}
 _DOWN_BONUS = 3.0
-_MANA_WORTH = 0.6
-_SHIELD_WORTH = 0.5
 
 
 class HeuristicPolicy:
@@ -56,8 +54,8 @@ class HeuristicPolicy:
       plan, and the dice to keep are the subset with the highest expected score over the rerolls left.
     - **Scoring:** the engine's own amounts (weaken, Steadfast, the Scout's combo bonus), applied in
       resolution order so two actions cannot both claim the same kill.
-    - **Reactions:** used only when they prevent something; mana for a revival is held back while an
-      ally is down.
+    - **Reactions:** always taken when one is eligible, on the most pressed target (unchanged from
+      version 1).
     - **Upgrades:** the offer that raises its die's average face value the most.
 
     It values the current activation only. It is a competent player, not an optimal one.
@@ -68,7 +66,6 @@ class HeuristicPolicy:
     #: Each part can be switched off, to measure what it contributes (decision log 7.6).
     lookahead = True
     real_amounts = True
-    selective_reactions = True
     value_upgrades = True
     #: Used only when ``lookahead`` is off: the version 1 rule (keep the best plan's dice if it scores this much).
     keep_threshold = 2.0
@@ -291,120 +288,29 @@ class HeuristicPolicy:
 
     # -- reactions ---------------------------------------------------------------------------
 
-    def _harm(self, engine: Engine, intent: ActionIntent, target: Combatant, extra_shield: int = 0,
-              damage_cut: int = 0, magnitude_cut: int = 0) -> float:
-        """How bad the committed enemy action is for one hero, in the same units as plan scores.
-
-        Lost health counts in full. Lost shields count at half, because shields last until they are
-        spent: a hit they absorb still costs the party something.
-        """
-        combat = engine.combat
-        enemy = combat.combatants[intent.actor_id]
-        face = engine.intent_face(intent)
-        shields = target.shields + extra_shield
-        harm = -_SHIELD_WORTH * extra_shield
-        for effect in face.effects:
-            if effect.get("target", "target") == "self":
-                continue
-            kind = effect["type"]
-            if kind == "damage":
-                dealt = max(0, damage_breakdown(engine, enemy, face, effect, intent)["effective"] - damage_cut)
-                absorbed = min(dealt, shields)
-                lost = min(dealt - absorbed, target.hp)
-                shields -= absorbed
-                harm += lost + _SHIELD_WORTH * absorbed + (_DOWN_BONUS if lost >= target.hp > 0 else 0.0)
-            elif kind == "apply_status":
-                magnitude = max(0, face.effect_amount(effect) - magnitude_cut)
-                room = engine.content.status_cap(effect["status"]) - target.stacks_of(effect["status"])
-                harm += min(magnitude, max(0, room)) * _STATUS_SCORE.get(effect["status"], 1.0)
-                harm += 0.3 if magnitude and room <= 0 else 0.0
-            elif kind == "gain_corruption":
-                amount = max(0, face.effect_amount(effect) - magnitude_cut)
-                harm += amount * (1.5 if target.corruption + amount >= 4 else 0.4)
-        return harm
-
-    def _reaction_choice(self, engine: Engine, option: dict[str, Any]) -> tuple[float, str | None]:
-        """``(value, target)`` of one eligible reaction: the harm it prevents plus what it grants."""
-        combat = engine.combat
-        intent = combat.committed_intent
-        assert intent is not None
-        hero = combat.combatants[option["hero_id"]]
-        reaction = engine.content.reactions[option["reaction_id"]]
-        shield_cap = engine.content.balance["shield"]["cap"]
-        candidates = [combat.combatants[t] for t in option["target_ids"]] if option["needs_target"] else [hero]
-        best_value, best_target = 0.0, None
-        for target in sorted(candidates, key=lambda c: c.id):
-            value = 0.0
-            for effect in reaction["effects"]:
-                kind = effect["type"]
-                if kind == "shield":
-                    gained = min(effect["amount"], shield_cap - target.shields)
-                    value += self._harm(engine, intent, target) - self._harm(engine, intent, target, extra_shield=gained)
-                elif kind == "remove_corruption":
-                    removed = min(effect["amount"], target.corruption)
-                    value += removed * (1.5 if target.corruption >= 4 else 0.4)
-                elif kind == "gain_mana":
-                    value += min(effect["amount"], hero.max_mana - hero.mana) * _MANA_WORTH
-                elif kind == "interrupt":
-                    struck = [combat.combatants[t] for t in intent.committed_target_ids if combat.combatants[t].standing]
-                    before = sum(self._harm(engine, intent, t) for t in struck)
-                    if "elite_resistant" not in intent.tags:
-                        value += before
-                    elif engine.intent_face(intent).has_effect("damage"):
-                        cut = effect["resisted_damage_reduction"]
-                        value += before - sum(self._harm(engine, intent, t, damage_cut=cut) for t in struck)
-                    else:
-                        cut = effect["resisted_magnitude_reduction"]
-                        value += before - sum(self._harm(engine, intent, t, magnitude_cut=cut) for t in struck)
-            if value > best_value + 1e-9:
-                best_value, best_target = value, target.id if option["needs_target"] else None
-        return best_value, best_target
-
-    def _revival_reserve(self, engine: Engine, hero: Combatant) -> int:
-        """Mana to hold back for a revival face while an ally is down (0 when none is down or the hero has none)."""
-        if all(ally.state != STATE_DOWNED for ally in engine.combat.side("hero")):
-            return 0
-        costs = [
-            face.mana_cost
-            for die_id in hero.equipped_dice_ids
-            for face in engine.die_for(hero.id, die_id).faces
-            if face.can_revive
-        ]
-        return min(costs) if costs else 0
-
     def _react(self, engine: Engine) -> None:
+        """Use the first eligible reaction, on the most pressed target.
+
+        A value-based rule (react only when it prevents more than the mana is worth, hold mana for a
+        revival) was measured and changed the win rate by less than the noise, so the simple rule stays
+        (decision log 7.6).
+        """
         combat = engine.combat
         assert combat.reaction_stage is not None
         options = reactions.eligible_options(engine, combat.reaction_stage)
         if not options:  # pragma: no cover - the engine only opens a window with an eligible option
             self._send(engine, cmd.SKIP_REACTION_STAGE)
             return
-        if not self.selective_reactions:
-            option = options[0]
-            target_id = None
-            if option["needs_target"]:
-                candidates = [combat.combatants[t] for t in option["target_ids"]]
-                if option["reaction_id"] == "grounding":
-                    candidates.sort(key=lambda c: (-c.corruption, c.id))
-                else:
-                    candidates.sort(key=lambda c: (c.hp + c.shields, c.id))
-                target_id = candidates[0].id
-            self._send(engine, cmd.USE_REACTION, hero_id=option["hero_id"], target_id=target_id)
-            return
-        best: tuple[float, dict[str, Any], str | None] | None = None
-        for option in options:
-            value, target_id = self._reaction_choice(engine, option)
-            hero = combat.combatants[option["hero_id"]]
-            if value <= option["mana_cost"] * _MANA_WORTH + 1e-9:
-                continue  # prevents nothing, or less than the mana is worth
-            if hero.mana - option["mana_cost"] < self._revival_reserve(engine, hero) and value < _DOWN_BONUS:
-                continue
-            if best is None or value > best[0] + 1e-9:
-                best = (value, option, target_id)
-        if best is None:
-            self._send(engine, cmd.SKIP_REACTION_STAGE)
-            return
-        self._send(engine, cmd.USE_REACTION, hero_id=best[1]["hero_id"], target_id=best[2])
+        option = options[0]
+        target_id = None
+        if option["needs_target"]:
+            candidates = [combat.combatants[t] for t in option["target_ids"]]
+            if option["reaction_id"] == "grounding":
+                candidates.sort(key=lambda c: (-c.corruption, c.id))
+            else:
+                candidates.sort(key=lambda c: (c.hp + c.shields, c.id))
+            target_id = candidates[0].id
+        self._send(engine, cmd.USE_REACTION, hero_id=option["hero_id"], target_id=target_id)
 
     # -- upgrades ----------------------------------------------------------------------------
 

@@ -20,7 +20,6 @@ from tests.conftest import (
     add_status,
     begin_enemy,
     begin_hero,
-    down,
     enemies,
     events_of,
     force_slash,
@@ -28,7 +27,6 @@ from tests.conftest import (
     start,
     unit,
 )
-from tests.unit.test_review_fixes import roll_for, saturate
 
 
 def variant(**switches: bool) -> HeuristicPolicy:
@@ -37,7 +35,7 @@ def variant(**switches: bool) -> HeuristicPolicy:
 
 
 def version_1() -> HeuristicPolicy:
-    return variant(lookahead=False, real_amounts=False, selective_reactions=False, value_upgrades=False)
+    return variant(lookahead=False, real_amounts=False, value_upgrades=False)
 
 
 def settle(engine: Engine, hero_id: str) -> None:
@@ -51,15 +49,6 @@ def planned(engine: Engine) -> list[tuple[str, list[str]]]:
     turn = engine.combat.turn
     assert turn is not None
     return [(intent.name, intent.committed_target_ids) for intent in turn.plan]
-
-
-def react_until_resolved(engine: Engine, policy: HeuristicPolicy) -> None:
-    while engine.combat.phase in CombatPhase.STAGE_BY_WINDOW:
-        policy.act(engine)
-
-
-def reactions_used(engine: Engine) -> list[tuple[str, list[str]]]:
-    return [(e.delta["reaction"], e.delta["target_ids"]) for e in events_of(engine, EventType.REACTION_USED)]
 
 
 # --------------------------------------------------------------------------------------------
@@ -199,71 +188,21 @@ def test_two_attacks_are_not_both_credited_with_the_same_kill():
 
 
 # --------------------------------------------------------------------------------------------
-# Reactions
+# Reactions (the version 1 rule, kept: see decision log 7.6)
 # --------------------------------------------------------------------------------------------
 
 
-def slash_at_the_squire(*, shields: int, hp: int | None = None, mana: int | None = None, ally_down: bool = False) -> Engine:
-    """Squire in front, Apprentice behind; the Goblin's Slash (2 damage) is revealed against the Squire."""
+def test_an_eligible_reaction_is_always_taken_on_the_most_pressed_target():
     engine = start("squire", "apprentice")
-    squire = unit(engine, "h01")
-    squire.shields = shields
-    squire.hp = squire.hp if hp is None else hp
-    squire.mana = squire.mana if mana is None else mana
     unit(engine, "h02").mana = unit(engine, "h02").max_mana  # Grounding has nothing to change
-    if ally_down:
-        down(engine, "h02")
     force_slash(engine)
     goblin = next(e for e in enemies(engine) if e.archetype_id == "goblin")
     begin_enemy(engine, goblin.id)
-    assert engine.combat.committed_intent.committed_target_ids == ["h01"]
-    return engine
-
-
-def test_interpose_is_used_when_it_saves_health():
-    engine = slash_at_the_squire(shields=0)
-    react_until_resolved(engine, HeuristicPolicy())
-    assert reactions_used(engine) == [("interpose", ["h01"])]
-
-
-def test_interpose_is_not_wasted_at_the_shield_cap():
-    """The engine offers Interpose at the cap, where it costs mana and adds nothing. Version 1 took it."""
-    cap = start("squire").content.balance["shield"]["cap"]
-    engine = slash_at_the_squire(shields=cap)
-    react_until_resolved(engine, HeuristicPolicy())
-    assert reactions_used(engine) == []
-
-    old = slash_at_the_squire(shields=cap)
-    react_until_resolved(old, version_1())
-    assert reactions_used(old) == [("interpose", ["h01"])]
-
-
-def test_the_last_mana_is_held_for_a_revival_unless_the_reaction_prevents_a_knockout():
-    held = slash_at_the_squire(shields=0, mana=1, ally_down=True)
-    react_until_resolved(held, HeuristicPolicy())
-    assert reactions_used(held) == []  # Rally costs 1 mana and can bring the Apprentice back
-
-    spent = slash_at_the_squire(shields=0, hp=2, mana=1, ally_down=True)
-    react_until_resolved(spent, HeuristicPolicy())
-    assert reactions_used(spent) == [("interpose", ["h01"])]  # without it the Squire falls and the run ends
-
-
-def test_disrupt_cancels_a_damaging_action_but_is_not_spent_on_a_harmless_one():
-    engine = start("scout", "scout")
-    force_slash(engine)
-    goblin = next(e for e in enemies(engine) if e.archetype_id == "goblin")
-    begin_enemy(engine, goblin.id)
-    react_until_resolved(engine, HeuristicPolicy())
-    assert [name for name, _ in reactions_used(engine)] == ["disrupt"]
-    assert events_of(engine, EventType.INTENT_CANCELLED)
-
-    quiet = start("scout", "scout")
-    adept = next(e for e in enemies(quiet) if e.archetype_id == "hex_adept")
-    saturate(quiet, "poison")  # Poison Dart would change nothing, so the Hex Adept will not choose it
-    begin_enemy(quiet, adept.id, roll_for(quiet, adept.id, "corrupt_mark"))
-    assert quiet.combat.committed_intent.name == "Corrupt Mark"
-    react_until_resolved(quiet, HeuristicPolicy())
-    assert reactions_used(quiet) == []  # 1 corruption on a hero with none is worth less than the mana
+    policy = HeuristicPolicy()
+    while engine.combat.phase in CombatPhase.STAGE_BY_WINDOW:
+        policy.act(engine)
+    used = [(e.delta["reaction"], e.delta["target_ids"]) for e in events_of(engine, EventType.REACTION_USED)]
+    assert used == [("interpose", ["h01"])]
 
 
 # --------------------------------------------------------------------------------------------
