@@ -26,6 +26,7 @@ from battle_dice.sim.policies import HeuristicPolicy, play_run
 from tests.conftest import (
     action,
     add_status,
+    begin_enemy,
     begin_hero,
     captain_content,
     commit,
@@ -586,3 +587,49 @@ def test_no_balance_key_is_left_that_nothing_reads(content):
         "weaken": {"stack_cap": 2, "damage_penalty_per_stack": 1},
         "speed_up": {"stack_cap": 1},
     }
+
+
+# --------------------------------------------------------------------------------------------
+# Reaction eligibility reasons that no test reached
+# --------------------------------------------------------------------------------------------
+
+
+def _reason(engine: Engine, stage: str, hero_id: str) -> str | None:
+    from battle_dice.core import reactions
+
+    return next(o["reason"] for o in reactions.stage_options(engine, stage) if o["hero_id"] == hero_id)
+
+
+def test_a_second_interrupt_is_refused_once_the_action_is_cancelled():
+    engine = start("squire", "scout", "scout")
+    force_slash(engine)
+    begin_enemy(engine, enemies(engine)[0].id)
+    while engine.combat.phase != CombatPhase.INTERRUPT_WINDOW:
+        ok(engine.do(cmd.SKIP_REACTION_STAGE))
+    ok(engine.do(cmd.USE_REACTION, hero_id="h02"))  # Disrupt cancels the basic Slash
+    assert last_event(engine, EventType.INTENT_CANCELLED).delta["by"] == "h02"
+    if engine.combat.phase == CombatPhase.INTERRUPT_WINDOW:
+        assert _reason(engine, "interrupt", "h03") == "The enemy action is already cancelled."
+        rejected(engine.do(cmd.USE_REACTION, hero_id="h03"), "already cancelled")
+    else:  # the window closed with the cancel: the reason is still what the rules report
+        engine.combat.committed_intent.cancelled = True
+        assert _reason(engine, "interrupt", "h03") == "The enemy action is already cancelled."
+
+
+def test_an_unreactable_action_and_a_non_interruptible_one_say_why():
+    engine = start("squire", "scout", content=captain_content(2))
+    captain = enemies(engine)[0]
+    make_ready(engine, captain.id)
+    engine.force_draws("enemy", [roll_for(engine, captain.id, "war_cry")])
+    step_to(engine, CombatPhase.REVEAL_INTENT)
+    assert _reason(engine, "guard", "h01") == "This enemy action cannot be reacted to."
+    assert _reason(engine, "interrupt", "h02") == "This enemy action cannot be reacted to."
+
+    def mutate(documents):
+        documents["enemies"]["enemies"]["goblin"]["actions"]["slash"]["tags"] = ["basic", "hostile"]
+
+    plain = start("squire", "scout", content=content_with(mutate))
+    force_slash(plain)
+    begin_enemy(plain, enemies(plain)[0].id)
+    assert _reason(plain, "interrupt", "h02") == "The enemy action is not interruptible."
+    assert _reason(plain, "guard", "h01") is None, "it still deals damage, so Interpose is allowed"

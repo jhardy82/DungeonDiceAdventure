@@ -714,3 +714,69 @@ def test_an_unexpected_crash_leaves_a_report_file_and_a_nonzero_exit(tmp_path, m
     reports = list((tmp_path / "logs").glob("crash-*.txt"))
     assert len(reports) == 1 and "simulated crash in the main loop" in reports[0].read_text(encoding="utf-8")
     assert "Details were saved to" in capsys.readouterr().err
+
+
+# --------------------------------------------------------------------------------------------
+# The remaining documented keys (AC-19)
+# --------------------------------------------------------------------------------------------
+
+
+def test_combo_planning_by_keyboard_alone_with_numbered_targets_order_and_clear(tmp_path):
+    play = Play(tmp_path, ["scout", "squire"], seed=7)
+    play.begin()
+    play.until(lambda: "plan:roll" in play.ui.keys() and play.combat.turn.hero_id == "h01")
+    play.roll_faces(striker_d8=4, tools_d4=1)  # Poison (status) and Quick Shot (attack): the Scout's combo
+    play.key(pygame.K_x)  # keep die 2
+    assert play.combat.turn.kept == ["tools_d4"]
+    play.key(pygame.K_x)
+    assert play.combat.turn.kept == []
+
+    play.key(pygame.K_1)  # plan Poison: two enemies, so a target is asked for
+    assert play.ctrl.targeting_die == "striker_d8"
+    numbered = {w.hotkeys[0]: w.key for w in play.ui.widgets if w.key.startswith("unit:") and w.hotkeys}
+    assert set(numbered) == {pygame.K_1, pygame.K_2}, "each legal target shows a number key"
+    play.key(pygame.K_2)
+    assert play.ctrl.draft == [{"die_id": "striker_d8", "target_ids": [numbered[pygame.K_2][5:]]}]
+    play.key(pygame.K_2)  # plan Quick Shot
+    play.key(pygame.K_1)
+    assert [a["die_id"] for a in play.ctrl.draft] == ["striker_d8", "tools_d4"] and play.ctrl.confirm_problem() is None
+
+    play.key(pygame.K_o)  # swap the drafted order; class rules still put the Status first when it resolves
+    assert [a["die_id"] for a in play.ctrl.draft] == ["tools_d4", "striker_d8"]
+    assert [entry["die_id"] for entry in play.ctrl.plan_preview()["ordered"]] == ["striker_d8", "tools_d4"]
+    play.key(pygame.K_c)
+    assert play.ctrl.draft == [] and "cleared" in play.ctrl.message.lower()
+
+    play.key(pygame.K_1)
+    play.key(pygame.K_1)
+    play.key(pygame.K_2)
+    play.key(pygame.K_1)
+    play.key(pygame.K_RETURN)
+    turn = play.combat.turn
+    assert turn is None or turn.hero_id != "h01" or turn.committed, play.ctrl.message
+
+
+def test_arrow_keys_move_the_focus_ring_and_f_and_m_toggle_pacing(tmp_path):
+    play = Play(tmp_path, ["squire"])
+    play.begin()
+    play.to_roll_prompt()
+    order = [w.key for w in play.ui.widgets]
+    play.key(pygame.K_DOWN)
+    assert play.ui.focus_key == order[0]
+    play.key(pygame.K_RIGHT)
+    assert play.ui.focus_key == order[1]
+    play.key(pygame.K_UP)
+    play.key(pygame.K_LEFT)
+    assert play.ui.focus_key == order[-1], "the ring wraps around"
+    play.key(pygame.K_TAB, mod=pygame.KMOD_SHIFT)
+    assert play.ui.focus_key == order[-2]
+    play.key(pygame.K_ESCAPE)  # first Esc opens the menu (its action wins) and drops the ring
+    assert play.ui.focus_key is None and play.ctrl.paused
+    play.key(pygame.K_ESCAPE)
+
+    fast = play.app.fast
+    play.key(pygame.K_f)
+    assert play.app.fast is (not fast) and "Fast mode" in play.ctrl.message
+    animated = play.ui.anim.enabled
+    play.key(pygame.K_m)
+    assert play.ui.anim.enabled is (not animated) and "Animation" in play.ctrl.message
