@@ -10,7 +10,7 @@ import copy
 from fractions import Fraction
 from typing import Any
 
-from battle_dice.core import planning, progression, reactions, timeline
+from battle_dice.core import effects, planning, progression, reactions, timeline
 from battle_dice.core.engine import Engine
 from battle_dice.core.events import EventType
 from battle_dice.core.models import (
@@ -18,11 +18,13 @@ from battle_dice.core.models import (
     STATUS_POISON,
     STATUS_SPEED_UP,
     STATUS_WEAKEN,
+    ActionIntent,
     Combatant,
     CombatEvent,
     CombatPhase,
     DieDefinition,
     FaceDefinition,
+    HeroTurn,
     RunPhase,
 )
 
@@ -84,6 +86,51 @@ def describe_face(face: FaceDefinition) -> str:
     if face.mana_cost:
         text += f"; costs {face.mana_cost} mana"
     return text
+
+
+def action_forecast(
+    engine: Engine,
+    actor: Combatant,
+    face: FaceDefinition,
+    intent: ActionIntent | None = None,
+    target: Combatant | None = None,
+    combo: bool = False,
+) -> dict[str, Any]:
+    """What an action will really produce, where that differs from the amounts printed on the face.
+
+    Uses the engine's own formulas (``effects.damage_breakdown``, ``effects.shield_bonus``), so a
+    preview cannot disagree with the resolution. ``combo`` marks the second action of a class combo
+    whose first action is planned: its bonus is granted when that first action resolves.
+    ``note`` is empty when every amount is as printed.
+    """
+    passive = engine.content.class_def(actor.archetype_id)["passive"] if actor.is_hero else None
+    damage: int | None = None
+    shield: int | None = None
+    weaken = 0
+    notes: list[str] = []
+    for effect in face.effects:
+        if effect["type"] == "damage":
+            parts = effects.damage_breakdown(engine, actor, face, effect, intent)
+            bonus = parts["bonus"]
+            if combo and passive is not None and passive["type"] == "combo_attack_bonus" and face.category == "attack":
+                bonus = max(bonus, int(passive["amount"]))
+            reasons = []
+            if bonus and passive is not None:
+                reasons.append(f"{passive['name']} +{bonus}")
+            if parts["weaken"]:
+                reasons.append(f"Weaken -{parts['weaken']}")
+            if parts["mitigation"]:
+                reasons.append(f"Disrupt -{parts['mitigation']}")
+            weaken = parts["weaken"]
+            damage = max(0, parts["base"] + bonus - parts["weaken"] - parts["mitigation"])
+            if damage != parts["base"]:
+                notes.append(f"deals {damage} ({', '.join(reasons)})")
+        elif effect["type"] == "shield" and passive is not None and intent is not None and target is not None:
+            bonus = effects.shield_bonus(engine, actor, face, target, intent)
+            shield = face.effect_amount(effect) + bonus
+            if bonus:
+                notes.append(f"+{shield} shield ({passive['name']} +{bonus})")
+    return {"damage": damage, "shield": shield, "weaken": weaken, "note": "; ".join(notes)}
 
 
 def face_view(face: FaceDefinition) -> dict[str, Any]:
@@ -223,7 +270,24 @@ def intent_view(engine: Engine) -> dict[str, Any] | None:
         "cancelled": intent.cancelled,
         "damage_reduction": intent.damage_reduction,
         "magnitude_reduction": intent.magnitude_reduction,
+        "forecast": action_forecast(engine, combat.combatants[intent.actor_id], face, intent),
     }
+
+
+def _die_forecast(engine: Engine, hero: Combatant, turn: HeroTurn, option: dict[str, Any]) -> dict[str, Any]:
+    """Forecast for one rolled die used on its own (a class combo bonus depends on the plan, not the die)."""
+    face: FaceDefinition = option["face"]
+    intent = target = None
+    if option["selectable"]:
+        single = face.target_scope in ("single_enemy", "single_ally")
+        targets = option["eligible_target_ids"][:1] if single else []
+        try:
+            intent = planning.build_plan(engine, hero, turn, [{"die_id": option["die_id"], "target_ids": targets}])[0]
+        except planning.PlanError:
+            intent = None  # not usable right now (mana); the printed amounts stand
+        else:
+            target = engine.combat.combatants[intent.committed_target_ids[0]] if intent.committed_target_ids else hero
+    return action_forecast(engine, hero, face, intent, target)
 
 
 def hero_turn_view(engine: Engine) -> dict[str, Any] | None:
@@ -234,6 +298,7 @@ def hero_turn_view(engine: Engine) -> dict[str, Any] | None:
     hero = combat.combatants[turn.hero_id]
     options = planning.die_options(engine, hero, turn) if turn.rolled else []
     for option in options:
+        option["forecast"] = _die_forecast(engine, hero, turn, option)
         option["face"] = face_view(option["face"])
         option["die"] = die_view(engine.die_for(hero.id, option["die_id"]))
     scheduling = copy.deepcopy(engine.content.class_def(hero.archetype_id)["scheduling"])

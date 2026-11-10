@@ -23,7 +23,8 @@ it; a protected target says why; a revival face says what it revives to; an empt
 clear "choose a die, or Pass"; skill matters (informed 90%, random 16%); no single habit wins
 (always-attack 73%, always-defend 66%); 16% of informed wins came after a hero had fallen.
 
-No game behaviour was changed by this playtest. The findings are for the owner to prioritise.
+No game behaviour was changed by the playtest itself. On 2026-11-10 the owner chose to fix
+findings 1, 2, 4, 5, 7, 8 and 9 (section 8) and to have options measured for findings 3 and 6.
 
 ## 2. Method
 
@@ -198,3 +199,26 @@ One person who has not played, about 30 minutes, the game on a real Windows disp
   Procedural Personas through MCTS with Evolved Heuristics",
   [IEEE Transactions on Games, 2019](https://www.antoniosliapis.com/papers/automated_playtesting_with_procedural_personas_through_mcts_with_evolved_heuristics.pdf).
   The personas here are hand-written heuristics, not evolved MCTS agents.
+
+## 8. Fixes and re-test (2026-11-10)
+
+Screens and guidance only; no rule or content changed. Each fix was re-tested by replaying the
+scenario that found it.
+
+| Finding | Fix | Re-test |
+|--------:|-----|---------|
+| 1 | A yellow "Now ..." line shows the amount that will really happen when it differs from the printed one: on the rolled die, on the plan line, and for a weakened enemy in the intent panel. It is computed by the engine's own formulas (`core/view.py`, `action_forecast`). | T3 replayed: Jab now reads "1 melee damage / Now deals 0 (Weaken -1)" and Guard "Now +4 shield (Steadfast +1)". Seven unit tests compare each forecast with the amount the engine then resolves (Weaken, Steadfast, Scout combo, Apprentice bonus, weakened enemy, resisted Disrupt). |
+| 2 | The first roll of a run explains Reroll and Keep; the first reaction prompt explains what a reaction is; the outcome screen adds one sentence when no reroll, or no reaction, was used in the whole run. | U1 replayed: both hints appear once, then the short messages return. The persona figures (newcomer 8%) are unchanged by design: personas do not read hints. Whether a person learns from them is for the human session in section 6. |
+| 4 | Swapping out a die that is larger than the bench die warns and needs a second press: "Confirm: give up Iron d6". | UI test: the first press changes nothing; the second swaps. |
+| 5 | "Skip All (A)" declines every remaining stage of the current enemy action. | U1 replayed as a newcomer: Battle 1 took 20 Skip All presses in place of 39 Skip Stage presses (143 inputs in place of 162 up to the upgrade screen). |
+| 7 | The status bar reads "rules 1.1.1   content 1.2.1". | UI test. |
+| 8 | A reaction decision sets its own status line. | UI test; U1 screenshot at 960x540. |
+| 9 | A die in the plan, or being aimed, no longer reads "will reroll". | UI test; T3 screenshot. |
+
+- **Not fixed here:** Interpose is still offered at the shield cap (T6). Removing the offer is an
+  engine rule change and needs an owner decision.
+- **Still open:** findings 3 and 6 are design questions. Options will be measured with the
+  personas after the class balance retune and brought to the owner as a proposal.
+- New strings were checked at 1280x720 and 960x540 under three fonts; the forecast line steps its
+  size down, and takes the place of the face details when the rules text needs two lines.
+

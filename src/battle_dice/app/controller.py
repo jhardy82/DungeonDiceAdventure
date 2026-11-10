@@ -20,11 +20,11 @@ from battle_dice.content.loader import Content, load_content
 from battle_dice.core import commands as cmd
 from battle_dice.core import planning
 from battle_dice.core.engine import Engine
-from battle_dice.core.events import summarize, write_jsonl
+from battle_dice.core.events import EventType, summarize, write_jsonl
 from battle_dice.core.models import ROW_BACK, ROW_FRONT, CombatPhase, RunPhase
 from battle_dice.core.progression import face_from_plain
 from battle_dice.core.replay import export_run
-from battle_dice.core.view import combat_log, die_view, face_view, hero_turn_view, snapshot
+from battle_dice.core.view import action_forecast, combat_log, die_view, face_view, hero_turn_view, snapshot
 
 
 class Screen:
@@ -97,6 +97,9 @@ class AppController:
         self.targeting_die: str | None = None
         self.inspect_die: str | None = None
         self.reaction_hero: str | None = None  # reacting hero whose target is being chosen by number key
+        self.hints_shown: set[str] = set()  # one-time guidance already given in this run
+        self.skip_reactions_for: str | None = None  # enemy intent whose remaining stages are all skipped
+        self.swap_confirm: tuple[str, str, str] | None = None  # a swap that gives up a larger die, awaiting a second press
         self._draft_owner: tuple[str | None, int] = (None, -1)
         # Upgrade screen selection.
         self.upgrade_hero: str | None = None
@@ -281,6 +284,9 @@ class AppController:
         self.engine = engine
         self.paused = self.pause_help = False
         self.reaction_hero = None
+        self.hints_shown = set()
+        self.skip_reactions_for = None
+        self.swap_confirm = None
         self.log_path = None
         self.log_error = None
         self._draft_owner = (None, -1)
@@ -311,7 +317,33 @@ class AppController:
         """Advance one automatic combat step. Returns True when a step was taken."""
         if self.paused or self.screen != Screen.BATTLE or self.engine is None or self.engine.needs_input():
             return False
-        return bool(self._guard(self._send, cmd.ADVANCE_PHASE))
+        stepped = bool(self._guard(self._send, cmd.ADVANCE_PHASE))
+        if stepped:
+            self._reaction_opened()
+        return stepped
+
+    def _in_reaction_window(self) -> bool:
+        engine = self.engine
+        return (engine is not None and self.screen == Screen.BATTLE and engine.started and not engine.finished()
+                and engine.state.phase == RunPhase.BATTLE and engine.needs_input()
+                and engine.combat.phase in CombatPhase.STAGE_BY_WINDOW)
+
+    def _reaction_opened(self) -> None:
+        """A reaction decision has just opened: skip it if the player declined every stage, else say so."""
+        while self._in_reaction_window():
+            assert self.engine is not None
+            intent = self.engine.combat.committed_intent
+            if intent is None or intent.id != self.skip_reactions_for:
+                break
+            if not self._guard(self._send, cmd.SKIP_REACTION_STAGE):
+                return
+        if not self._in_reaction_window():
+            return
+        if "reaction" not in self.hints_shown:
+            self.hints_shown.add("reaction")
+            self.info("An enemy action is revealed. A hero may react before it lands: pick a reaction, or Skip Stage (S).")
+        else:
+            self.info("Reaction decision: pick a reaction, Skip Stage (S), or Skip All (A).")
 
     # ----------------------------------------------------------------------------------------
     # Battle: hero activation
@@ -324,7 +356,11 @@ class AppController:
 
     def roll(self) -> None:
         if self._guard(self._send, cmd.ROLL_DICE):
-            self.info("Keep dice, reroll the rest, then choose actions.")
+            if "reroll" not in self.hints_shown:
+                self.hints_shown.add("reroll")
+                self.info("Rolled. Reroll (R) rerolls every die you have not kept; Keep (Z, X) holds a die. Then choose actions.")
+            else:
+                self.info("Keep dice, reroll the rest, then choose actions.")
 
     def toggle_keep(self, die_id: str) -> None:
         engine = self.engine
@@ -457,12 +493,16 @@ class AppController:
                         "target_names": [engine.combat.combatants[t].name for t in entry["target_ids"]
                                          if t in engine.combat.combatants],
                         "fallback": "",
+                        "forecast": action_forecast(engine, hero, face)["note"],
                     }
                 )
             return result
         mana = hero.mana
-        for intent in intents:
+        first_category = self.content.class_def(hero.archetype_id)["scheduling"].get("first_category")
+        for position, intent in enumerate(intents):
             face = engine.intent_face(intent)
+            target = engine.combat.combatants[intent.committed_target_ids[0]] if intent.committed_target_ids else hero
+            combo = len(intents) == 2 and position == 1 and intents[0].category == first_category
             mana -= face.mana_cost
             for effect in face.effects:
                 if effect["type"] == "gain_mana" and effect.get("target", "target") == "self":
@@ -477,6 +517,7 @@ class AppController:
                     "text": face_view(face)["text"],
                     "target_names": [engine.combat.combatants[t].name for t in intent.committed_target_ids],
                     "fallback": FALLBACK_TEXT[face.target_scope],
+                    "forecast": action_forecast(engine, hero, face, intent, target, combo)["note"],
                 }
             )
         result["mana_after"] = mana
@@ -516,6 +557,7 @@ class AppController:
         self.reaction_hero = None
         if self._guard(self._send, cmd.USE_REACTION, hero_id=hero_id, target_id=target_id):
             self.info("Reaction used.")
+            self._reaction_opened()
 
     def pick_reaction(self, hero_id: str, needs_target: bool, target_ids: list[str]) -> None:
         """Keyboard path: choose the reacting hero first, then the ally by number."""
@@ -538,6 +580,19 @@ class AppController:
         self.reaction_hero = None
         if self._guard(self._send, cmd.SKIP_REACTION_STAGE):
             self.info("Stage skipped.")
+            self._reaction_opened()
+
+    def skip_all_stages(self) -> None:
+        """Decline every remaining reaction stage for the enemy action now revealed."""
+        engine = self.engine
+        if engine is None or not self._in_reaction_window() or engine.combat.committed_intent is None:
+            return
+        self.reaction_hero = None
+        self.skip_reactions_for = engine.combat.committed_intent.id
+        name = engine.combat.committed_intent.name
+        if self._guard(self._send, cmd.SKIP_REACTION_STAGE):
+            self._reaction_opened()
+            self.info(f"No reaction to {name}: every stage skipped.")
 
     # ----------------------------------------------------------------------------------------
     # Recovery, upgrade and equipment
@@ -610,7 +665,22 @@ class AppController:
             self.upgrade_offer = None
             self.info("Upgrade applied. Optional: swap one die per hero or change rows, then start Battle 2.")
 
+    def swap_gives_up_a_larger_die(self, hero_id: str, out_die_id: str, in_die_id: str) -> bool:
+        engine = self.engine
+        if engine is None or in_die_id not in self.content.dice:
+            return False
+        return engine.die_for(hero_id, out_die_id).size > self.content.dice[in_die_id].size
+
     def swap_die(self, hero_id: str, out_die_id: str, in_die_id: str) -> None:
+        engine = self.engine
+        request = (hero_id, out_die_id, in_die_id)
+        if engine is not None and self.swap_gives_up_a_larger_die(*request) and self.swap_confirm != request:
+            self.swap_confirm = request
+            leaving, arriving = engine.die_for(hero_id, out_die_id), self.content.dice[in_die_id]
+            self.warn(f"{leaving.name} has {leaving.size} faces and {arriving.name} only {arriving.size}: "
+                      "this swap gives up the larger die. Press the same swap again to confirm.")
+            return
+        self.swap_confirm = None
         if self._guard(self._send, cmd.SWAP_DIE, hero_id=hero_id, out_die_id=out_die_id, in_die_id=in_die_id):
             self.upgrade_die = in_die_id if self.upgrade_hero == hero_id else self.upgrade_die
             self.info("Die swapped.")
@@ -684,7 +754,21 @@ class AppController:
             "log_path": str(self.log_path) if self.log_path else None,
             "log_error": self.log_error,
             "upgrades": copy.deepcopy(engine.state.upgrades),
+            "tips": self.outcome_tips(),
         }
+
+    def outcome_tips(self) -> list[str]:
+        """Advice for the outcome screen when a whole mechanic went unused (playtest finding 2)."""
+        engine = self.engine
+        assert engine is not None
+        stats = summarize(engine.events)
+        tips = []
+        if stats["rerolls_used"] == 0 and stats["hero_activations"] > 0:
+            tips.append("Tip: no reroll was used. Reroll (R) rerolls every die you have not kept, twice per activation, for free.")
+        offered = any(e.type == EventType.REACTION_STAGE_OPENED for e in engine.events)
+        if stats["reactions_used"] == 0 and offered:
+            tips.append("Tip: no reaction was used. Interpose, Grounding and Disrupt answer enemy actions before they land.")
+        return tips
 
     # ----------------------------------------------------------------------------------------
     # Views
