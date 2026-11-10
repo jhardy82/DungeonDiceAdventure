@@ -106,15 +106,15 @@ display labels added for the UI; their numbers are exactly the PRD tables.
 | U-15 | **Reaction panel.** One row per reacting hero (at most five) with that reaction's eligible allies as buttons on the row; a reaction that needs no ally shows its effect there instead. Mouse: one click on the ally. Keyboard: the row's number, then the ally's number; Esc cancels the choice. The earlier one-row-per-pair list ran off the panel with five heroes and showed at most four allies. |
 | U-16 | **Leaving a run.** Esc or the Menu button opens a pause menu in battle and on the upgrade screen: resume, controls, abandon to party setup, abandon to the main menu. Nothing advances while it is open. An abandoned run writes no event log. Esc still cancels a target choice first. |
 | U-17 | **Status bar.** A message that arrived since the last frame is shown until the pointer or the focus moves to a different control; after that the hot control's help text returns. Before, the tooltip of the button just used hid the reason a click was refused. |
-| U-18 | **Readable rules text.** Pointing at or focusing a unit card replaces the combat log with an inspect panel: stats, every status stack with what it does, and the full ability list (enemies) or dice, reaction and passive (heroes). Die face rules wrap onto a second line instead of being cut. Unit cards sum status stacks per kind and pick the longest form that fits (`PSN x3 (1-2)`, then `PSN 3(1-2)`, then `P3(1-2)`); the gauge number gives way before the status text can overlap it, and the gauge bar always stays. Names keep their trailing number when shortened. |
+| U-18 | **Readable rules text.** Pointing at or focusing a unit card replaces the combat log with an inspect panel: stats, every status stack with what it does, and the full ability list (enemies) or dice, reaction and passive (heroes). Die face rules wrap onto a second line instead of being cut. Unit cards sum status stacks per kind and pick the longest form that fits (`PSN x3 (1-2)`, then `PSN 3(1-2)`, then `P3(1-2)`); the gauge number gives way before the status text can overlap it, and the gauge bar always stays. Names keep their trailing number when shortened. Font widths differ widely between machines (DejaVu Sans is about 40% wider than Liberation Sans), so these layouts are chosen by measuring the text, and the text-fit tests run under the machine's own font, DejaVu Sans where installed, and pygame's bundled font. |
 | U-19 | While a die tumbles the planner shows "Rolling ..." and no face name or rules text, so it never states a face that was not rolled. The buttons act on the real result throughout. |
 | U-20 | A log file name that already exists gets a numeric suffix, so a second session with the same `--seed` does not overwrite the first log. An unexpected crash of the main loop writes `crash-<time>.txt` in the log folder and exits 1. Faults while editing the plan, routing input or animating reach the error screen instead of closing the window. |
 
 ## 6. Acceptance evidence
 
-405 automated tests pass on the reference environment (Linux container, Python 3.15.2,
+432 automated tests pass on the reference environment (Linux container, Python 3.15.2,
 pygame-ce 2.5.8, jsonschema 4.26.0, pytest 9.2.0): 200 unit, 78 fixture, 49 integration,
-78 headless UI and graphics. `ruff` 0.17.4 and `mypy` 2.4.1 are clean with their 3.15 targets.
+105 headless UI and graphics. `ruff` 0.17.4 and `mypy` 2.4.1 are clean with their 3.15 targets.
 
 Line coverage of the rules engine, content loader and random numbers (`battle_dice.core`,
 `battle_dice.content`, `battle_dice.rng`) is 97% against the PRD target of at least 80%. CI fails

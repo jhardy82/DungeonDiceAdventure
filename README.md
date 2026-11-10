@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 405 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
+python -m pytest                 # 432 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice/core src/battle_dice/rng.py src/battle_dice/content src/battle_dice/sim src/battle_dice/app src/battle_dice/replay_cli.py
 ```

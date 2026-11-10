@@ -243,10 +243,8 @@ def _status_forms(c: dict[str, Any]) -> list[str]:
 
 def _combatant_tooltip(c: dict[str, Any]) -> str:
     if c["side"] == "hero":
-        return (f"{c['name']}: {c['scheduling']['label']}, speed {c['speed']}, gauge {c['gauge']}. "
-                "Dice, reaction and statuses are listed in the centre panel while this card is pointed at or focused.")
-    return (f"{c['name']}: speed {c['speed']}, gauge {c['gauge']}, {len(c['actions'])} abilities. "
-            "Abilities and statuses are listed in the centre panel while this card is pointed at or focused.")
+        return f"{c['name']}: {c['scheduling']['label']}, speed {c['speed']}, gauge {c['gauge']}. Details are in the centre panel."
+    return f"{c['name']}: speed {c['speed']}, gauge {c['gauge']}, {len(c['actions'])} abilities. Details are in the centre panel."
 
 
 def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float, y: float, view: dict[str, Any],
@@ -319,26 +317,27 @@ def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float
     else:
         ui.text(x + 50, y + 36, f"SPD {c['speed']}   {c['row'].capitalize()} row", 14, Theme.DIM)
 
-    # Bottom line: gauge bar, gauge number, status summary. The status text never overlaps the
-    # gauge number: it shortens first, and the number gives way last (the bar itself always stays).
-    show_gauge_number, status_text, status_room = True, "", 0.0
+    # Bottom line: gauge bar, gauge number, status summary. Fonts differ a lot in width between
+    # machines, so the layout is chosen by measuring: the status text shortens first, then the
+    # gauge number gives way, then the gauge bar narrows and the text shrinks. The bar never goes.
+    gauge_number, bar_width, status_text, status_size, status_room = True, 36.0, "", 13, 0.0
     if c["statuses"]:
         forms = _status_forms(c)
-        for with_number, room in ((True, 96.0), (False, 124.0)):
-            fitting = next((form for form in forms[:2] if ui.text_width(form, 13, True) <= room), None)
-            if fitting is not None:
-                show_gauge_number, status_text, status_room = with_number, fitting, room
-                break
-        else:
-            show_gauge_number, status_text, status_room = False, forms[2], 124.0
-    ui.bar(x + 50, y + 56, 36, 8, min(c["gauge"], view["ready_threshold"]), view["ready_threshold"], Theme.GAUGE)
-    if show_gauge_number:
+        layouts = (
+            [(True, 36.0, 96.0, form, 13) for form in forms[:2]]
+            + [(False, 36.0, 124.0, form, 13) for form in forms]
+            + [(False, 16.0, 146.0, forms[2], size) for size in (13, 12, 11, 10)]
+        )
+        chosen = next((layout for layout in layouts if ui.text_width(layout[3], layout[4], True) <= layout[2]), layouts[-1])
+        gauge_number, bar_width, status_room, status_text, status_size = chosen
+    ui.bar(x + 50, y + 56, bar_width, 8, min(c["gauge"], view["ready_threshold"]), view["ready_threshold"], Theme.GAUGE)
+    if gauge_number:
         ui.text(x + 90, y + 51, f"G{c['gauge']}", 13, Theme.FAINT)
     kinds = list(dict.fromkeys(status["kind"] for status in c["statuses"]))
     for position, kind in enumerate(kinds[:3]):  # badges at the character's feet; the text stays as well
         ui.sprite(ui.assets.status_key(kind), x + 2 + position * 15, y + 52, 16, 16)
     if status_text:
-        ui.text(x + w - 6, y + 51, status_text, 13, Theme.WARN, bold=True, align="right", max_width=status_room)
+        ui.text(x + w - 6, y + 51, status_text, status_size, Theme.WARN, bold=True, align="right", max_width=status_room)
 
 
 def draw_formation(ui: UI, ctrl: AppController, view: dict[str, Any], targeting: dict[str, Any] | None) -> None:
@@ -411,23 +410,25 @@ def draw_center(ui: UI, ctrl: AppController, view: dict[str, Any], inspect: dict
     intent = view.get("intent")
     log_top = 92.0
     if intent is not None:
-        ui.panel(478, 88, 324, 132, "Enemy intent (committed)", border=Theme.ENEMY, width=2)
+        ui.panel(478, 88, 324, 144, "Enemy intent (committed)", border=Theme.ENEMY, width=2)
         state = "CANCELLED" if intent["cancelled"] else "elite-resistant" if intent["elite_resistant"] else "interruptible" if intent["interruptible"] else "not interruptible"
         actor_archetype = next((c["archetype_id"] for c in view["combatants"] if c["id"] == intent["actor_id"]), "")
         ui.sprite(ui.assets.combatant_key(actor_archetype), 760, 106, 36, 36)
         ui.sprite(ui.assets.category_key(intent["category"]), 722, 106, 36, 36)
-        ui.text(488, 110, f"{intent['actor_name']}: {intent['name']}", 16, Theme.TEXT, bold=True, max_width=230)
-        ui.paragraph(488, 130, f"{intent['glyph']} {intent['power']}: {intent['text']}", 230, 14, Theme.DIM, line_height=16, max_lines=2)
-        ui.paragraph(488, 164, "Targets: " + ", ".join(intent["target_names"]), 304, 14, Theme.ACCENT, line_height=16, max_lines=2)
+        # The lines flow, so a long name or rule wraps instead of being cut on a wide font.
+        y = ui.paragraph(488, 108, f"{intent['actor_name']}: {intent['name']}", 230, 16, Theme.TEXT, line_height=18, max_lines=2, bold=True)
+        y = ui.paragraph(488, y + 1, f"{intent['glyph']} {intent['power']}: {intent['text']}", 230, 14, Theme.DIM, line_height=16, max_lines=2)
+        y = max(y + 2, 146.0)  # below the two sprites, where the full width is free
+        y = ui.paragraph(488, y, "Targets: " + ", ".join(intent["target_names"]), 304, 14, Theme.ACCENT, line_height=16, max_lines=2)
         mods = []
         if intent["damage_reduction"]:
             mods.append(f"-{intent['damage_reduction']} damage")
         if intent["magnitude_reduction"]:
             mods.append(f"-{intent['magnitude_reduction']} magnitude")
         extra = f"  ({', '.join(mods)})" if mods else ""
-        ui.text(488, 198, f"[{state}]{'' if intent['reactable'] else ' [no reactions]'}{extra}", 14,
+        ui.text(488, y + 2, f"[{state}]{'' if intent['reactable'] else ' [no reactions]'}{extra}", 14,
                 Theme.BAD if intent["cancelled"] else Theme.WARN, bold=True, max_width=304)
-        log_top = 226.0
+        log_top = 238.0
     height = 470 - log_top
     if inspect is not None:
         draw_inspect(ui, inspect, view, log_top, height)
@@ -502,7 +503,9 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
             ui.text(x + 8, 598, f"d{die['die_size']}", 13, Theme.FAINT)
         else:
             ui.sprite(ui.assets.category_key(face["category"]), x + 4, 521, 44, 44)
-            ui.text(x + 52, 533, f"{face['glyph']}  {face['name']}", 17, CATEGORY_COLORS[face["category"]], bold=True, max_width=146)
+            heading = f"{face['glyph']}  {face['name']}"
+            heading_size = next((size for size in (17, 15, 13, 12) if ui.text_width(heading, size, True) <= 146), 12)
+            ui.text(x + 52, 533 + (17 - heading_size) * 0.6, heading, heading_size, CATEGORY_COLORS[face["category"]], bold=True, max_width=146)
             ui.paragraph(x + 8, 567, face["text"], 232, 14, Theme.TEXT, line_height=15, max_lines=2)
             detail = f"Face {die['face_index'] + 1}/{die['die_size']}"
             if face["action_speed"] is not None:
@@ -603,11 +606,12 @@ def draw_reactions(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
         selected = picking == hero_id
         row_hotkeys = (NUMBER_KEYS[number - 1],) if picking is None and number <= len(NUMBER_KEYS) else ()
         follow_up = " Then choose the ally." if len(targets) > 1 else ""
-        ui.button(row_key, 20, y, 236, 28, f"{number}. {option['name']} ({option['hero_name']})",
+        ui.button(row_key, 20, y, 228, 28, f"{number}. {option['name']} ({option['hero_name']})",
                   lambda h=hero_id, n=option["needs_target"], t=targets: ctrl.pick_reaction(h, n, t),
                   enabled=option["eligible"], reason=option["reason"], hotkeys=row_hotkeys, selected=selected, size=14,
                   tooltip=f"{option['expected']} Cost: {option['mana_cost']} mana, 1 charge.{follow_up}")
-        ui.text(264, y + 7, f"{option['mana_cost']} mana, {option['charges']} charge", 12, Theme.DIM, max_width=96)
+        # Cost only: the reaction charge is on the hero's card ("React 1") and in the tooltip.
+        ui.text(254, y + 7, f"costs {option['mana_cost']} mana", 12, Theme.DIM, max_width=108)
         hot = ui.is_hot(row_key) or selected
         if not option["eligible"]:
             ui.text(366, y + 6, f"Unavailable: {option['reason']}", 13, Theme.WARN, max_width=664)

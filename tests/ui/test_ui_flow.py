@@ -25,6 +25,26 @@ from battle_dice.ui.toolkit import UI  # noqa: E402
 SIZES = [(1280, 720), (960, 540)]
 
 
+@pytest.fixture(params=["system", "dejavusans", "bundled"])
+def font(request, monkeypatch):
+    """Run a text-fit test under several fonts: widths differ a lot between machines.
+
+    "system" is whatever this machine resolves first; DejaVu Sans is the widest common fallback
+    (skipped where it is not installed); "bundled" is pygame's own font, used when no listed
+    system font exists.
+    """
+    from battle_dice.ui import toolkit
+
+    pygame.font.init()
+    if request.param == "dejavusans":
+        if pygame.font.match_font("dejavusans") is None:
+            pytest.skip("DejaVu Sans is not installed on this machine")
+        monkeypatch.setattr(toolkit, "FONT_CANDIDATES", ("dejavusans",))
+    elif request.param == "bundled":
+        monkeypatch.setattr(toolkit, "FONT_CANDIDATES", ())
+    return request.param
+
+
 class Play:
     """A headless game with direct access to the same events a player produces."""
 
@@ -260,10 +280,16 @@ def _guard_window(play):
 
 
 @pytest.mark.parametrize("size", SIZES)
-def test_every_reaction_control_is_inside_the_panel_with_five_reactors(tmp_path, size):
+def test_every_reaction_control_is_inside_the_panel_with_five_reactors(tmp_path, monkeypatch, size, font):
     play = Play(tmp_path, ["squire"] * 5, seed=7, size=size)
     play.begin()
     play.until(lambda: _guard_window(play))
+    drawn, shortened = record_text(monkeypatch)
+    play.app.frame(0)
+    intent = play.ctrl.view()["intent"]
+    title = f"{intent['actor_name']}: {intent['name']}"
+    assert title in drawn and title not in shortened, "the enemy's action name is cut off in the intent panel"
+    assert "costs 1 mana" in drawn and "costs 1 mana" not in shortened
     panel = play.ui.r(8, 476, 1264, 214)
     rows = [k for k in play.ui.keys("react:") if k.count(":") == 1 and k != "react:skip"]
     assert len(rows) == 5
@@ -428,7 +454,7 @@ def test_a_refused_action_is_shown_instead_of_the_buttons_own_tooltip(tmp_path, 
     assert any(text.startswith("End this activation") for text in drawn)
 
 
-def test_enemy_abilities_and_statuses_are_readable_in_full(tmp_path, monkeypatch):
+def test_enemy_abilities_and_statuses_are_readable_in_full(tmp_path, monkeypatch, font):
     play = Play(tmp_path, ["squire", "scout"], seed=7)
     play.begin()
     play.to_input()
@@ -449,7 +475,7 @@ def test_enemy_abilities_and_statuses_are_readable_in_full(tmp_path, monkeypatch
 
 
 @pytest.mark.parametrize("size", SIZES)
-def test_the_boss_move_list_is_never_cut_off(tmp_path, monkeypatch, size):
+def test_the_boss_move_list_is_never_cut_off(tmp_path, monkeypatch, size, font):
     from tests.conftest import packaged_content
 
     content = packaged_content()
@@ -475,7 +501,7 @@ def test_the_boss_move_list_is_never_cut_off(tmp_path, monkeypatch, size):
 
 @pytest.mark.parametrize("size", SIZES)
 @pytest.mark.parametrize("class_id", ["squire", "apprentice", "scout"])
-def test_die_face_rules_are_never_cut_off_in_battle_or_on_the_upgrade_screen(tmp_path, monkeypatch, size, class_id):
+def test_die_face_rules_are_never_cut_off_in_battle_or_on_the_upgrade_screen(tmp_path, monkeypatch, size, class_id, font):
     play = Play(tmp_path, [class_id], size=size)
     play.begin()
     play.to_roll_prompt()
@@ -490,6 +516,8 @@ def test_die_face_rules_are_never_cut_off_in_battle_or_on_the_upgrade_screen(tmp
         play.app.frame(0)
     cut = [text for text in shortened if any(face in text for face in face_texts)]
     assert not cut, f"face rules were shortened: {cut}"
+    rolled = [f"{d['face']['glyph']}  {d['face']['name']}" for d in play.ctrl.view()["hero_turn"]["dice"]]
+    assert all(heading in drawn and heading not in shortened for heading in rolled), "a rolled face's name was cut off"
 
     # Upgrade screen: equipped dice comparison and the bench die.
     for enemy in play.combat.side("enemy"):
@@ -511,28 +539,39 @@ def test_die_face_rules_are_never_cut_off_in_battle_or_on_the_upgrade_screen(tmp
     assert not cut, f"face rules were shortened on the upgrade screen: {cut}"
 
 
-def test_status_summary_on_a_card_groups_stacks_and_never_overlaps_the_gauge(tmp_path, monkeypatch):
-    play = Play(tmp_path, ["squire"], seed=7)
+@pytest.mark.parametrize("size", SIZES)
+def test_status_summary_on_a_card_groups_stacks_and_never_overlaps_the_gauge(tmp_path, monkeypatch, size, font):
+    play = Play(tmp_path, ["squire"], seed=7, size=size)
     play.begin()
     play.to_input()
     hero = play.combat.combatants["h01"]
     hero.status_instances.clear()
-    for index, kind in enumerate(("weaken", "poison", "poison", "poison", "weaken", "speed_up")):
-        hero.status_instances.append(StatusInstance(f"st90{index}", kind, "test", "h01", 1, 1 + index % 2, 0))
+    for index, (kind, stacks, remaining) in enumerate((("weaken", 1, 1), ("poison", 1, 2), ("poison", 1, 1), ("poison", 1, 2),
+                                                       ("weaken", 1, 2), ("speed_up", 2, 2))):
+        hero.status_instances.append(StatusInstance(f"st90{index}", kind, "test", "h01", stacks, remaining, 0))
     view = next(c for c in play.ctrl.view()["combatants"] if c["id"] == "h01")
     forms = screens._status_forms(view)
-    assert forms[0] == "PSN x3 (1-2)  WKN x2 (1)  SPD+ x1 (2)"  # fixed order, whatever order they were applied in
-    assert forms[2] == "P3(1-2) W2(1) S1(2)"
+    assert forms[0] == "PSN x3 (1-2)  WKN x2 (1-2)  SPD+ x2 (2)"  # fixed order, whatever order they were applied in
+    assert forms[2] == "P3(1-2) W2(1-2) S2(2)"  # the widest summary the rules allow
     drawn, shortened = record_text(monkeypatch)
     play.app.frame(0)
     shown = [text for text in drawn if text in forms]
     assert len(shown) == 1 and shown[0] not in shortened, "the status summary on the card was cut off"
     assert f"G{hero.gauge}" not in drawn, "with three statuses the gauge number gives way (the bar stays)"
 
+    # Two statuses, as heroes commonly have: one of the forms fits whole in every font.
+    hero.status_instances = [s for s in hero.status_instances if s.kind != "speed_up"]
+    forms = screens._status_forms(next(c for c in play.ctrl.view()["combatants"] if c["id"] == "h01"))
+    drawn.clear()
+    shortened.clear()
+    play.app.frame(0)
+    shown = [text for text in drawn if text in forms]
+    assert len(shown) == 1 and shown[0] not in shortened
+
     hero.status_instances = hero.status_instances[:1]
     drawn.clear()
     play.app.frame(0)
-    assert "WKN x1 (1)" in drawn and f"G{hero.gauge}" in drawn
+    assert "WKN x1 (1)" in drawn and f"G{hero.gauge}" in drawn, "one status: full form and the gauge number together"
 
 
 def test_unit_names_keep_their_number_when_shortened(tmp_path):
