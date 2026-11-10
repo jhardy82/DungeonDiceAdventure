@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 446 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
+python -m pytest                 # 465 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice/core src/battle_dice/rng.py src/battle_dice/content src/battle_dice/sim src/battle_dice/app src/battle_dice/replay_cli.py
 ```
@@ -168,7 +168,7 @@ python -m pytest --cov=battle_dice.core --cov=battle_dice.content --cov=battle_d
 
 | Folder | Contents |
 |--------|----------|
-| `tests/unit` | RNG golden vectors, content tables and validation, command envelope, timeline, dice, planning, targeting, effects, enemy AI, purity, regression tests from the MVP review, forced-roll tests of the simulated player |
+| `tests/unit` | RNG golden vectors, content tables and validation, command envelope, timeline, dice, planning, targeting, effects, enemy AI, purity, regression tests from the MVP review, forced-roll tests of the simulated player and the playtest personas |
 | `tests/fixtures` | One module per PRD fixture, `test_t01_solo_basic.py` to `test_t16_seed_replay.py` |
 | `tests/integration` | Full two-battle runs for every party size, invariants after every command, both outcomes; run-log replay and three runs pinned by hash |
 | `tests/ui` | Scripted mouse run at 1280x720 and keyboard-only run at 960x540 through every screen; every documented key; reaction panel, pause menu and readable text at both sizes; sprite manifest, licences, whole-number scaling and animation |
@@ -186,6 +186,11 @@ is a measurement, not a balance claim: the heuristic policy is a scripted player
 recorded in the output as `policy_version`), not human play. `--content-dir PATH` measures a candidate fixture set
 from a folder without touching the shipped content. See `docs/DECISION_LOG.md` section 7 for the
 recorded results and the per-party-size table chosen from them.
+
+`python tools/playtest_scenarios.py --seeds 80 --jobs 4` plays twelve scripted personas (a
+newcomer, a player who never rerolls, one who never reacts, and so on) and reports what each habit
+is worth. `docs/PLAYTEST.md` has the method, the scenarios, the findings and a session script
+for testing with a person.
 
 Every finished run writes a JSONL event log: a header line (seed, rules and content identity,
 the ordered commands, the final hashes), then one event per line with sequence number, tick,
