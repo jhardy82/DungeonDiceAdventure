@@ -103,7 +103,7 @@ def action_forecast(
     whose first action is planned: its bonus is granted when that first action resolves.
     ``note`` is empty when every amount is as printed.
     """
-    passive = engine.content.class_def(actor.archetype_id)["passive"] if actor.is_hero else None
+    passive = engine.build(actor.id).passive if actor.is_hero else None
     damage: int | None = None
     shield: int | None = None
     weaken = 0
@@ -229,12 +229,12 @@ def combatant_view(engine: Engine, c: Combatant) -> dict[str, Any]:
         ],
     }
     if c.side == SIDE_HERO:
-        cls = engine.content.class_def(c.archetype_id)
-        view["class_name"] = cls["name"]
+        build = engine.build(c.id)
+        view["class_name"] = build.name
         view["dice"] = [die_view(engine.die_for(c.id, d)) for d in c.equipped_dice_ids]
-        view["scheduling"] = copy.deepcopy(cls["scheduling"])
-        view["passive"] = copy.deepcopy(cls["passive"])
-        view["reaction"] = {"id": cls["reaction"], **copy.deepcopy(engine.content.reactions[cls["reaction"]])}
+        view["scheduling"] = copy.deepcopy(build.scheduling)
+        view["passive"] = copy.deepcopy(build.passive)
+        view["reaction"] = {"id": build.reaction_id, **copy.deepcopy(engine.content.reactions[build.reaction_id])}
         view["corruption_backlash"] = c.corruption >= balance["corruption"]["backlash_threshold"]
     else:
         view["actions"] = [
@@ -301,7 +301,7 @@ def hero_turn_view(engine: Engine) -> dict[str, Any] | None:
         option["forecast"] = _die_forecast(engine, hero, turn, option)
         option["face"] = face_view(option["face"])
         option["die"] = die_view(engine.die_for(hero.id, option["die_id"]))
-    scheduling = copy.deepcopy(engine.content.class_def(hero.archetype_id)["scheduling"])
+    scheduling = copy.deepcopy(engine.build(hero.id).scheduling)
     return {
         "hero_id": hero.id,
         "hero_name": hero.name,
@@ -309,7 +309,7 @@ def hero_turn_view(engine: Engine) -> dict[str, Any] | None:
         "dice": options,
         "kept": list(turn.kept),
         "rerolls_remaining": turn.rerolls_remaining,
-        "rerolls_total": engine.content.class_def(hero.archetype_id)["rerolls"],
+        "rerolls_total": engine.build(hero.id).rerolls,
         "scheduling": scheduling,
         "policy_text": planning.describe_policy(scheduling),
         "has_legal_action": planning.has_legal_action(engine, hero, turn) if turn.rolled else False,
@@ -342,7 +342,7 @@ def upgrade_view(engine: Engine) -> dict[str, Any]:
             for out_id in hero.equipped_dice_ids:
                 problem = progression.swap_problem(engine, hero.id, out_id, die_id) if state.phase == RunPhase.EQUIPMENT else "Choose the mandatory upgrade first."
                 swaps.append({"out_die_id": out_id, "allowed": problem is None, "reason": problem})
-            bench.append({"die": die_view(engine.content.die(die_id)), "swaps": swaps})
+            bench.append({"die": die_view(engine.die_for(hero.id, die_id)), "swaps": swaps})
         result["heroes"].append(
             {
                 "hero_id": hero.id,

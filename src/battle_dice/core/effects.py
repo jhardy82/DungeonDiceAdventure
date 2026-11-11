@@ -187,13 +187,13 @@ def damage_breakdown(
 def attack_bonus(ctx: Engine, actor: Combatant, face: FaceDefinition, intent: ActionIntent | None) -> int:
     if not actor.is_hero:
         return 0
-    passive = ctx.content.class_def(actor.archetype_id)["passive"]
+    passive = ctx.build(actor.id).passive
     if passive["type"] == "spell_damage_at_corruption":
         if "spell" in face.tags and actor.corruption >= passive["threshold"]:
             return int(passive["amount"])
     if passive["type"] == "combo_attack_bonus" and intent is not None:
         turn = ctx.combat.turn
-        scheduling = ctx.content.class_def(actor.archetype_id)["scheduling"]
+        scheduling = ctx.build(actor.id).scheduling
         if (
             turn is not None
             and turn.hero_id == actor.id
@@ -209,7 +209,7 @@ def shield_bonus(ctx: Engine, actor: Combatant, face: FaceDefinition, target: Co
     """Steadfast: +1 shield on every Defense die action the Squire takes (self or ally), never on reactions."""
     if not actor.is_hero or intent is None or intent.source_die_id is None:
         return 0
-    passive = ctx.content.class_def(actor.archetype_id)["passive"]
+    passive = ctx.build(actor.id).passive
     if passive["type"] == "defense_die_bonus" and face.category == CATEGORY_DEFENSE and target.standing:
         return int(passive["amount"])
     return 0

@@ -20,6 +20,7 @@ from battle_dice import RNG_ALGORITHM, RULES_VERSION, rng
 from battle_dice.content.loader import Content, load_content
 from battle_dice.core import commands as cmd
 from battle_dice.core import effects, enemy_ai, planning, progression, reactions, terminal, timeline
+from battle_dice.core.build import HeroBuild, build_from_class
 from battle_dice.core.commands import Command, CommandRejected, CommandResult
 from battle_dice.core.events import EventType
 from battle_dice.core.models import (
@@ -49,6 +50,7 @@ class Engine:
     def __init__(self, content: Content | None = None):
         self.content: Content = content if content is not None else load_content()
         self._state: RunState | None = None
+        self._builds: dict[str, HeroBuild] = {}  # hero id -> build; derived at StartRun, not hashed state
         self.events: list[CombatEvent] = []
         self.command_log: list[Command] = []
         self._accepted: dict[str, tuple[str, str]] = {}  # command_id -> (type, canonical params)
@@ -79,10 +81,22 @@ class Engine:
     def revision(self) -> int:
         return self._state.revision if self._state is not None else 0
 
+    def build(self, hero_id: str) -> HeroBuild:
+        """The hero's class data for this run. The one place the rules read it from."""
+        return self._builds[hero_id]
+
+    def base_die(self, hero_id: str, die_id: str) -> DieDefinition | None:
+        """A die as authored, before any upgrade of this run: from the hero's build, else from the content."""
+        own = self._builds[hero_id].dice.get(die_id)
+        return own if own is not None else self.content.dice.get(die_id)
+
     def die_for(self, hero_id: str, die_id: str) -> DieDefinition:
         """The hero's die definition, honouring this run's versioned upgrade override."""
         override = self.state.die_overrides.get(hero_id, {}).get(die_id)
-        return override if override is not None else self.content.die(die_id)
+        if override is not None:
+            return override
+        own = self._builds[hero_id].dice.get(die_id)
+        return own if own is not None else self.content.die(die_id)
 
     def enemy_action(self, enemy: Combatant, action_id: str) -> FaceDefinition:
         base = self.content.enemy_action(enemy.archetype_id, action_id)
@@ -152,17 +166,21 @@ class Engine:
         try:
             handler(**copy.deepcopy(command.params))
         except CommandRejected as rejection:
-            self._state = backup
-            del self.events[event_count:]
+            self._roll_back(backup, event_count)
             return CommandResult(False, self.revision, reason=str(rejection))
         except Exception:
-            self._state = backup
-            del self.events[event_count:]
+            self._roll_back(backup, event_count)
             raise
         self.state.revision += 1
         self._accepted[command.command_id] = _fingerprint(command)
         self.command_log.append(command)
         return CommandResult(True, self.revision, events=self.events[event_count:])
+
+    def _roll_back(self, backup: RunState | None, event_count: int) -> None:
+        self._state = backup
+        del self.events[event_count:]
+        if backup is None:  # a StartRun that failed leaves no builds behind
+            self._builds = {}
 
     def force_draws(self, stream: str, values: list[int]) -> None:
         """Fixture hook: queue forced bounded results for a stream (e.g. specific die faces).
@@ -279,11 +297,14 @@ class Engine:
             rng=rng.derive_streams(seed),
         )
         heroes = []
+        self._builds = {}
         for slot, member in enumerate(party, start=1):
             hero_id = f"h{slot:02d}"
+            build = build_from_class(self.content, member["class_id"])
+            self._builds[hero_id] = build
             state.party.append({"id": hero_id, "class_id": member["class_id"], "row": member["row"]})
-            state.inventory[hero_id] = list(self.content.class_def(member["class_id"])["bench_dice"])
-            heroes.append(progression.make_hero(self.content, hero_id, member["class_id"], member["row"]))
+            state.inventory[hero_id] = list(build.bench_dice)
+            heroes.append(progression.hero_from_build(self.content, hero_id, build, member["row"]))
         self._state = state
         state.combat = self._build_combat(1, heroes, event_seq=0)
         self.emit(
@@ -630,8 +651,7 @@ class Engine:
             combat.phase = CombatPhase.TERMINAL_CHECK
             return
         if actor.is_hero:
-            rerolls = self.content.class_def(actor.archetype_id)["rerolls"]
-            combat.turn = HeroTurn(hero_id=actor.id, rerolls_remaining=rerolls)
+            combat.turn = HeroTurn(hero_id=actor.id, rerolls_remaining=self.build(actor.id).rerolls)
             combat.phase = CombatPhase.HERO_ROLL
         else:
             combat.phase = CombatPhase.ENEMY_INTENT

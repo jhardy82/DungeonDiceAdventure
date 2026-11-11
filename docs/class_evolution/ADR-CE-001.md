@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Proposed, awaiting owner approval** with FDD v0.2 |
+| Status | **Accepted.** Approved by the owner with FDD v0.2 on 2026-11-11 |
 | Date | 2026-11-11 |
 | Decides | Question Q15 of BD-UNIFIED-FDD-001 v0.1 (delegated to the designer) |
 | Cited by | FDD v0.1 (its Q15 resolution) and fixture CE-17; never written until now |

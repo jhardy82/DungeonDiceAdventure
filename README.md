@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 622 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 631 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -237,17 +237,18 @@ scripts/              Start-BattleDice.ps1 launcher (Windows)
 packaging/            PyInstaller entry point and spec for the standalone app
                       class_evolution/: checkers for the Class Evolution specification
 docs/DECISION_LOG.md  interpretations, authored catalogs, deviations, measured evidence
-docs/class_evolution/ Class Evolution FDD v0.2: specification only, awaiting owner approval
+docs/class_evolution/ Class Evolution FDD v0.2: approved design; being built behind a gate that is off
 ```
 
 Changing balance means editing `src/battle_dice/content/data/*.json` (bump `content_version`,
 run `python tools/update_replay_pin.py`, rerun the tests, add a decision-log entry). No numeric balance value is hard-coded in the engine.
 
-## Class Evolution (specification only)
+## Class Evolution (in development, not in the game)
 
-`docs/class_evolution/FDD_v0.2.md` is a proposed design for class evolution: 14 vocations, mastery,
-unlocks and a save database. **It is not in the game.** Nothing under `src/` reads it, and the
-feature gate `class_evolution_v1` is off. The specification is executable and checked in CI:
+`docs/class_evolution/FDD_v0.2.md` is the approved design for class evolution: 14 vocations,
+mastery, unlocks and a save database. **It is not playable yet.** The feature gate
+`class_evolution_v1` is off, and with it off the game is byte for byte unchanged (the replay pin
+proves it on every change). The specification is executable and checked in CI:
 
 ```
 python tools/class_evolution/validate_catalog.py      # the vocation catalog against shipped content
@@ -255,7 +256,8 @@ python tools/class_evolution/check_persistence.py     # the save database script
 ```
 
 Both print `OK`. The first also lists, as warnings, every rank and vocation that cannot be reached
-on shipped content yet. No build work starts until the owner approves the document.
+on shipped content yet. The build follows the phases in section 9 of the document; Phase 1
+(foundations, nothing visible to a player) is under way.
 
 ## Scope
 

@@ -41,7 +41,7 @@ def stage_options(ctx: Engine, stage: str) -> list[dict[str, Any]]:
         return options
     face = ctx.intent_face(intent)
     for hero in combat.side("hero"):
-        reaction_id = ctx.content.class_def(hero.archetype_id)["reaction"]
+        reaction_id = ctx.build(hero.id).reaction_id
         reaction = ctx.content.reactions[reaction_id]
         if reaction["stage"] != stage:
             continue

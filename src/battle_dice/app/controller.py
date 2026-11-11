@@ -498,7 +498,7 @@ class AppController:
                 )
             return result
         mana = hero.mana
-        first_category = self.content.class_def(hero.archetype_id)["scheduling"].get("first_category")
+        first_category = engine.build(hero.id).scheduling.get("first_category")
         for position, intent in enumerate(intents):
             face = engine.intent_face(intent)
             target = engine.combat.combatants[intent.committed_target_ids[0]] if intent.committed_target_ids else hero
@@ -667,16 +667,17 @@ class AppController:
 
     def swap_gives_up_a_larger_die(self, hero_id: str, out_die_id: str, in_die_id: str) -> bool:
         engine = self.engine
-        if engine is None or in_die_id not in self.content.dice:
+        arriving = engine.base_die(hero_id, in_die_id) if engine is not None else None
+        if engine is None or arriving is None:
             return False
-        return engine.die_for(hero_id, out_die_id).size > self.content.dice[in_die_id].size
+        return engine.die_for(hero_id, out_die_id).size > arriving.size
 
     def swap_die(self, hero_id: str, out_die_id: str, in_die_id: str) -> None:
         engine = self.engine
         request = (hero_id, out_die_id, in_die_id)
         if engine is not None and self.swap_gives_up_a_larger_die(*request) and self.swap_confirm != request:
             self.swap_confirm = request
-            leaving, arriving = engine.die_for(hero_id, out_die_id), self.content.dice[in_die_id]
+            leaving, arriving = engine.die_for(hero_id, out_die_id), engine.die_for(hero_id, in_die_id)
             self.warn(f"{leaving.name} has {leaving.size} faces and {arriving.name} only {arriving.size}: "
                       "this swap gives up the larger die. Press the same swap again to confirm.")
             return
