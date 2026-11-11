@@ -42,7 +42,7 @@ def stage_options(ctx: Engine, stage: str) -> list[dict[str, Any]]:
     face = ctx.intent_face(intent)
     for hero in combat.side("hero"):
         reaction_id = ctx.build(hero.id).reaction_id
-        reaction = ctx.content.reactions[reaction_id]
+        reaction = ctx.build(hero.id).reaction
         if reaction["stage"] != stage:
             continue
         target_ids: list[str] = []
@@ -137,7 +137,7 @@ def use_reaction(ctx: Engine, hero_id: str, target_id: str | None) -> str | None
         target_id = None
 
     hero = combat.combatants[hero_id]
-    reaction = ctx.content.reactions[option["reaction_id"]]
+    reaction = ctx.build(hero_id).reaction
     face = ctx.intent_face(intent)
     affected = sorted({hero_id, *( [target_id] if target_id else [] )})
     before = ctx.snap(affected)

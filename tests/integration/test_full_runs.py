@@ -30,7 +30,7 @@ def check_invariants(engine: Engine) -> None:
             assert len(c.instances_of(kind)) <= balance["statuses"][kind]["stack_cap"], c
         assert all(s.remaining_target_activations > 0 for s in c.status_instances), c
         if c.is_hero:
-            assert len(c.equipped_dice_ids) == engine.content.class_def(c.archetype_id)["dice_capacity"]
+            assert len(c.equipped_dice_ids) == engine.build(c.id).dice_capacity
     if combat.turn is not None:
         assert 0 <= combat.turn.rerolls_remaining <= 2
     assert len(engine.state.upgrades) <= 1

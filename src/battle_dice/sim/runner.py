@@ -21,6 +21,7 @@ from typing import Any
 
 from battle_dice.content.loader import Content, load_content
 from battle_dice.core import commands as cmd
+from battle_dice.core.build import BuildSource
 from battle_dice.core.engine import Engine
 from battle_dice.core.events import state_hash, summarize
 from battle_dice.sim.policies import POLICY_VERSION, HeuristicPolicy, RandomPolicy
@@ -42,8 +43,9 @@ def party_for(content: Content, class_ids: list[str]) -> list[dict[str, str]]:
 
 
 def simulate(content: Content, seed: int, class_ids: list[str], policy: Any, timings: list[float] | None = None,
-             max_commands: int = 20000) -> dict[str, Any]:
-    engine = Engine(content)
+             max_commands: int = 20000, vocations: BuildSource | None = None, rows: list[str] | None = None) -> dict[str, Any]:
+    """Play one run. ``vocations`` and ``rows`` are for parties with an evolved hero (Class Evolution)."""
+    engine = Engine(content, vocations)
 
     def send(command_type: str, **params: Any) -> Any:
         started = time.perf_counter()
@@ -52,7 +54,11 @@ def simulate(content: Content, seed: int, class_ids: list[str], policy: Any, tim
             timings.append(time.perf_counter() - started)
         return result
 
-    result = send(cmd.START_RUN, seed=seed, party=party_for(content, class_ids))
+    if rows is None:
+        party = party_for(content, class_ids)
+    else:
+        party = [{"class_id": class_id, "row": row} for class_id, row in zip(class_ids, rows, strict=True)]
+    result = send(cmd.START_RUN, seed=seed, party=party)
     if not result.accepted:
         raise RuntimeError(result.reason)
     while not engine.finished():

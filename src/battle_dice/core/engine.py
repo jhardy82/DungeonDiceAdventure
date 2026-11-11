@@ -20,7 +20,7 @@ from battle_dice import RNG_ALGORITHM, RULES_VERSION, rng
 from battle_dice.content.loader import Content, load_content
 from battle_dice.core import commands as cmd
 from battle_dice.core import effects, enemy_ai, planning, progression, reactions, terminal, timeline
-from battle_dice.core.build import HeroBuild, build_from_class
+from battle_dice.core.build import BuildNotSupported, BuildSource, HeroBuild, build_from_class
 from battle_dice.core.commands import Command, CommandRejected, CommandResult
 from battle_dice.core.events import EventType
 from battle_dice.core.models import (
@@ -47,8 +47,10 @@ def _fingerprint(command: Command) -> tuple[str, str]:
 
 
 class Engine:
-    def __init__(self, content: Content | None = None):
+    def __init__(self, content: Content | None = None, vocations: BuildSource | None = None):
         self.content: Content = content if content is not None else load_content()
+        #: Builds beyond the shipped classes (Class Evolution). ``None`` unless the feature gate is on.
+        self.vocations: BuildSource | None = vocations
         self._state: RunState | None = None
         self._builds: dict[str, HeroBuild] = {}  # hero id -> build; derived at StartRun, not hashed state
         self.events: list[CombatEvent] = []
@@ -84,6 +86,25 @@ class Engine:
     def build(self, hero_id: str) -> HeroBuild:
         """The hero's class data for this run. The one place the rules read it from."""
         return self._builds[hero_id]
+
+    @property
+    def vocation_catalog_pin(self) -> dict[str, str] | None:
+        """Version and hash of the vocation catalog, when at least one hero's build comes from it.
+
+        ``None`` for a party of shipped classes, whether or not the gate is on: such a run is
+        byte for byte the run the game has always produced.
+        """
+        if self.vocations is None or all(b.vocation_id in self.content.classes for b in self._builds.values()):
+            return None
+        return {"version": self.vocations.version, "sha256": self.vocations.sha256}
+
+    def _resolve_build(self, class_id: str) -> HeroBuild:
+        if self.vocations is not None and self.vocations.known(class_id):
+            try:
+                return self.vocations.build(class_id)
+            except BuildNotSupported as refusal:
+                raise CommandRejected(str(refusal)) from refusal
+        return build_from_class(self.content, class_id)
 
     def base_die(self, hero_id: str, die_id: str) -> DieDefinition | None:
         """A die as authored, before any upgrade of this run: from the hero's build, else from the content."""
@@ -282,7 +303,8 @@ class Engine:
                 f"Party size must be between {limits['min_size']} and {limits['max_size']} (got {len(party)})."
             )
         for member in party:
-            if member["class_id"] not in self.content.classes:
+            listed = self.vocations is not None and self.vocations.known(member["class_id"])
+            if member["class_id"] not in self.content.classes and not listed:
                 raise CommandRejected(f"Unknown class '{member['class_id']}'.")
             if member["row"] not in ROWS:
                 raise CommandRejected(f"Row must be 'front' or 'back' (got '{member['row']}').")
@@ -300,26 +322,26 @@ class Engine:
         self._builds = {}
         for slot, member in enumerate(party, start=1):
             hero_id = f"h{slot:02d}"
-            build = build_from_class(self.content, member["class_id"])
+            build = self._resolve_build(member["class_id"])
             self._builds[hero_id] = build
             state.party.append({"id": hero_id, "class_id": member["class_id"], "row": member["row"]})
             state.inventory[hero_id] = list(build.bench_dice)
             heroes.append(progression.hero_from_build(self.content, hero_id, build, member["row"]))
         self._state = state
         state.combat = self._build_combat(1, heroes, event_seq=0)
-        self.emit(
-            EventType.RUN_STARTED,
-            delta={
-                "run_id": state.run_id,
-                "seed": str(seed),
-                "rules_version": state.rules_version,
-                "content_version": state.content_version,
-                "content_hash": state.content_hash,
-                "rng_algorithm": state.rng_algorithm,
-                "rng_streams": list(rng.STREAM_NAMES),
-                "party": state.party,
-            },
-        )
+        started: dict[str, Any] = {
+            "run_id": state.run_id,
+            "seed": str(seed),
+            "rules_version": state.rules_version,
+            "content_version": state.content_version,
+            "content_hash": state.content_hash,
+            "rng_algorithm": state.rng_algorithm,
+            "rng_streams": list(rng.STREAM_NAMES),
+            "party": state.party,
+        }
+        if self.vocation_catalog_pin is not None:
+            started["vocation_catalog"] = self.vocation_catalog_pin
+        self.emit(EventType.RUN_STARTED, delta=started)
         self._emit_battle_started()
 
     def _build_combat(self, battle: int, heroes: list[Combatant], event_seq: int) -> CombatState:

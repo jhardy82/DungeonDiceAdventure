@@ -234,7 +234,7 @@ def combatant_view(engine: Engine, c: Combatant) -> dict[str, Any]:
         view["dice"] = [die_view(engine.die_for(c.id, d)) for d in c.equipped_dice_ids]
         view["scheduling"] = copy.deepcopy(build.scheduling)
         view["passive"] = copy.deepcopy(build.passive)
-        view["reaction"] = {"id": build.reaction_id, **copy.deepcopy(engine.content.reactions[build.reaction_id])}
+        view["reaction"] = {"id": build.reaction_id, **copy.deepcopy(build.reaction)}
         view["corruption_backlash"] = c.corruption >= balance["corruption"]["backlash_threshold"]
     else:
         view["actions"] = [

@@ -24,8 +24,8 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from class_evolution import validate_catalog as vc  # noqa: E402
 
-CATALOG_PATH = ROOT / "docs" / "class_evolution" / "catalog" / "vocation_catalog.json"
-SCHEMA_PATH = ROOT / "docs" / "class_evolution" / "catalog" / "vocation_catalog.schema.json"
+CATALOG_PATH = ROOT / "src" / "battle_dice" / "content" / "class_evolution" / "vocation_catalog.json"
+SCHEMA_PATH = CATALOG_PATH.with_name("vocation_catalog.schema.json")
 
 Json = dict[str, Any]
 

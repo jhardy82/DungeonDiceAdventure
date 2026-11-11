@@ -28,8 +28,9 @@
 |------|------------|------------|
 | `docs/class_evolution/FDD_v0.2.md` | This document | Read by the owner |
 | `docs/class_evolution/ADR-CE-001.md` | The decision record v0.1 cites but never defined: one active vocation | Read by the owner |
-| `docs/class_evolution/catalog/vocation_catalog.json` | The 14 vocations in the engine's own vocabulary | `tools/class_evolution/validate_catalog.py`, 49 tests |
-| `docs/class_evolution/catalog/vocation_catalog.schema.json` | Strict JSON Schema for the catalog | Same |
+| `src/battle_dice/content/class_evolution/vocation_catalog.json` | The 14 vocations in the engine's own vocabulary. Package data since Phase 1: the game loads it when the gate is on | `tools/class_evolution/validate_catalog.py`, 49 tests |
+| `src/battle_dice/content/class_evolution/vocation_catalog.schema.json` | Strict JSON Schema for the catalog | Same |
+| `src/battle_dice/content/vocations.py` | The validator, and the code that turns a playable vocation into a hero build | `tests/unit/test_vocations.py`, `tests/integration/test_class_evolution_runs.py` |
 | `docs/class_evolution/persistence/progression.sql` | The save database: 24 tables | `tools/class_evolution/check_persistence.py`, 73 tests |
 | `docs/class_evolution/persistence/example_profile.json` | One worked save that loads into the database | Same |
 | `docs/class_evolution/persistence/error_codes.json` | The one list of machine-readable codes | Same |
@@ -207,8 +208,10 @@ names.
 - 40 cases, CE-01 to CE-40: 21 at priority P0, 19 at P1.
 - Each case is: given this state, when this one command or trusted event is applied, then this
   result and state.
-- **24 are fully specified.** They become executable tests in Phases 2 and 3.
-- **16 need a design decision.** Each states its assumption, so it can be confirmed or changed.
+- **25 are fully specified.** They become executable tests in Phases 2 and 3. (24 at first;
+  CE-01 joined them when the owner decided where the gate lives.)
+- **15 need a design decision.** Each states its assumption, so it can be confirmed or changed.
+  The table lists the original 16, with CE-01 marked decided.
 
 | Case | The question |
 |------|--------------|
@@ -260,7 +263,7 @@ names.
    the three novice classes.
    - **Answer to 2 and 3:** retune each wave by measurement when it is built. Nothing is
      changed in the catalog now; Guardian's passive is settled with the first slice.
-4. **The 16 fixtures in section 8.**
+4. **The 16 fixtures in section 8** (15 still open).
    - **Status:** CE-01 is decided (the gate is a launch setting, off by default, read by the
      app; the rules engine has no global switch and is handed the vocation catalog only when
      the gate is on; content files and their hash are untouched). The other 15 are settled in

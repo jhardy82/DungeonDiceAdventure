@@ -599,6 +599,48 @@ owner chose to keep Vanguard d4.
   that literally, so two of the three actions is not a legal plan. Whether "Resource then Attack"
   alone should be legal is a design decision for wave 4.
 
+**Phase 1, part C: the catalog in the package, builds from it, and the gate.**
+
+- **The gate** (`src/battle_dice/features.py`): `--feature class_evolution_v1`, or the environment
+  variable `BATTLE_DICE_FEATURES`. Off by default; nothing is stored between launches; an
+  unknown name is refused. `--version`, the smoke-test line and the main-menu status bar name an
+  enabled gate, so a log or a screenshot always shows the mode.
+- **The catalog and its validator moved into the package** (`content/class_evolution/`,
+  `content/vocations.py`), so the wheel and the Windows build contain them. With the gate off the
+  game never imports that module (checked in a fresh interpreter). The catalog is not one of the
+  six content documents and is not part of the content hash.
+- **Builds from the catalog.** `load_vocation_catalog` validates the catalog, then resolves each
+  playable vocation to a `HeroBuild` using the game's own content loader. A vocation that needs
+  a listed engine gap is refused by name.
+
+| Vocation | Playable by the rules today? | What it still needs |
+|----------|------------------------------|---------------------|
+| Squire, Apprentice, Scout | Yes (the shipped classes themselves) | Nothing |
+| Ranger | **Yes** | Nothing in the rules; screens and tuning come with its wave |
+| Guardian | No | Passive: Defense die bonus on another ally |
+| Spellblade | No | A face that costs corruption; descriptive face tags |
+| Duelist, Arcanist, Shadowbinder | No | Their new schedule shapes switched on, and their passives |
+| Champion, Archmage, Hero, Trickster, Dragon Knight | No | As listed in the catalog's `engine_gaps` |
+
+- **The engine** takes the catalog as an optional second argument. Without it, an evolved
+  vocation is an unknown class, as before.
+- **A run records the catalog only when it used it.** With an evolved hero in the party,
+  `RUN_STARTED` and the exported record carry the catalog's version and hash, and a replay
+  refuses a different catalog. A party of shipped classes produces the identical events, final
+  state and record with the gate on or off (checked on the three pinned parties). This settles
+  fixture CE-01 and is the behaviour fixture CE-40 assumes.
+- **Evidence that nothing changed with the gate off:** the replay pin is rewritten to the same
+  bytes, the content files are untouched, and the official runner on seeds 300-339 gives the
+  same result for all 55 parties.
+- **First evolved hero, in tests only:** parties with a Ranger play full runs under the same
+  invariants as every other run and replay exactly from their records. No screen offers a
+  Ranger; a player cannot reach one yet.
+- **Not a balance claim:** Squire and Ranger won 10 of 10 trial runs with the v0.1 numbers. The
+  Ranger is retuned by measurement with its wave, as decided.
+
+**Phase 1 is complete with part C.** Phase 2 (progression rules in memory) starts with the
+fixture decisions it needs.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

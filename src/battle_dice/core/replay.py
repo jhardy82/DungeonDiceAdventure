@@ -9,6 +9,7 @@ from typing import Any
 
 from battle_dice import RULES_VERSION
 from battle_dice.content.loader import Content, canonical_json
+from battle_dice.core.build import BuildSource
 from battle_dice.core.commands import Command
 from battle_dice.core.engine import Engine
 from battle_dice.core.events import events_hash, state_hash, to_plain
@@ -32,12 +33,14 @@ def export_run(engine: Engine) -> dict[str, Any]:
         "final_state_hash": state_hash(state),
         "events_hash": events_hash(engine.events),
         "event_count": len(engine.events),
+        # Only a run with an evolved hero names the vocation catalog; every other record is unchanged.
+        **({"vocation_catalog": engine.vocation_catalog_pin} if engine.vocation_catalog_pin is not None else {}),
     }
 
 
-def replay(content: Content, commands: Iterable[Command | dict[str, Any]]) -> Engine:
+def replay(content: Content, commands: Iterable[Command | dict[str, Any]], vocations: BuildSource | None = None) -> Engine:
     """Re-run recorded commands on a fresh engine. Any rejection means the replay diverged."""
-    engine = Engine(content)
+    engine = Engine(content, vocations)
     for index, raw in enumerate(commands):
         command = raw if isinstance(raw, Command) else Command.from_dict(raw)
         result = engine.submit(command)
@@ -46,11 +49,25 @@ def replay(content: Content, commands: Iterable[Command | dict[str, Any]]) -> En
     return engine
 
 
-def verify(content: Content, record: dict[str, Any]) -> Engine:
-    """Replay an exported run and check content identity, event hash and final state hash."""
+def verify(content: Content, record: dict[str, Any], vocations: BuildSource | None = None) -> Engine:
+    """Replay an exported run and check content identity, event hash and final state hash.
+
+    A run with an evolved hero names the vocation catalog it used; ``vocations`` must then be that
+    catalog. When it is not given, the packaged catalog is loaded.
+    """
     if record["content_hash"] != content.content_hash:
         raise ReplayError("Content hash differs from the recorded run.")
-    engine = replay(content, record["commands"])
+    pinned = record.get("vocation_catalog")
+    if pinned is not None:
+        if vocations is None:
+            from battle_dice.content.vocations import (
+                load_vocation_catalog,  # only a Class Evolution run needs it
+            )
+
+            vocations = load_vocation_catalog(content)
+        if vocations.sha256 != pinned["sha256"]:
+            raise ReplayError("The vocation catalog differs from the recorded run.")
+    engine = replay(content, record["commands"], vocations)
     if events_hash(engine.events) != record["events_hash"]:
         raise ReplayError("Event log hash differs from the recorded run.")
     if state_hash(engine.state) != record["final_state_hash"]:
@@ -82,7 +99,7 @@ def read_log(path: str | Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     return header, events
 
 
-def verify_log(content: Content, path: str | Path) -> dict[str, Any]:
+def verify_log(content: Content, path: str | Path, vocations: BuildSource | None = None) -> dict[str, Any]:
     """Replay a finished run from its log file alone and check that it reproduces exactly.
 
     Checks, in order: the log carries its commands; it was written by this rules version and
@@ -94,7 +111,7 @@ def verify_log(content: Content, path: str | Path) -> dict[str, Any]:
         raise ReplayError("This log was written before commands were recorded, so it cannot be replayed.")
     if header.get("rules_version") != RULES_VERSION:
         raise ReplayError(f"The log was written by rules {header.get('rules_version')}; this build is rules {RULES_VERSION}.")
-    engine = verify(content, header)
+    engine = verify(content, header, vocations)
     replayed = [to_plain(event) for event in engine.events]
     if len(logged) != len(replayed):
         raise ReplayError(f"The file has {len(logged)} events but the replay produced {len(replayed)}.")

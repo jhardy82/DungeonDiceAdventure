@@ -16,6 +16,7 @@ import pygame
 from battle_dice import RULES_VERSION
 from battle_dice.app.controller import AppController
 from battle_dice.core.models import CombatPhase
+from battle_dice.features import describe as describe_features
 from battle_dice.ui.toolkit import UI, Theme
 
 NUMBER_KEYS = (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9)
@@ -51,9 +52,11 @@ PHASE_LABELS = {
 def status_bar(ui: UI, ctrl: AppController, extra: str = "") -> None:
     ui.panel(0, 694, 1280, 26, fill=(12, 13, 18), border=(12, 13, 18))
     text, is_error = ui.status_line(ctrl.message, ctrl.message_is_error, ctrl.message_serial)
-    ui.text(10, 699, text, 15, Theme.WARN if is_error else Theme.TEXT, max_width=1000 if extra else 1260)
+    # The right-hand text keeps its usual 250 units; it only grows when a feature gate adds to it.
+    extra_width = max(250, ui.text_width(extra, 14) + 4) if extra else 0
+    ui.text(10, 699, text, 15, Theme.WARN if is_error else Theme.TEXT, max_width=1250 - extra_width if extra else 1260)
     if extra:
-        ui.text(1270, 699, extra, 14, Theme.FAINT, align="right", max_width=250)
+        ui.text(1270, 699, extra, 14, Theme.FAINT, align="right", max_width=extra_width)
 
 
 def draw_die_faces(ui: UI, x: float, y: float, w: float, die: dict[str, Any], highlight_face: int | None = None,
@@ -104,7 +107,8 @@ def draw_main_menu(ui: UI, ctrl: AppController, quit_action: Callable[[], Any]) 
     ui.button("menu:quit", 490, 450, 300, 56, "Quit  (Q)", quit_action, hotkeys=(pygame.K_q,), size=22, tooltip="Close the game.")
     ui.escape_action = quit_action
     ui.text(640, 560, "Tab / arrow keys move focus.  Enter or Space activates.  Every screen works with mouse or keyboard.", 15, Theme.FAINT, align="center")
-    status_bar(ui, ctrl, f"rules {RULES_VERSION}   content {ctrl.content.content_version}")
+    versions = f"rules {RULES_VERSION}   content {ctrl.content.content_version}"
+    status_bar(ui, ctrl, f"{versions}   {describe_features(ctrl.features)}".rstrip())
 
 
 CONTROLS_TEXT = [
