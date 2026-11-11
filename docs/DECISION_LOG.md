@@ -535,6 +535,28 @@ gives the same result for all 55 parties as content 1.3.0 (per size: 79.2 / 73.8
 **Limits.** All figures are for the scripted player. Whether human players find the choice
 interesting is `<UNKNOWN>`; that needs the human playtest.
 
+**Owner confirmation (2026-11-11).** Shown the 80-run figures and the correction above, the
+owner chose to keep Vanguard d4.
+
+### 7.10 Class Evolution: specification v0.2 added, no game code (2026-11-11)
+
+- **What was added.** `docs/class_evolution/` (the design document `FDD_v0.2.md`, the decision
+  record `ADR-CE-001.md`, the vocation catalog, the save database script, an example save, the
+  code registry and 40 acceptance fixtures), two checkers in `tools/class_evolution/`, and 122
+  specification tests in `tests/spec/`.
+- **What it is not.** Game code. Nothing under `src/` reads these files, the feature gate is off,
+  and the replay pin is unchanged by this addition.
+- **Why now.** The owner's first step for the feature was a reconciled specification, approved
+  before any build work. The original document (v0.1) could not be built as written: its
+  baseline was stale, its catalog had no executable effects, its example save did not load into
+  its own database, and its 40 fixtures were free text.
+- **How it stays true.** The catalog names the content version it was written against, and the
+  validator fails when shipped content moves on. The example save's content hash must equal the
+  replay pin's. These run in CI with every other test.
+- **Status:** proposed, awaiting owner approval. The open decisions are in section 10 of the
+  document (Guardian's last rank needs an encounter that is not shipped; Guardian's passive is
+  weaker than the Squire's; pacing; 16 fixtures that need a design decision).
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one
@@ -559,4 +581,5 @@ checked here. Each needs an owner decision or a real Windows display.
 | Class balance | Changed in content 1.3.0 (D-21, section 7.8): every party size is at 74-83% and one composition is at or below 40%. Still weak: five Squires (16%; about 30% when they swap to the Vanguard bench die, section 7.9), and all-Apprentice parties at sizes 3 and 4 (52-56%). Still strong: Scout-heavy parties at sizes 4 and 5 (98-100%). All figures are for the scripted player. |
 | Windows display | Never launched on a physical Windows display. Window resize while dragging, font rendering and behaviour at 125% or 150% scaling are unverified. |
 | Python install manager | Whether its `py` command downloads a missing Python on request is `<UNKNOWN>` here; the launcher itself never downloads or installs Python. |
+| Class Evolution | Specification only (section 7.10). Whether the design is balanced or enjoyable is `<UNKNOWN>` until a playable slice exists. On shipped encounters the six advanced vocations (Guardian first) cannot reach their last rank, and Champion, Archmage, Hero and Dragon Knight cannot be trained at all; the validator lists each case. |
 | Type checking | Closed on 2026-11-10: `mypy` now covers the whole package (including `ui/`), `tools/` and `tests/` with no findings, and CI runs it that way. The one relaxation is for tests only: `union-attr` is off there, because a test that reads optional engine state fails with an AttributeError when it is None, which is the signal wanted. |
