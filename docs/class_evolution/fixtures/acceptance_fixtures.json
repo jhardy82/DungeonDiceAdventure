@@ -1091,8 +1091,7 @@
           }
         ]
       },
-      "needs_design_decision": "Whether discovery only moves forward (a later 'hinted' signal must not downgrade 'discovered') and what clue_count counts; the fixture follows the catalog's signal_to_state map and counts one per distinct signal.",
-      "notes": "The other authored signal, quest_hint:crooked_mirror, leads to 'hinted': the clue text is shown and the prerequisite stays hidden."
+      "notes": "The other authored signal, quest_hint:crooked_mirror, leads to 'hinted': the clue text is shown and the prerequisite stays hidden. Decided by the owner on 2026-11-11: discovery only moves forward (hidden, hinted, discovered); a weaker signal after a stronger one changes nothing, and clue_count counts each distinct signal once."
     },
     {
       "id": "CE-11",
@@ -2177,8 +2176,7 @@
           ]
         }
       },
-      "needs_design_decision": "Whether ChangeVocation is legal in the engine phase 'upgrade' (before the mandatory upgrade), in 'equipment' (after it) or both; the fixture assumes 'upgrade' only, following the v0.1 order recovery, switch, upgrade, swap.",
-      "notes": "ChooseUpgrade, its parameters and the offer id format are the shipped ones. The shipped engine already moves to 'equipment' after the upgrade and refuses to swap out the upgraded die."
+      "notes": "ChooseUpgrade, its parameters and the offer id format are the shipped ones. The shipped engine already moves to 'equipment' after the upgrade and refuses to swap out the upgraded die. Decided by the owner on 2026-11-11: inside a run a hero may change vocation after recovery and before the mandatory upgrade (engine phase 'upgrade', before ChooseUpgrade), so the upgrade cards are offered for the new vocation's dice. Changing is also allowed at party setup, and never during a battle or after the upgrade."
     },
     {
       "id": "CE-20",
@@ -2665,7 +2663,7 @@
           ]
         }
       },
-      "needs_design_decision": "v0.1 names no denial reason for a lost encounter and the shipped engine has no flee outcome; the fixture proposes ENCOUNTER_NOT_WON for a defeat and leaves flee out until such an outcome exists."
+      "notes": "Decided by the owner on 2026-11-11: a lost encounter records a mastery award row with 0 points and the reason ENCOUNTER_NOT_WON. Flee stays out until the engine has such an outcome."
     },
     {
       "id": "CE-25",
@@ -3148,8 +3146,7 @@
         ],
         "events": []
       },
-      "needs_design_decision": "Whether equipping a face-modifier skill with no eligible face is rejected with NO_LEGAL_FACE (assumed here) or accepted and shown as inert.",
-      "notes": "Neither Duelist die has a Healing face."
+      "notes": "Neither Duelist die has a Healing face. Decided by the owner on 2026-11-11: equipping a face-modifier skill with no eligible face is rejected with NO_LEGAL_FACE; the skill stays learned and nothing changes."
     },
     {
       "id": "CE-29",
@@ -4376,8 +4373,7 @@
           "Corruption is kept, capped at the new maximum."
         ]
       },
-      "needs_design_decision": "Shipped recovery already stands a downed hero up at 50% HP and refills mana before the 'upgrade' phase, so the rule that a downed hero stays down has no reachable state unless the switch may also happen before recovery; the fixture assumes after recovery.",
-      "notes": "Squire 14 HP (1.3.1) and Guardian 17 HP (v0.1 catalog), each +1 for the mastered Squire. 8 * 18 / 15 = 9.6, rounded up to 10."
+      "notes": "Squire 14 HP (1.3.1) and Guardian 17 HP (v0.1 catalog), each +1 for the mastered Squire. 8 * 18 / 15 = 9.6, rounded up to 10. Decided by the owner on 2026-11-11: a vocation change inside a run happens after recovery (see CE-19), so the hero is standing when it changes. The conversion rule still never revives: a hero at 0 HP would stay at 0 HP and downed."
     },
     {
       "id": "CE-40",
