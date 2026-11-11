@@ -246,7 +246,8 @@ names.
 | 6 | Release: instrumentation, sampled balance report, all P0 and P1 fixtures | v0.1 section 10.1 gates |
 
 - Every phase leaves the game shippable with the gate off.
-- Progress, with the evidence for each step, is recorded in `docs/DECISION_LOG.md` section 7.11.
+- Progress, with the evidence for each step, is recorded in `docs/DECISION_LOG.md` sections 7.11
+  (Phase 1) and 7.12 (Phase 2).
 - The first playable evolution arrives before the expensive engine work of waves 3 to 5.
 
 ## 10. Decisions put to the owner, and the answers (2026-11-11)

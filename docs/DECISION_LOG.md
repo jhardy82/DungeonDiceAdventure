@@ -653,6 +653,42 @@ standalone Windows build passed its smoke test with the gate on.
 Ten fixtures still need a decision (CE-09, 18, 25, 29, 30, 31, 32, 35, 36, 40); each is settled in
 the phase that first needs it. The three codes v0.2 proposed are marked approved in the registry.
 
+### 7.12 Class Evolution Phase 2: progression rules in memory (2026-11-11)
+
+**What was built** (`src/battle_dice/career/`): the rules that decide claims, vocation changes,
+previews, mastery awards, inherited skills and discovery. The state is held in memory; nothing is
+saved and nothing in the game calls it yet. It follows the rules engine's contract: a rejected
+command returns one code and changes nothing, a repeated command id returns the stored result, and
+every change runs on a copy that replaces the state only on success.
+
+**Gate: the fully specified rule fixtures pass as executable tests.**
+
+| Check | Result |
+|-------|--------|
+| Acceptance fixtures run against the rules (`tests/spec/test_class_evolution_rules.py`) | 27 of 27 pass |
+| The other 13 fixtures | Each is named with where it is checked or which phase will run it; a test fails if a fixture is neither run nor accounted for |
+| Twenty deliberate rule breaks, one at a time (threat floor ignored, wrong route, no rollback, and so on) | Each makes at least one fixture fail |
+| Line coverage of the new package | 100%; it now counts toward the CI coverage floor |
+| Replay pin and content files | Unchanged; the game does not import the package |
+
+**This build's own readings, where the fixtures and v0.1 are silent.** Each has a test whose name
+says so. None changes an approved rule; the owner can overrule any of them.
+
+| # | Situation | What this build does |
+|--:|-----------|----------------------|
+| 1 | Claiming a vocation the hero already has; changing to the active vocation; unequipping an empty slot | Accepted, and nothing changes: no event, no new revision |
+| 2 | Equipping a skill the hero has not learned, or a native-only skill | Rejected with `PREREQUISITE_UNMET` |
+| 3 | A skill tied to melee or ranged faces on dice without such a face | Rejected with `NO_LEGAL_FACE`, like the Healing case the owner decided |
+| 4 | Skills that no longer fit after a change of vocation (capacity or face) | Unequipped in slot order; the change event lists them |
+| 5 | A mastery award for a mastered vocation, for a hero that was not deployed, or for an encounter that never awards mastery | Nothing is recorded |
+| 6 | Claiming during a run | Allowed in every phase except battle (a claim does not alter the build in play) |
+| 7 | A skill's rank is reached by an award | The skill is learned at once and a `SkillLearned` event follows the award event |
+| 8 | A prerequisite that counts mastered vocations and is not met | Reported as `MASTERED_COUNT_AT_LEAST` with the current count |
+
+**Not in Phase 2:** saving (Phase 3); owned dice, item grants and quest completion as events,
+the screens, and the rules engine calling these rules (Phase 4). Discovery signals are applied
+when given; nothing raises them automatically yet.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one
