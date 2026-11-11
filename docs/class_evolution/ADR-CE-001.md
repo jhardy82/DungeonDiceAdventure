@@ -15,6 +15,10 @@
 - Other mastered vocations contribute only through two budgeted channels:
   - **Inherited skills**, equipped within the active vocation's inheritance capacity.
   - **Permanent stat rewards**, capped per hero (health +2, mana +1, speed +1).
+- **Dice (owner decision, 2026-11-11):** a vocation may equip its own dice, plus the dice of the
+  starting class it grew from (its family). It may equip no other vocation's dice. This is
+  narrower than the free mixing rejected below: a family's dice were written for the same
+  schedule shapes, and the catalog validator checks every such die against the vocation's rules.
 - A command that asks for a second active vocation is rejected with
   `UNSUPPORTED_SECONDARY_VOCATION` and changes nothing.
 - The active vocation changes only between encounters, never during a battle. Combat reads a

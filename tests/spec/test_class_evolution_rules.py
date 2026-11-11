@@ -43,23 +43,23 @@ CASES = {case["id"]: case for case in FIXTURES["cases"]}
 #: The cases the career rules decide on their own.
 RUN_HERE = [
     "CE-02", "CE-03", "CE-04", "CE-05", "CE-06", "CE-07", "CE-08", "CE-10", "CE-11", "CE-12", "CE-13", "CE-14", "CE-15",
-    "CE-16", "CE-17", "CE-20", "CE-21", "CE-22", "CE-23", "CE-24", "CE-26", "CE-27", "CE-28", "CE-33", "CE-37", "CE-38", "CE-39",
+    "CE-16", "CE-17", "CE-18", "CE-20", "CE-21", "CE-22", "CE-23", "CE-24", "CE-26", "CE-27", "CE-28", "CE-33", "CE-37", "CE-38",
+    "CE-39",
 ]
 #: Every other case, and where it is checked or will be.
 NOT_RUN_HERE = {
     "CE-01": "the replay pin and tests/unit/test_vocations.py (gate off)",
     "CE-09": "needs a decision; the career-tree view is Phase 4",
-    "CE-18": "needs a decision (which dice fit which vocation)",
     "CE-19": "the rules engine and owned dice together: Phase 4",
-    "CE-25": "needs a decision (run upgrades at run end)",
+    "CE-25": "saved run upgrades: Phase 3",
     "CE-29": "needs a decision; a rules-engine case",
     "CE-30": "needs a decision; a rules-engine case",
     "CE-31": "needs a decision; a rules-engine case",
     "CE-32": "needs a decision (what every hash covers)",
     "CE-34": "loading a save: Phase 3",
-    "CE-35": "needs a decision (how evolved heroes enter StartRun)",
+    "CE-35": "StartRun with saved heroes and build snapshots: Phase 4",
     "CE-36": "the catalog validator: tests/spec/test_class_evolution_catalog.py",
-    "CE-40": "needs a decision; its assumption is checked by tests/integration/test_class_evolution_runs.py",
+    "CE-40": "tests/integration/test_class_evolution_runs.py (gate on, starting classes: byte for byte)",
 }
 #: Lists a case states in full; every other list is matched entry by entry on its id.
 COMPLETE_LISTS = {"unlocked_vocations", "equipped_skills", "item_consumptions", "quests_completed", "mastery_award_events",
@@ -232,4 +232,4 @@ def test_every_case_is_either_run_here_or_accounted_for() -> None:
     assert not set(RUN_HERE) & set(NOT_RUN_HERE)
     still_open = {case_id for case_id, case in CASES.items() if "needs_design_decision" in case}
     assert still_open <= set(NOT_RUN_HERE)
-    assert len(RUN_HERE) == 27
+    assert len(RUN_HERE) == 28

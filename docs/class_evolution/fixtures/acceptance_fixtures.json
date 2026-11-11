@@ -2011,7 +2011,7 @@
           }
         ]
       },
-      "needs_design_decision": "Die compatibility is not defined beyond the per-die affinity_tags of the catalog; the fixture assumes a die fits only a vocation named in its tags, which sends both Squire dice to the bench."
+      "notes": "Decided by the owner on 2026-11-11: a vocation may equip its own dice, plus the dice of the starting class it grew from (its family: the catalog's upgrade_family). This differs from the assumption this case first stated (own dice only). The expected state stays as written under this reading: on a change of vocation the new vocation's own starting dice take the slots and the dice that were equipped move to the bench (displaced_dice_ids). The decision changes what may happen next: iron_d6 and oath_d4 are the Guardian's family dice, so EquipDie may put either back; a die of any other vocation is refused with INCOMPATIBLE_DIE. A starting class may equip only its own dice."
     },
     {
       "id": "CE-19",
@@ -2812,7 +2812,7 @@
           }
         }
       },
-      "needs_design_decision": "Whether 'run-only upgrade removed' means the run_die_upgrade rows are deleted at run end or kept as history and no longer applied; the fixture assumes they are kept and stop applying once the run is complete."
+      "notes": "Decided by the owner on 2026-11-11: run_die_upgrade rows are kept as history when the run ends and are no longer applied."
     },
     {
       "id": "CE-26",
@@ -3980,7 +3980,7 @@
           "Two heroes of one party may have the same active vocation."
         ]
       },
-      "needs_design_decision": "How Class Evolution heroes enter the shipped StartRun party parameter (class ids today, hero ids with build snapshots later) is undecided; the fixture lists the party matrix and sends the shipped command for the five-hero party."
+      "notes": "Decided by the owner on 2026-11-11: with the gate on, the party names saved heroes, and each hero's complete build (vocation, stats with bonuses, dice, skills) is resolved once and written into the run's log as a snapshot, so a replay needs only the log. With the gate off the shipped StartRun command is unchanged, which is what this case sends. The snapshot form of the command is specified with Phase 4."
     },
     {
       "id": "CE-36",
@@ -4457,8 +4457,7 @@
           "Action scheduling, rerolls, two-row targeting, seed streams and terminal priority are those of the baseline."
         ]
       },
-      "needs_design_decision": "Whether a fresh profile with the gate on must reproduce the pin exactly, final_state_hash included (assumed here), or only its combat events, since that hash changes as soon as any progression field joins the engine state.",
-      "notes": "Baseline: With the feature gate off, the replay pin tests/golden/replay_pin.json reproduces byte for byte. Here the gate is on and every hero is a novice with a default build and no mastery bonus."
+      "notes": "Baseline: With the feature gate off, the replay pin tests/golden/replay_pin.json reproduces byte for byte. Here the gate is on and every hero is a novice with a default build and no mastery bonus. Decided by the owner on 2026-11-11: yes, byte for byte, final_state_hash included. Progression data stays outside the run's hashed state. tests/integration/test_class_evolution_runs.py checks it on the three pinned parties."
     }
   ]
 }

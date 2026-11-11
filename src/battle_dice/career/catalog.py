@@ -49,6 +49,23 @@ class CareerCatalog:
     def starting_dice(self, vocation_id: str) -> list[str]:
         return list(self._definition(vocation_id)["starting_dice"])
 
+    def own_dice(self, vocation_id: str) -> list[str]:
+        """The dice made for a vocation: its starting dice and its bench dice."""
+        definition = self._definition(vocation_id)
+        return [*definition["starting_dice"], *definition["bench_dice"]]
+
+    def family(self, vocation_id: str) -> str | None:
+        """The starting class an evolved vocation grew from; ``None`` for a starting class itself."""
+        vocation = self.vocations[vocation_id]
+        return None if vocation["group"] == NOVICE else str(vocation["upgrade_family"])
+
+    def may_equip(self, vocation_id: str, die_id: str) -> bool:
+        """Owner decision of 2026-11-11: a vocation may equip its own dice, plus its family's."""
+        if die_id in self.own_dice(vocation_id):
+            return True
+        family = self.family(vocation_id)
+        return family is not None and die_id in self.own_dice(family)
+
     def die_faces(self, die_id: str) -> list[tuple[str, tuple[str, ...]]]:
         """``(category, tags)`` of every face on a die, shipped or from the catalog."""
         if die_id in self.raw["dice"]:

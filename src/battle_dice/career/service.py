@@ -25,6 +25,7 @@ from battle_dice.career.model import (
     ELIGIBLE,
     AwardRow,
     CareerState,
+    DieInstance,
     DiscoveryRow,
     HeroRecord,
     MasteryRow,
@@ -39,8 +40,9 @@ CHANGE = "ChangeVocation"
 PREVIEW = "PreviewVocation"
 EQUIP = "EquipInheritedSkill"
 UNEQUIP = "UnequipInheritedSkill"
+EQUIP_DIE = "EquipDie"
 #: Commands that change the build a hero fights with.
-BUILD_COMMANDS = (CHANGE, EQUIP, UNEQUIP)
+BUILD_COMMANDS = (CHANGE, EQUIP, UNEQUIP, EQUIP_DIE)
 #: Run phases in which the build is fixed: during a battle, and after the mandatory upgrade was chosen.
 BUILD_LOCKED_PHASES = ("battle", "equipment")
 #: What a skill's ``transfer`` rule needs from the dice: a face of this category, or with this tag.
@@ -103,7 +105,9 @@ class CareerService:
         """Apply one client command."""
         command_type, command_id = command["type"], command["command_id"]
         params: Json = command.get("params", {})
-        handler = {CLAIM: self._claim, CHANGE: self._change, PREVIEW: self._preview, EQUIP: self._equip, UNEQUIP: self._unequip}.get(command_type)
+        handlers = {CLAIM: self._claim, CHANGE: self._change, PREVIEW: self._preview, EQUIP: self._equip, UNEQUIP: self._unequip,
+                    EQUIP_DIE: self._equip_die}
+        handler = handlers.get(command_type)
         if handler is None:
             raise ValueError(f"Unknown career command '{command_type}'.")
         fingerprint = canonical_json({"type": command_type, "params": params})
@@ -319,10 +323,51 @@ class CareerService:
         if hero.combat is not None:
             self._convert_combat(hero, target)
         hero.active_vocation_id = target
+        extra: Json = {}
+        if hero.dice:  # the hero's dice are tracked: the new vocation's own dice take the slots
+            extra["displaced_dice_ids"] = self._equip_starting_dice(hero, target)
+        dropped = self._drop_skills_that_no_longer_fit(hero)
+        if dropped:
+            extra["unequipped_skills"] = dropped
+        hero.revision += 1
+        self._emit("VocationChanged", hero_id=hero.hero_id, **{"from": previous, "to": target}, **extra)
+
+    def _equip_starting_dice(self, hero: HeroRecord, vocation_id: str) -> list[str]:
+        """Bench what is equipped and equip the vocation's own starting dice. Returns the ids that left a slot.
+
+        A die the hero does not own yet is added: a vocation always comes with its starting dice.
+        The benched dice stay owned, and the family's can be put back with ``EquipDie``.
+        """
+        displaced = [die for die in sorted(hero.dice, key=lambda d: (d.slot_index is None, d.slot_index)) if die.location == "equipped"]
+        for die in displaced:
+            die.location, die.slot_index = "bench", None
+        for slot, definition_id in enumerate(self.catalog.starting_dice(vocation_id)):
+            mine = next((d for d in hero.dice if d.definition_id == definition_id and d.location == "bench"), None)
+            if mine is None:
+                owned = sum(1 for d in hero.dice if d.definition_id == definition_id)
+                mine = DieInstance(f"{hero.hero_id}-{definition_id}-{owned + 1}", definition_id, "bench")
+                hero.dice.append(mine)
+            mine.location, mine.slot_index = "equipped", slot
+        return [die.die_instance_id for die in displaced if die.location == "bench"]
+
+    def _equip_die(self, hero: HeroRecord, params: Json) -> None:
+        """Put an owned die into a slot. The die that was there goes to the bench."""
+        slot = int(params["slot_index"])
+        die = next((d for d in hero.dice if d.die_instance_id == params["die_instance_id"]), None)
+        capacity = len(self.catalog.starting_dice(hero.active_vocation_id))
+        if die is None or not 0 <= slot < capacity or not self.catalog.may_equip(hero.active_vocation_id, die.definition_id):
+            raise _Reject("INCOMPATIBLE_DIE", {"die_instance_id": params["die_instance_id"], "vocation_id": hero.active_vocation_id})
+        if die.location == "equipped" and die.slot_index == slot:
+            return  # already there: accepted, and nothing changes
+        previous = next((d for d in hero.dice if d.location == "equipped" and d.slot_index == slot), None)
+        if previous is not None:  # the two dice trade places
+            previous.location, previous.slot_index = die.location, die.slot_index
+        die.location, die.slot_index = "equipped", slot
         dropped = self._drop_skills_that_no_longer_fit(hero)
         hero.revision += 1
         extra = {"unequipped_skills": dropped} if dropped else {}
-        self._emit("VocationChanged", hero_id=hero.hero_id, **{"from": previous, "to": target}, **extra)
+        self._emit("DieEquipped", hero_id=hero.hero_id, die_instance_id=die.die_instance_id, slot_index=slot,
+                   displaced_die_id=previous.die_instance_id if previous is not None else None, **extra)
 
     def _convert_combat(self, hero: HeroRecord, target: str) -> None:
         """``current' = ceil(current * new_max / old_max)``, clamped. A hero at 0 HP stays down: a change never revives."""
@@ -517,7 +562,8 @@ def state_view(service: CareerService) -> Json:
             "inheritance_capacity_max": service.catalog.inheritance_capacity(hero.active_vocation_id),
             "inheritance_capacity_used": service.capacity_used(hero),
             "permanent_stat_bonus": service.permanent_stat_bonus(hero),
-            "dice": [vars(die).copy() for die in hero.dice],
+            "dice": [{key: value for key, value in vars(die).items() if value is not None} for die in hero.dice],
+            "owned_dice_count": len(hero.dice),
         }
         if hero.combat is not None:
             entry["combat"] = {key: value for key, value in vars(hero.combat).items() if value is not None}

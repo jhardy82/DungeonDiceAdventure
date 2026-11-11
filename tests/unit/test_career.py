@@ -487,3 +487,85 @@ def test_the_game_does_not_load_the_career_package_yet():
     env = {**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"}
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=120, check=True)
     assert done.stdout.strip().splitlines()[-1] == "[]"
+
+
+# --------------------------------------------------------------------------------------------
+# Dice: a vocation may equip its own dice, plus its family's (owner decision of 2026-11-11)
+# --------------------------------------------------------------------------------------------
+
+
+def test_which_dice_a_vocation_may_equip(catalog):
+    assert catalog.family("squire") is None and catalog.family("guardian") == "squire" and catalog.family("ranger") == "scout"
+    assert catalog.own_dice("squire") == ["iron_d6", "oath_d4", "vanguard_d4"]
+    # A Guardian: its own dice and the Squire's, nobody else's.
+    assert all(catalog.may_equip("guardian", die) for die in ("guardian_d6", "guardian_d4", "iron_d6", "oath_d4", "vanguard_d4"))
+    assert not any(catalog.may_equip("guardian", die) for die in ("striker_d8", "arcane_d6", "ranger_d8", "duelist_d6"))
+    # A starting class: only its own. The family rule does not run backwards.
+    assert not catalog.may_equip("squire", "guardian_d6") and not catalog.may_equip("scout", "ranger_d8")
+    # A capstone's family is the starting class, not the vocations in between.
+    assert catalog.may_equip("champion", "iron_d6") and not catalog.may_equip("champion", "guardian_d6")
+
+
+def dice_hero(catalog: CareerCatalog) -> CareerService:
+    from battle_dice.career.model import DieInstance
+
+    dice = [DieInstance("hero_001-iron_d6-1", "iron_d6", "equipped", 0), DieInstance("hero_001-oath_d4-1", "oath_d4", "equipped", 1),
+            DieInstance("hero_001-striker_d8-1", "striker_d8", "bench")]
+    return service_with(catalog, mastered=("squire",), unlocked=("guardian",), dice=dice)
+
+
+def test_a_change_of_vocation_equips_its_own_dice_and_a_family_die_can_be_put_back(catalog):
+    service = dice_hero(catalog)
+    hero = hero_of(service)
+    changed = service.submit(command(service, "ChangeVocation", 1, target_vocation_id="guardian"))
+    assert changed.events[0]["displaced_dice_ids"] == ["hero_001-iron_d6-1", "hero_001-oath_d4-1"]
+    equipped = {d.slot_index: d.definition_id for d in hero.dice if d.location == "equipped"}
+    assert equipped == {0: "guardian_d6", 1: "guardian_d4"} and len(hero.dice) == 5, "the Guardian's dice came with the vocation"
+
+    back = service.submit(command(service, "EquipDie", 2, die_instance_id="hero_001-iron_d6-1", slot_index=0))
+    assert back.accepted and back.events[0]["type"] == "DieEquipped" and back.events[0]["displaced_die_id"] == "hero_001-guardian_d6-1"
+    equipped = {d.slot_index: d.definition_id for d in hero.dice if d.location == "equipped"}
+    assert equipped == {0: "iron_d6", 1: "guardian_d4"}, "a family die may be put back"
+    assert next(d for d in hero.dice if d.definition_id == "guardian_d6").location == "bench"
+
+    same = service.submit(command(service, "EquipDie", 3, die_instance_id="hero_001-iron_d6-1", slot_index=0))
+    assert same.accepted and same.events == [] and hero.revision == 5
+
+
+@pytest.mark.parametrize(
+    ("die_instance_id", "slot"),
+    [("hero_001-striker_d8-1", 0), ("hero_001-no_such_die-1", 0), ("hero_001-iron_d6-1", 2), ("hero_001-iron_d6-1", -1)],
+)
+def test_a_die_of_another_vocation_an_unknown_die_or_a_slot_that_does_not_exist_is_refused(catalog, die_instance_id, slot):
+    service = dice_hero(catalog)
+    assert service.submit(command(service, "ChangeVocation", 1, target_vocation_id="guardian")).accepted
+    before = state_view(service)
+    refused = service.submit(command(service, "EquipDie", 2, die_instance_id=die_instance_id, slot_index=slot))
+    assert refused.error_code == "INCOMPATIBLE_DIE" and state_view(service) == before
+    assert refused.error_details == {"die_instance_id": die_instance_id, "vocation_id": "guardian"}
+
+
+def test_two_equipped_dice_trade_places_and_a_die_swap_can_cost_a_skill_its_face(catalog):
+    service = dice_hero(catalog)
+    hero = hero_of(service)
+    swapped = service.submit(command(service, "EquipDie", 1, die_instance_id="hero_001-oath_d4-1", slot_index=0))
+    assert swapped.accepted and {d.definition_id: d.slot_index for d in hero.dice if d.location == "equipped"} == {"oath_d4": 0, "iron_d6": 1}
+
+    # Field Medic needs a Healing face. Of the dice a Guardian may equip, only the Guardian d6 and the Iron d6 have one.
+    medic = service_with(catalog, mastered=("squire", "guardian"), active="squire", dice=list(dice_hero(catalog).state.heroes["hero_001"].dice))
+    assert medic.submit(command(medic, "ChangeVocation", 1, target_vocation_id="guardian")).accepted
+    assert medic.submit(command(medic, "EquipInheritedSkill", 2, skill_id="guardian_field_medic", slot_index=0)).accepted
+    assert medic.submit(command(medic, "EquipDie", 3, die_instance_id="hero_001-oath_d4-1", slot_index=0)).accepted
+    equipped = sorted(d.definition_id for d in hero_of(medic).dice if d.location == "equipped")
+    assert equipped == ["guardian_d4", "oath_d4"], "neither has a Healing face"
+    assert medic.state.events[-1]["unequipped_skills"] == ["guardian_field_medic"] and hero_of(medic).equipped_skills == {}
+    assert "guardian_field_medic" in hero_of(medic).learned_skills, "the skill stays learned"
+    refused = medic.submit(command(medic, "EquipInheritedSkill", 4, skill_id="guardian_field_medic", slot_index=0))
+    assert refused.error_code == "NO_LEGAL_FACE"
+
+
+def test_die_changes_are_locked_like_every_other_build_change(catalog):
+    service = dice_hero(catalog)
+    service.state.run = RunInfo("run_0001", "battle", 12)
+    locked = service.submit(command(service, "EquipDie", 1, die_instance_id="hero_001-oath_d4-1", slot_index=0))
+    assert locked.error_code == "PHASE_LOCKED"

@@ -209,29 +209,30 @@ names.
 - 40 cases, CE-01 to CE-40: 21 at priority P0, 19 at P1.
 - Each case is: given this state, when this one command or trusted event is applied, then this
   result and state.
-- **30 are fully specified.** They become executable tests in Phases 2 and 3. (24 at first; six
-  joined them on 2026-11-11 when the owner decided CE-01, CE-10, CE-19, CE-24, CE-28 and CE-39.)
-- **10 need a design decision.** Each states its assumption, so it can be confirmed or changed.
-  The table lists the original 16, with the decided ones marked.
+- **34 are fully specified.** They become executable tests as their phase is built. (24 at
+  first; ten joined them on 2026-11-11 as the owner decided CE-01, 10, 18, 19, 24, 25, 28, 35, 39
+  and 40.)
+- **6 need a design decision** (CE-09, 29, 30, 31, 32, 36). Each states its assumption, so it can
+  be confirmed or changed. The table lists the original 16, with the decided ones marked.
 
 | Case | The question |
 |------|--------------|
 | CE-01 | Where does the feature gate live (content file, settings or build flag), and is the save database opened at all while it is off? **Decided 2026-11-11:** a launch setting, off by default; the save database is not opened while it is off. |
 | CE-09 | Does a hidden secret vocation show as an anonymous placeholder in the career tree, or not at all? |
 | CE-10 | Does discovery only move forward, and what does the clue count count? **Decided 2026-11-11:** only forward; the clue count counts each distinct clue once. |
-| CE-18 | Which dice fit which vocation? The case assumes a die fits only a vocation named in its tags. |
+| CE-18 | Which dice fit which vocation? The case assumes a die fits only a vocation named in its tags. **Decided 2026-11-11:** its own dice, plus the dice of the starting class it grew from. This is not the case's first assumption (own dice only). On a change of vocation the new vocation's own dice take the slots; a family die on the bench may be put back; any other die is refused with `INCOMPATIBLE_DIE`. |
 | CE-19 | Is changing vocation allowed before the mandatory upgrade, after it, or both? The case assumes before. **Decided 2026-11-11:** after recovery and before the mandatory upgrade (and at party setup); never during a battle or after the upgrade. |
 | CE-24 | Which reason is recorded for a lost encounter? The case proposes `ENCOUNTER_NOT_WON`. **Decided 2026-11-11:** a zero-point award row with the reason `ENCOUNTER_NOT_WON`. |
-| CE-25 | Are a run's upgrade rows deleted at run end, or kept as history and no longer applied? The case assumes kept. |
+| CE-25 | Are a run's upgrade rows deleted at run end, or kept as history and no longer applied? The case assumes kept. **Decided 2026-11-11:** kept as history, no longer applied. |
 | CE-28 | Is equipping a skill with no eligible face rejected (assumed) or accepted and shown as inert? **Decided 2026-11-11:** rejected with `NO_LEGAL_FACE`; the skill stays learned. |
 | CE-29 | Which code or reason does a face disabled for lack of mana carry? |
 | CE-30 | Does an illegal action plan get a registry code? The shipped engine rejects it with free text. |
 | CE-31 | What exactly does Duelist's Parry reaction do in the engine? |
 | CE-32 | Which fields are left out of every hash, and what is the canonical encoding of progression events? |
-| CE-35 | How do evolved heroes enter `StartRun` (class ids today, hero ids with build snapshots later)? |
+| CE-35 | How do evolved heroes enter `StartRun` (class ids today, hero ids with build snapshots later)? **Decided 2026-11-11:** with the gate on, the party names saved heroes and each hero's complete build is written into the run's log as a snapshot; with the gate off the command is unchanged. |
 | CE-36 | Which encounters count as available, and what are their threat ratings? |
 | CE-39 | May a vocation change happen before recovery? Otherwise "a downed hero stays down" is unreachable. **Decided 2026-11-11:** no: the change happens after recovery, so the hero is standing. The rule that a change never revives stays. |
-| CE-40 | With the gate on and a fresh profile, must the replay pin match exactly, final state hash included? |
+| CE-40 | With the gate on and a fresh profile, must the replay pin match exactly, final state hash included? **Decided 2026-11-11:** yes, byte for byte. Progression data stays outside the run's hashed state. |
 
 ## 9. Phased plan and gates
 
@@ -265,12 +266,12 @@ names.
    the three novice classes.
    - **Answer to 2 and 3:** retune each wave by measurement when it is built. Nothing is
      changed in the catalog now; Guardian's passive is settled with the first slice.
-4. **The 16 fixtures in section 8** (10 still open).
+4. **The 16 fixtures in section 8** (6 still open).
    - **Status:** CE-01 is decided (the gate is a launch setting, off by default, read by the
      app; the rules engine has no global switch and is handed the vocation catalog only when
      the gate is on; content files and their hash are untouched). CE-10, CE-19, CE-24, CE-28 and
-     CE-39 are decided too (section 8), for Phase 2. The other 10 are settled in the phase that
-     first needs them.
+     CE-39 are decided too (section 8), for Phase 2; CE-18, CE-25, CE-35 and CE-40 for Phases 3
+     and 4. The other 6 are settled in the phase that first needs them.
 5. **Pacing.** By the thresholds above, reaching Hero by the lineage route needs 208 mastery
    points for one hero: 52 to 104 winning runs on two-battle content. Options: shrink the
    thresholds, add encounters, or award more per win.
