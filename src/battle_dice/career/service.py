@@ -46,6 +46,8 @@ EQUIP_DIE = "EquipDie"
 BUILD_COMMANDS = (CHANGE, EQUIP, UNEQUIP, EQUIP_DIE)
 #: Run phases in which the build is fixed: during a battle, and after the mandatory upgrade was chosen.
 BUILD_LOCKED_PHASES = ("battle", "equipment")
+#: What the career tree shows in place of a secret vocation the profile has not discovered.
+UNDISCOVERED_LABEL = "???"
 #: What a skill's ``transfer`` rule needs from the dice: a face of this category, or with this tag.
 TRANSFER_NEEDS: dict[str, tuple[str, str]] = {
     "compatible_healing": ("category", "healing"),
@@ -592,3 +594,49 @@ def state_view(service: CareerService) -> Json:
         "mastery_award_events": [vars(row).copy() for row in state.awards],
         "processed_commands": [{"command_id": p.command_id, "type": p.type, "result": p.result["result"]} for p in state.processed.values()],
     }
+
+
+# --------------------------------------------------------------------------------------------
+# The career tree, as a player may see it
+# --------------------------------------------------------------------------------------------
+
+
+def career_tree_view(service: CareerService, hero_id: str) -> Json:
+    """The career tree of one hero, holding only what its player may know.
+
+    Owner decision of 2026-11-11 (fixture CE-09): a secret vocation the profile has not discovered
+    is an anonymous entry, not a missing one, so the player can see that something is still to be
+    found.
+
+    * A discovered vocation is listed in full, in catalog order.
+    * A **hinted** secret is an entry with the label ``???`` and its clue. It has no id, name,
+      group or requirement.
+    * A **hidden** secret is an entry with the label ``???`` and nothing else. Every hidden entry
+      is identical, and they come last, so neither content nor position says which secret it is.
+
+    Building the view reads the state and changes nothing.
+    """
+    hero = service.state.heroes[hero_id]
+    catalog = service.catalog
+    listed: list[Json] = []
+    hinted: list[Json] = []
+    hidden: list[Json] = []
+    for vocation_id in catalog.vocations:
+        state = service.discovery_state(vocation_id)
+        if state == "discovered":
+            rank = hero.rank(vocation_id)
+            listed.append({
+                "kind": "vocation",
+                "vocation_id": vocation_id,
+                "name": catalog.name(vocation_id),
+                "group": catalog.group(vocation_id),
+                "unlocked": vocation_id in hero.unlocked_vocations,
+                "active": vocation_id == hero.active_vocation_id,
+                "rank": rank,
+                "mastered": rank >= MASTERED_RANK,
+            })
+        elif state == "hinted":
+            hinted.append({"kind": "undiscovered", "label": UNDISCOVERED_LABEL, "clue": catalog.clue(vocation_id)})
+        else:
+            hidden.append({"kind": "undiscovered", "label": UNDISCOVERED_LABEL})
+    return {"career_tree": {"hero_id": hero_id, "entries": [*listed, *hinted, *hidden]}}

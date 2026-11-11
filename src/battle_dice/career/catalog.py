@@ -77,6 +77,14 @@ class CareerCatalog:
         vocation = self.vocations[vocation_id]
         return vocation["group"] == NOVICE or vocation["discovery"]["rule"] == "visible_from_start"
 
+    def name(self, vocation_id: str) -> str:
+        return str(self._definition(vocation_id)["name"])
+
+    def clue(self, vocation_id: str) -> str | None:
+        """The text shown for a secret vocation the profile has a hint of; ``None`` for a public one."""
+        clue = self.vocations[vocation_id].get("discovery", {}).get("clue")
+        return None if clue is None else str(clue)
+
     def discovery_signals(self) -> list[tuple[str, str, str]]:
         """``(signal, vocation id, state it leads to)`` for every authored discovery signal."""
         found = []

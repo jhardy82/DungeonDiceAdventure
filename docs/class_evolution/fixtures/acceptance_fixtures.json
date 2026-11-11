@@ -21,7 +21,7 @@
     "A rejected result changes nothing: no row, no revision, no random draw. error_code and denial_reason values come from docs/class_evolution/persistence/error_codes.json.",
     "then.duplicate true is the replay result of the registry: accepted, the stored result returned, no second effect.",
     "Vocation, skill, item, quest, die and encounter ids are those of the v0.1 vocation catalog. Catalog version, rules and RNG are the baseline's.",
-    "A case with needs_design_decision gives the best structured form available; the sentence says what must be decided before it can become a test."
+    "A case with needs_design_decision gives the best structured form available; the sentence says what must be decided before it can become a test. A decided case says so in its notes, with the date."
   ],
   "cases": [
     {
@@ -1026,6 +1026,14 @@
                 "archmage",
                 "hero"
               ],
+              "anonymous_entries": [
+                {
+                  "label": "???"
+                },
+                {
+                  "label": "???"
+                }
+              ],
               "absent_vocation_ids": [
                 "trickster",
                 "dragon_knight"
@@ -1035,13 +1043,17 @@
                 "Trickster",
                 "jester_mask",
                 "crooked_mirror",
-                "A crooked reflection hides an unlikely profession."
+                "A crooked reflection hides an unlikely profession.",
+                "dragon_knight",
+                "Dragon Knight",
+                "drake_scale",
+                "An ancient scale hums when drawn steel touches magic."
               ]
             }
           }
         }
       },
-      "needs_design_decision": "The career-tree view model does not exist yet: its shape, and whether a hidden secret vocation shows as an anonymous placeholder or not at all, must be decided."
+      "notes": "Decided by the owner on 2026-11-11: a secret vocation the profile has not discovered shows as an anonymous '???' entry, not as a missing one. This differs from the assumption this case first stated (not shown at all). A hidden secret's entry holds the label and nothing else: no id, name, group, requirement or clue, and every hidden entry is identical and comes last, so neither content nor position says which secret it is. A hinted secret's entry holds the label and its clue. absent_vocation_ids and forbidden_strings must appear nowhere in the view. The view is battle_dice.career.service.career_tree_view; no screen shows it before Phase 4."
     },
     {
       "id": "CE-10",
@@ -3280,6 +3292,7 @@
       },
       "then": {
         "result": "rejected",
+        "error_code": "INSUFFICIENT_MANA",
         "state": {
           "heroes": [
             {
@@ -3304,7 +3317,7 @@
               "action_id": "heal2",
               "visible": true,
               "revive_option_enabled": false,
-              "disabled_reason": "insufficient_mana"
+              "disabled_reason": "INSUFFICIENT_MANA"
             }
           ],
           "run": {
@@ -3319,7 +3332,7 @@
           "The skill stays learned and equipped."
         ]
       },
-      "needs_design_decision": "No authored vocation has max_mana 0 and the shipped engine rejects action plans with free text, not codes; the catalog override used here and the code or reason for a face that is disabled for lack of mana must be decided."
+      "notes": "Decided by the owner on 2026-11-11: a refused action plan carries a registry code beside the text shown to the player; here INSUFFICIENT_MANA, which is also the reason a face option is disabled. The target check comes before the mana check, and Field Medic makes the downed ally a legal target, so the mana check is the one that fails. No authored vocation has max_mana 0; the catalog override is a device of this case. Not executable before the Champion's wave (4) and inherited skills in battle (Phase 4). Until then tests/unit/test_plan_codes.py checks the code on the shipped content."
     },
     {
       "id": "CE-30",
@@ -3437,6 +3450,7 @@
       },
       "then": {
         "result": "rejected",
+        "error_code": "TARGET_DOWNED",
         "state": {
           "heroes": [
             {
@@ -3461,7 +3475,7 @@
           "Squire Rally and Apprentice Mend can still target a downed hero when their resource and target conditions are met."
         ]
       },
-      "needs_design_decision": "The shipped engine rejects an illegal action plan with free text and no code, so whether this rejection gets a registry code, and which, must be decided."
+      "notes": "Decided by the owner on 2026-11-11: a refused action plan carries a registry code beside the text shown to the player; here TARGET_DOWNED. Not executable before the Champion's wave (4). Until then tests/unit/test_plan_codes.py checks the code on the shipped content: a heal without the revival tag is refused on a downed ally, and Rally and Mend are accepted."
     },
     {
       "id": "CE-31",
@@ -3561,7 +3575,7 @@
             "StartRun",
             "two encounters"
           ],
-          "command_log": "to be recorded"
+          "command_log": "recorded by tests/spec/test_class_evolution_determinism.py on every test run"
         }
       },
       "when": {
@@ -3580,7 +3594,7 @@
           }
         }
       },
-      "needs_design_decision": "The recorded command sequence, the canonical encoding of progression events and the fields left out of every hash (wall-clock timestamps) must be fixed before this case can name expected hash values."
+      "notes": "Decided by the owner on 2026-11-11: as built. A progression event is hashed as sha256 over the previous event's hash, the event id, the event type and the canonical JSON of its payload (sorted keys, no space between tokens, every non-ASCII character escaped), joined by line feeds and encoded as UTF-8. The wall-clock time of an event, a command, an unlock or an award is stored but is in no hash; the event log is append only, so the stored time of an event cannot be rewritten either. The session is recorded by the test itself: a hero claims and changes to Ranger, a run with seed 12345 is started and played through its encounters by the heuristic player, and the mastery award of each encounter is applied. It is replayed twice with different clocks. Until Phase 4 the test hands the run's results to the career rules itself; the game does not yet."
     },
     {
       "id": "CE-33",
@@ -4017,8 +4031,7 @@
           "max_available_threat": 3
         }
       },
-      "needs_design_decision": "The shipped game has two fixed battles and no threat ratings, so which encounters count as available, and their ratings, must be authored before the validator can run on real content.",
-      "notes": "With only training_01 to training_03 the highest threat is 3. Other ranks fail on this pool as well; the case names the one v0.1 used."
+      "notes": "Decided by the owner on 2026-11-11: the available encounters are the ones the catalog marks 'shipped', at the catalog's ratings: training_01 (shipped battle 1) is threat 1 and training_03 (shipped battle 2) is threat 3. The highest available threat is therefore 3, with this case's pool and with the catalog as it stands. An advanced vocation needs threat 4 at rank 7, so it cannot be mastered until a threat 4 encounter is authored (planned for Phase 4). For an advanced vocation rank 7 is the only dead end; capstone and secret vocations have more. The validator reports one line per vocation and rank; this case names the group."
     },
     {
       "id": "CE-37",

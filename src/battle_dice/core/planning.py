@@ -17,8 +17,31 @@ if TYPE_CHECKING:  # pragma: no cover
     from battle_dice.core.engine import Engine
 
 
+#: The machine-readable code of every plan refusal, in the order the checks run: the per-action
+#: checks in the player's order, then the class schedule, then the mana projection. The registry
+#: (``docs/class_evolution/persistence/error_codes.json``) lists the same codes in the same order.
+PLAN_CODES = (
+    "DIE_NOT_ROLLED",
+    "DIE_ALREADY_USED",
+    "FACE_NOT_AN_ACTION",
+    "NO_LEGAL_TARGET",
+    "WRONG_TARGET_COUNT",
+    "TARGET_UNKNOWN",
+    "TARGET_PROTECTED",
+    "TARGET_DOWNED",
+    "TARGET_NOT_LEGAL",
+    "SCHEDULE_VIOLATION",
+    "INSUFFICIENT_MANA",
+)
+
+
 class PlanError(ValueError):
-    """The submitted plan is not legal. The message is shown to the player."""
+    """The submitted plan is not legal. The message is shown to the player; the code is for programs."""
+
+    def __init__(self, message: str, code: str):
+        super().__init__(message)
+        assert code in PLAN_CODES, code
+        self.code = code
 
 
 def describe_policy(scheduling: dict[str, Any]) -> str:
@@ -46,36 +69,37 @@ def build_plan(ctx: Engine, hero: Combatant, turn: HeroTurn, actions: list[dict[
     for order, action in enumerate(actions):
         die_id = action["die_id"]
         if die_id not in turn.rolled:
-            raise PlanError(f"Die '{die_id}' has not been rolled this activation.")
+            raise PlanError(f"Die '{die_id}' has not been rolled this activation.", "DIE_NOT_ROLLED")
         if die_id in seen:
-            raise PlanError(f"Die '{die_id}' already supplies another action this activation.")
+            raise PlanError(f"Die '{die_id}' already supplies another action this activation.", "DIE_ALREADY_USED")
         seen.add(die_id)
         face_index = turn.rolled[die_id]
         face = ctx.die_for(hero.id, die_id).faces[face_index]
         if face.is_blank:
-            raise PlanError(f"{face.name} is a non-action and cannot be committed.")
+            raise PlanError(f"{face.name} is a non-action and cannot be committed.", "FACE_NOT_AN_ACTION")
         eligible = eligible_targets(combat, hero, face)
         if not eligible:
-            raise PlanError(f"{face.name} has no legal target.")
+            raise PlanError(f"{face.name} has no legal target.", "NO_LEGAL_TARGET")
         requested = list(action.get("target_ids", []))
         if face.target_scope in ("all_enemies", "all_allies"):
             targets = eligible
         elif face.target_scope == "self":
             if requested not in ([], [hero.id]):
-                raise PlanError(f"{face.name} can only target its user.")
+                raise PlanError(f"{face.name} can only target its user.", "WRONG_TARGET_COUNT")
             targets = [hero.id]
         else:
             if len(requested) != 1:
-                raise PlanError(f"{face.name} needs exactly one target.")
+                raise PlanError(f"{face.name} needs exactly one target.", "WRONG_TARGET_COUNT")
             if requested[0] not in eligible:
-                raise PlanError(target_problem(ctx, hero, face, requested[0]))
+                code, message = target_refusal(ctx, hero, face, requested[0])
+                raise PlanError(message, code)
             targets = requested
         chosen.append((face, die_id, order, targets))
 
     try:
         resolution_order = schedule.resolution_order([(c[0], c[2]) for c in chosen], strict=True)
     except ScheduleError as error:
-        raise PlanError(str(error)) from error
+        raise PlanError(str(error), "SCHEDULE_VIOLATION") from error
 
     # Mana projection in resolution order: costs are charged on resolution, gains arrive first.
     mana = hero.mana
@@ -83,7 +107,7 @@ def build_plan(ctx: Engine, hero: Combatant, turn: HeroTurn, actions: list[dict[
     for position in resolution_order:
         face, die_id, order, targets = chosen[position]
         if face.mana_cost > mana:
-            raise PlanError(f"{face.name} needs {face.mana_cost} mana but only {mana} will be available.")
+            raise PlanError(f"{face.name} needs {face.mana_cost} mana but only {mana} will be available.", "INSUFFICIENT_MANA")
         mana -= face.mana_cost
         for effect in face.effects:
             if effect["type"] == "gain_mana" and effect.get("target", "target") == "self":
@@ -109,18 +133,23 @@ def build_plan(ctx: Engine, hero: Combatant, turn: HeroTurn, actions: list[dict[
     return intents
 
 
-def target_problem(ctx: Engine, hero: Combatant, face: FaceDefinition, target_id: str) -> str:
+def target_refusal(ctx: Engine, hero: Combatant, face: FaceDefinition, target_id: str) -> tuple[str, str]:
+    """``(code, message)`` for a target the face may not take."""
     combat = ctx.combat
     target = combat.combatants.get(target_id)
     if target is None:
-        return f"Unknown target '{target_id}'."
+        return "TARGET_UNKNOWN", f"Unknown target '{target_id}'."
     if target_id in protected_targets(combat, hero, face):
-        return f"{target.name} is protected: melee must target the standing front row first."
+        return "TARGET_PROTECTED", f"{target.name} is protected: melee must target the standing front row first."
     if face.target_scope == "single_ally" and target.side == hero.side and not target.standing:
-        return f"{target.name} is downed; only a revival-capable Heal can target a downed ally."
+        return "TARGET_DOWNED", f"{target.name} is downed; only a revival-capable Heal can target a downed ally."
     if not target.standing:
-        return f"{target.name} is not a valid target."
-    return f"{target.name} is not a legal target for {face.name}."
+        return "TARGET_DOWNED", f"{target.name} is not a valid target."
+    return "TARGET_NOT_LEGAL", f"{target.name} is not a legal target for {face.name}."
+
+
+def target_problem(ctx: Engine, hero: Combatant, face: FaceDefinition, target_id: str) -> str:
+    return target_refusal(ctx, hero, face, target_id)[1]
 
 
 def die_options(ctx: Engine, hero: Combatant, turn: HeroTurn) -> list[dict[str, Any]]:

@@ -62,7 +62,15 @@ PARAM_SPECS: dict[str, dict[str, tuple[str, bool]]] = {
 
 
 class CommandRejected(Exception):
-    """Raised inside a handler to reject a command. State is rolled back by the engine."""
+    """Raised inside a handler to reject a command. State is rolled back by the engine.
+
+    ``code`` is the machine-readable name of the refusal where one is defined. Today that is every
+    refusal of an action plan (``planning.PLAN_CODES``); the text is always present.
+    """
+
+    def __init__(self, message: str, code: str | None = None):
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -92,6 +100,8 @@ class CommandResult:
     reason: str | None = None
     duplicate: bool = False
     events: list[Any] = field(default_factory=list)
+    #: Machine-readable name of the refusal, beside ``reason``. ``None`` where no code is defined.
+    code: str | None = None
 
     def __bool__(self) -> bool:
         return self.accepted

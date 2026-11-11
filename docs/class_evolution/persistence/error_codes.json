@@ -1,14 +1,15 @@
 {
   "document_id": "BD-FDD-CE-001",
   "fdd_version": "0.2",
-  "registry_version": 1,
+  "registry_version": 2,
   "status": "SPECIFICATION_ONLY",
-  "description": "The one registry of machine-readable codes for Class Evolution. A rejected command returns exactly one code and changes nothing: no row, no revision, no random draw. Fixtures, the persistence check and later the engine use these names and no others.",
+  "description": "The one registry of machine-readable codes for Class Evolution, and for the refusal of an action plan by the rules engine. A rejected command returns exactly one code and changes nothing: no row, no revision, no random draw. Fixtures, the persistence check and the game code use these names and no others.",
   "kinds": {
     "command_rejection": "Returned as the error_code of a rejected client command.",
     "award_denial": "Stored in mastery_award_event.denial_reason. The award event is accepted and records zero points.",
     "load_failure": "Returned when a saved profile cannot be opened as it is. The save is left untouched.",
-    "content_validation": "Reported by the catalog validator at build time. No player ever sees it."
+    "content_validation": "Reported by the catalog validator at build time. No player ever sees it.",
+    "plan_rejection": "Returned by the rules engine as the code of a rejected SetActionPlan or CommitActionPlan, beside the text shown to the player (owner decision of 2026-11-11, fixtures CE-29 and CE-30). It does not depend on the feature gate."
   },
   "codes": [
     {
@@ -111,6 +112,72 @@
       "meaning": "A vocation could never be unlocked in the wave it is released in: its prerequisite names a vocation of a later wave, or a quest or item whose encounter is not shipped.",
       "raised_by": ["ValidateCatalog"],
       "status": "approved"
+    },
+    {
+      "code": "DIE_NOT_ROLLED",
+      "kind": "plan_rejection",
+      "meaning": "The plan names a die the hero has not rolled this activation.",
+      "raised_by": ["SetActionPlan", "CommitActionPlan"]
+    },
+    {
+      "code": "DIE_ALREADY_USED",
+      "kind": "plan_rejection",
+      "meaning": "The plan uses the same die for two actions. A die supplies one action per activation.",
+      "raised_by": ["SetActionPlan", "CommitActionPlan"]
+    },
+    {
+      "code": "FACE_NOT_AN_ACTION",
+      "kind": "plan_rejection",
+      "meaning": "The rolled face is a blank. A blank cannot be committed as an action.",
+      "raised_by": ["SetActionPlan", "CommitActionPlan"]
+    },
+    {
+      "code": "NO_LEGAL_TARGET",
+      "kind": "plan_rejection",
+      "meaning": "The rolled face has no legal target at all in the current battle state.",
+      "raised_by": ["SetActionPlan", "CommitActionPlan"]
+    },
+    {
+      "code": "WRONG_TARGET_COUNT",
+      "kind": "plan_rejection",
+      "meaning": "The action names the wrong number of targets: a single-target face needs exactly one, and a self-targeted face takes only its user.",
+      "raised_by": ["SetActionPlan", "CommitActionPlan"]
+    },
+    {
+      "code": "TARGET_UNKNOWN",
+      "kind": "plan_rejection",
+      "meaning": "The action names a target that is not a combatant of this battle.",
+      "raised_by": ["SetActionPlan", "CommitActionPlan"]
+    },
+    {
+      "code": "TARGET_PROTECTED",
+      "kind": "plan_rejection",
+      "meaning": "The target is behind a standing front row. A melee action must target the standing front row first.",
+      "raised_by": ["SetActionPlan", "CommitActionPlan"]
+    },
+    {
+      "code": "TARGET_DOWNED",
+      "kind": "plan_rejection",
+      "meaning": "The target is downed. Only a face with the revival tag may target a downed ally, and nothing may target a downed enemy.",
+      "raised_by": ["SetActionPlan", "CommitActionPlan"]
+    },
+    {
+      "code": "TARGET_NOT_LEGAL",
+      "kind": "plan_rejection",
+      "meaning": "The target is standing but the face may not take it (for example an ally for an attack).",
+      "raised_by": ["SetActionPlan", "CommitActionPlan"]
+    },
+    {
+      "code": "SCHEDULE_VIOLATION",
+      "kind": "plan_rejection",
+      "meaning": "The actions do not fit the hero's schedule: too many actions, the wrong order of categories, or a repeated category.",
+      "raised_by": ["SetActionPlan", "CommitActionPlan"]
+    },
+    {
+      "code": "INSUFFICIENT_MANA",
+      "kind": "plan_rejection",
+      "meaning": "In resolution order, an action costs more mana than the hero will have when it resolves. No mana is spent and nothing else changes.",
+      "raised_by": ["SetActionPlan", "CommitActionPlan"]
     }
   ],
   "replay_result": {
@@ -136,6 +203,20 @@
     {"code": "INCOMPATIBLE_DIE", "reason": "No CE fixture equips a die by command; CE-18 covers the automatic move of incompatible dice to the bench."},
     {"code": "REVISION_CONFLICT", "reason": "No CE fixture sends a stale state_revision; the persistence test suite exercises it against the database."},
     {"code": "COMMAND_ID_REUSED", "reason": "No CE fixture reuses a command id for a different command; CE-33 and CE-38 cover the unchanged repeat only. The persistence test suite exercises it against the database."},
-    {"code": "UNLOCK_DEAD_END", "reason": "No CE fixture releases a vocation before its prerequisites; the catalog test suite exercises it wave by wave against the vocation catalog."}
-  ]
+    {"code": "UNLOCK_DEAD_END", "reason": "No CE fixture releases a vocation before its prerequisites; the catalog test suite exercises it wave by wave against the vocation catalog."},
+    {"code": "DIE_NOT_ROLLED", "reason": "No CE fixture sends such a plan; tests/unit/test_plan_codes.py raises it against the shipped content."},
+    {"code": "DIE_ALREADY_USED", "reason": "No CE fixture sends such a plan; tests/unit/test_plan_codes.py raises it against the shipped content."},
+    {"code": "FACE_NOT_AN_ACTION", "reason": "No CE fixture sends such a plan; tests/unit/test_plan_codes.py raises it against the shipped content."},
+    {"code": "NO_LEGAL_TARGET", "reason": "No CE fixture sends such a plan; tests/unit/test_plan_codes.py raises it against the shipped content."},
+    {"code": "WRONG_TARGET_COUNT", "reason": "No CE fixture sends such a plan; tests/unit/test_plan_codes.py raises it against the shipped content."},
+    {"code": "TARGET_UNKNOWN", "reason": "No CE fixture sends such a plan; tests/unit/test_plan_codes.py raises it against the shipped content."},
+    {"code": "TARGET_PROTECTED", "reason": "No CE fixture sends such a plan; tests/unit/test_plan_codes.py raises it against the shipped content."},
+    {"code": "TARGET_NOT_LEGAL", "reason": "No CE fixture sends such a plan; tests/unit/test_plan_codes.py raises it against the shipped content."},
+    {"code": "SCHEDULE_VIOLATION", "reason": "No CE fixture sends such a plan; tests/unit/test_plan_codes.py raises it against the shipped content."}
+  ],
+  "plan_check_order": {
+    "status": "approved",
+    "meaning": "The order in which a plan is checked. The first failing check is reported. The checks up to TARGET_NOT_LEGAL run for each action in the player's order; SCHEDULE_VIOLATION is checked on the whole plan after them; INSUFFICIENT_MANA is checked last, action by action in resolution order.",
+    "order": ["DIE_NOT_ROLLED", "DIE_ALREADY_USED", "FACE_NOT_AN_ACTION", "NO_LEGAL_TARGET", "WRONG_TARGET_COUNT", "TARGET_UNKNOWN", "TARGET_PROTECTED", "TARGET_DOWNED", "TARGET_NOT_LEGAL", "SCHEDULE_VIOLATION", "INSUFFICIENT_MANA"]
+  }
 }

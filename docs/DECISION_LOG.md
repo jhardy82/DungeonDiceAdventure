@@ -40,6 +40,7 @@ tests, and add an entry here.
 | D-22 | 8.1 Squire fixtures (bench die) | **Owner decision, 2026-11-11 (content 1.3.1):** the Squire's bench die is now **Vanguard d4** (Strike 3, Jab 2, Jab 2, Blank), replacing Bulwark d4 (Guard 2, Guard 2, Tend 1, Blank). The Apprentice and Scout bench dice are unchanged. See section 7.9, including a correction to the numbers the choice was made on. | Playtest finding 3: swapping the bench die in changed nothing (+0.8 points). The owner asked for a true sidegrade to be designed and measured first, then chose this one. |
 | D-23 | Class Evolution (beyond the MVP PRD) | **Owner decision, 2026-11-11:** FDD v0.2 (`docs/class_evolution/`) is approved and built in phases behind the feature gate `class_evolution_v1`, a launch setting that is off by default. With the gate off the game stays byte for byte identical. See section 7.11. | The owner asked for the design to be evaluated, chose a reconciled specification as the first step, then approved it. |
 | D-25 | Class Evolution fixtures CE-18, CE-25, CE-35, CE-40 | **Owner decisions, 2026-11-11:** a vocation may equip its own dice plus its family's; run upgrades are kept as history after a run; with the gate on a run takes saved heroes with a build snapshot in its log; gate on with starting classes stays byte for byte identical to gate off. See section 7.12. | Asked before Phases 3 and 4. The dice answer differs from the fixture's first assumption (own dice only), so that fixture's notes and one rule changed. |
+| D-26 | Class Evolution fixtures CE-09, CE-29, CE-30, CE-32, CE-36 | **Owner decisions, 2026-11-11:** an undiscovered secret vocation shows in the career tree as an anonymous `???` entry (not the fixture's first assumption, which was not to show it); a refused action plan carries a machine-readable code beside its text; event hashes and the canonical encoding stay as built, with times in no hash; the available encounters are the ones the catalog marks shipped, at its ratings (threat 1 and threat 3). One fixture stays open: CE-31. Rules, content and the replay pin are unchanged. | Section 7.14 |
 
 ## 2. Content authored under delegation
 
@@ -752,6 +753,117 @@ file yet.
 **Not in Phase 3:** the game opening a save (the gate decides that in Phase 4), screens, item
 grants and quest completion as events, build snapshots at run start (CE-35).
 
+### 7.14 Owner decision D-26: five fixtures decided before Phase 4 (2026-11-11)
+
+**The answers**
+
+| Fixture | Question | Answer | Same as the fixture assumed? |
+|---------|----------|--------|------------------------------|
+| CE-09 | How does the career tree show a secret vocation that is not discovered? | As an anonymous `???` entry | **No.** It assumed the vocation is not shown at all |
+| CE-29, CE-30 | Does a refused action plan get a code? | Yes, beside the text; the text stays | It had no assumption |
+| CE-32 | What does an event hash cover, and how is a payload encoded? | As built | Yes |
+| CE-36 | Which encounters count as available, at which ratings? | The ones the catalog marks shipped, at its ratings | Yes |
+
+**What was built**
+
+- **Career tree** (`career_tree_view` in `src/battle_dice/career/service.py`). A discovered
+  vocation is listed with its id, name, group, whether the hero has unlocked it, whether it is
+  active, and the hero's rank. A **hidden** secret is an entry with the label `???` and nothing
+  else; every hidden entry is identical and they come last, so neither content nor position says
+  which secret it is. A **hinted** secret is the label plus its clue. Building the view changes
+  nothing. No screen shows it before Phase 4.
+- **Plan codes** (`PLAN_CODES` in `src/battle_dice/core/planning.py`). Eleven codes, one for each
+  way `SetActionPlan` or `CommitActionPlan` can refuse a plan. `CommandResult.code` carries the
+  code beside `reason`; the app's plan preview carries it as `problem_code`. The registry lists
+  them under a new kind, `plan_rejection`, with the order of the checks. They do not depend on
+  the gate. Other refusals of the rules engine still have text and no code.
+- **Reachability** (`available_threat` and `training_dead_end_details` in
+  `src/battle_dice/content/vocations.py`). The validator's check can now be asked about a named
+  set of encounters, and returns each dead end as data (group, rank, required and available
+  threat). The lines it prints are unchanged.
+- **A run-started event** (`StoredCareerService.begin_run`). The save could end a run but had
+  no way to start one outside an import. A run id is used once.
+
+**Evidence**
+
+- **35 of the 40 acceptance fixtures now run as tests** (32 before). New: CE-09 and CE-36
+  (`tests/spec/test_class_evolution_rules.py`) and CE-32
+  (`tests/spec/test_class_evolution_determinism.py`).
+- **CE-32.** The session is recorded on every test run: a hero claims Ranger and changes to it,
+  a run with seed 12345 (Squire in front, Ranger behind) is played by the heuristic player and
+  won in both battles, and each battle's mastery awards are applied. It is then replayed twice
+  from the record into new save files with different clocks.
+  - The 11 progression events are byte for byte the same in all three, hashes included, while
+    every stored time differs.
+  - Apart from its time columns the whole save is the same, row for row, in all three.
+  - The run ends in the same state hash and the same event hash, and replays from its record.
+  - Three commands that must be refused were sent before every step of the run (1,128 while
+    recording, 1,155 in each replay). They drew 0 random numbers and changed nothing.
+  - The awards follow the rules: battle 1 (threat 1) gives the Squire a point and gives the
+    Ranger a zero award with `UNDER_THREAT_CAP`; battle 2 (threat 3) gives each a point.
+- **CE-09.** With both secrets hidden the view lists the 12 public vocations and two identical
+  `???` entries, and none of 9 forbidden strings (ids, names, the item and quest that unlock
+  them, both clues) appears anywhere in it. With a hint, the Trickster's entry shows its clue
+  and still no id, name or group.
+- **CE-36.** With the fixture's pool, and with the catalog as it stands, the highest available
+  threat is 3 and every advanced vocation has exactly one dead end: rank 7, which needs threat 4.
+  With a threat-4 encounter added to the pool the dead end is gone.
+- **CE-29 and CE-30 cannot run yet**: they name Champion dice, and the engine cannot build a
+  Champion before wave 4. `tests/unit/test_plan_codes.py` checks every one of the eleven codes,
+  the order of the checks, and the two fixtures' situations on today's content: a heal without
+  the revival tag is refused on a downed ally with `TARGET_DOWNED` while Rally and Mend are
+  accepted; Mend on a downed ally with too little mana is refused with `INSUFFICIENT_MANA`,
+  mana stays at 0 and the ally stays down.
+- 860 tests pass (819 before). Lint and type checks are clean. Coverage of the rules, content
+  and career code is 97%.
+- The replay pin and the six content files are unchanged, and the smoke test passes with and
+  without the gate.
+- The simulator on seeds 300 to 339 (2,200 runs) gives the result it gave before this change,
+  composition by composition: 1,703 wins (77.4%). Adding codes changed no decision of the engine.
+- **Deliberate breaks.** 25 breaks of the new code were applied one at a time (a wrong code, a
+  dropped code, a hidden entry that shows its group, a hint that shows a name, a pool that is
+  ignored, a time inside an event hash, a rejected command that leaves a random draw, and so
+  on). All 25 now fail at least one test. That took two corrections:
+  - **22 were caught at first.** Two misses were gaps in the new tests, now closed: no test had
+    a hero one rank short of mastery, and an off-by-one in the required threat gave the same
+    number for the one rank the test looked at. The third miss was a badly chosen break: the
+    engine's rollback undoes it by design, so it changed nothing. It was replaced by one that
+    does survive the rollback.
+  - **The harness itself was wrong on its first run.** It reported 25 of 25, but from the sixth
+    break on every run failed on the same unrelated test. Cause: a same-size edit put back
+    within one second left a stale bytecode file behind. The harness now runs without bytecode
+    files and starts with a control run that must pass.
+  - The harnesses of sections 7.12 and 7.13 had the same flaw, so both were run again the same
+    way. Their results stand: 20 of 20 rule breaks and 20 of 20 store breaks are caught, each
+    by a test that fits the break.
+
+**Found while testing**
+
+- The event log refuses any change to a stored event, including its time (a database trigger).
+  My first test tried to rewrite a time to show that hashes ignore it, and the file refused. The
+  test now shows the same thing from the three sessions: same hashes, different times.
+- One row of a new save is stamped by SQLite's own clock, not by the store's: the baseline entry
+  of the migration list, written by the schema script. It is in no hash and no rule reads it.
+  Left as it is.
+
+**This build's own readings, open to correction**
+
+- A **hinted** secret shows its clue. The decision named the hidden state; showing the clue at
+  the hinted state is what the catalog's `clue` field is for.
+- Hidden entries come **last**, after hinted ones, rather than at their place in the catalog.
+- A target that is down is refused with `TARGET_DOWNED` whether it is an ally or an enemy.
+- The number of `???` entries tells a player how many secrets are still hidden (two at first).
+  That follows from the decision; it is stated here because it is information.
+
+**Still not executable, and why**
+
+| Fixture | Waits for |
+|---------|-----------|
+| CE-19 | Phase 4: the rules engine and owned dice together |
+| CE-29, CE-30 | The Champion's wave (4); CE-29 also needs inherited skills in battle (Phase 4) |
+| CE-31 | A decision on Duelist's Parry, asked with the Duelist's wave (3) |
+| CE-35 | Phase 4: `StartRun` with saved heroes and build snapshots |
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one
@@ -776,5 +888,5 @@ checked here. Each needs an owner decision or a real Windows display.
 | Class balance | Changed in content 1.3.0 (D-21, section 7.8): every party size is at 74-83% and one composition is at or below 40%. Still weak: five Squires (16%; about 30% when they swap to the Vanguard bench die, section 7.9), and all-Apprentice parties at sizes 3 and 4 (52-56%). Still strong: Scout-heavy parties at sizes 4 and 5 (98-100%). All figures are for the scripted player. |
 | Windows display | Never launched on a physical Windows display. Window resize while dragging, font rendering and behaviour at 125% or 150% scaling are unverified. |
 | Python install manager | Whether its `py` command downloads a missing Python on request is `<UNKNOWN>` here; the launcher itself never downloads or installs Python. |
-| Class Evolution | Specification only (section 7.10). Whether the design is balanced or enjoyable is `<UNKNOWN>` until a playable slice exists. On shipped encounters the six advanced vocations (Guardian first) cannot reach their last rank, and Champion, Archmage, Hero and Dragon Knight cannot be trained at all; the validator lists each case. |
+| Class Evolution | Not playable. The rules and the save file are built and tested behind a gate that is off by default (sections 7.11 to 7.14); no screen offers any of it, and the game does not hand a run's results to the career rules yet (Phase 4). 35 of the 40 acceptance cases run as tests; one question is open (CE-31). Whether the design is balanced or enjoyable is `<UNKNOWN>` until a playable slice exists. On shipped encounters the six advanced vocations (Guardian first) cannot reach their last rank, and Champion, Archmage, Hero and Dragon Knight cannot be trained at all; the validator lists each case. |
 | Type checking | Closed on 2026-11-10: `mypy` now covers the whole package (including `ui/`), `tools/` and `tests/` with no findings, and CI runs it that way. The one relaxation is for tests only: `union-attr` is off there, because a test that reads optional engine state fails with an AttributeError when it is None, which is the signal wanted. |

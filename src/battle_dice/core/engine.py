@@ -188,7 +188,7 @@ class Engine:
             handler(**copy.deepcopy(command.params))
         except CommandRejected as rejection:
             self._roll_back(backup, event_count)
-            return CommandResult(False, self.revision, reason=str(rejection))
+            return CommandResult(False, self.revision, reason=str(rejection), code=rejection.code)
         except Exception:
             self._roll_back(backup, event_count)
             raise
@@ -514,7 +514,7 @@ class Engine:
         try:
             turn.plan = planning.build_plan(self, hero, turn, actions)
         except planning.PlanError as error:
-            raise CommandRejected(str(error)) from error
+            raise CommandRejected(str(error), error.code) from error
         combat.phase = CombatPhase.ACTION_PLAN
         self.emit(
             EventType.PLAN_SET,
@@ -533,7 +533,7 @@ class Engine:
         try:
             turn.plan = planning.build_plan(self, hero, turn, selections)
         except planning.PlanError as error:
-            raise CommandRejected(str(error)) from error
+            raise CommandRejected(str(error), error.code) from error
         combat.next_intent_seq += len(turn.plan)
         turn.committed = True
         turn.queue_index = 0
@@ -795,15 +795,24 @@ class Engine:
 
     def preview_plan(self, actions: list[dict[str, Any]]) -> tuple[list[ActionIntent], str | None]:
         """Validate a draft plan without committing it. Returns ``(ordered intents, problem)``."""
+        intents, problem, _ = self.check_plan(actions)
+        return intents, problem
+
+    def check_plan(self, actions: list[dict[str, Any]]) -> tuple[list[ActionIntent], str | None, str | None]:
+        """As :meth:`preview_plan`, with the refusal's code: ``(ordered intents, problem, code)``.
+
+        The code is the one ``SetActionPlan`` would return for the same draft. It is ``None`` for a
+        legal plan, and when no hero is planning or the dice are not rolled yet.
+        """
         if self._state is None or self.state.phase != RunPhase.BATTLE or self.combat.turn is None:
-            return [], "No hero is planning."
+            return [], "No hero is planning.", None
         hero, turn = self._active_hero()
         if not turn.rolled:
-            return [], "Roll the dice first."
+            return [], "Roll the dice first.", None
         try:
-            return planning.build_plan(self, hero, turn, actions), None
+            return planning.build_plan(self, hero, turn, actions), None, None
         except planning.PlanError as error:
-            return [], str(error)
+            return [], str(error), error.code
 
     def permissible_commands(self) -> list[str]:
         if self._state is None:

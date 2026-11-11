@@ -280,6 +280,9 @@ class SqliteProfileStore:
             previous, count = stored_hash, count + 1
         return count
 
+    def has_run(self, run_id: str) -> bool:
+        return self.conn.execute("SELECT 1 FROM run WHERE run_id = ?", (run_id,)).fetchone() is not None
+
     def run_upgrades(self, run_id: str) -> list[Json]:
         """Every die upgrade recorded for a run. ``applies`` is false once the run has ended: the rows stay as history."""
         finished = self.conn.execute("SELECT phase FROM run WHERE run_id = ?", (run_id,)).fetchone()
@@ -547,6 +550,21 @@ class StoredCareerService:
 
     def apply_discovery_signal(self, event: Json) -> CareerResult:
         return self._saved(lambda: self.service.apply_discovery_signal(event))
+
+    def begin_run(self, run_id: str) -> None:
+        """Trusted event ``RunStarted``: a run of this profile has begun and is in its first battle.
+
+        The save holds what the career rules know of a run: its id, phase and revision. The seed and
+        the build snapshots arrive with Phase 4.
+        """
+        run = self.state.run
+        if run is not None and run.phase not in FINISHED_PHASES:
+            raise ValueError(f"'{run.run_id}' is still being played.")
+        if self.store.has_run(run_id):
+            raise ValueError(f"'{run_id}' is already in the save; a run id is used once.")
+        before = copy.deepcopy(self.state)
+        self.state.run = RunInfo(run_id, "battle")
+        self._write(before)
 
     def end_run(self, run_id: str, outcome: str) -> None:
         """Trusted event ``RunEnded``: the run is finished. Its die upgrades stay as history and stop applying."""
