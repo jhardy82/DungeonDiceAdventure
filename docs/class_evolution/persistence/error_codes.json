@@ -84,7 +84,7 @@
       "kind": "command_rejection",
       "meaning": "The command_id was already accepted for a different command (another type or other params). This is the shipped engine's behaviour for run commands, carried over. Sending the same command again is not an error: see replay_result.",
       "raised_by": ["ClaimVocation", "ChangeVocation", "EquipInheritedSkill", "UnequipInheritedSkill", "EquipDie", "ConfirmBuild"],
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "code": "UNDER_THREAT_CAP",
@@ -97,7 +97,7 @@
       "kind": "award_denial",
       "meaning": "The encounter did not end in victory. Base and challenge points are both zero.",
       "raised_by": ["AwardEncounterMastery"],
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "code": "TRAINING_DEAD_END",
@@ -110,7 +110,7 @@
       "kind": "content_validation",
       "meaning": "A vocation could never be unlocked in the wave it is released in: its prerequisite names a vocation of a later wave, or a quest or item whose encounter is not shipped.",
       "raised_by": ["ValidateCatalog"],
-      "status": "proposed"
+      "status": "approved"
     }
   ],
   "replay_result": {
@@ -127,7 +127,7 @@
     {"v0_1_code": "DUPLICATE_COMMAND", "use": "replay_result", "reason": "A repeated command id returns the original result, so it is not an error."}
   ],
   "check_order": {
-    "status": "proposed",
+    "status": "approved",
     "meaning": "When several conditions fail at once, the first one in this order is reported.",
     "order": ["replay_result", "COMMAND_ID_REUSED", "CONTENT_MIGRATION_REQUIRED", "REVISION_CONFLICT", "PHASE_LOCKED", "HERO_NOT_ELIGIBLE", "UNSUPPORTED_SECONDARY_VOCATION", "NOT_DISCOVERED", "PREREQUISITE_UNMET", "ITEM_INSUFFICIENT", "INCOMPATIBLE_DIE", "NO_LEGAL_FACE", "CAPACITY_EXCEEDED"]
   },

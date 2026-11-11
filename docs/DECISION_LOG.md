@@ -638,8 +638,20 @@ owner chose to keep Vanguard d4.
 - **Not a balance claim:** Squire and Ranger won 10 of 10 trial runs with the v0.1 numbers. The
   Ranger is retuned by measurement with its wave, as decided.
 
-**Phase 1 is complete with part C.** Phase 2 (progression rules in memory) starts with the
-fixture decisions it needs.
+**Phase 1 is complete with part C** (pull requests 12, 13 and 14, merged 2026-11-11). The
+standalone Windows build passed its smoke test with the gate on.
+
+**Owner decisions for Phase 2 (2026-11-11).**
+
+| Fixture | Question | Answer |
+|---------|----------|--------|
+| CE-19, CE-39 | When may a hero change vocation inside a run? | After recovery and before the mandatory upgrade; also at party setup; never during a battle or after the upgrade |
+| CE-24 | What is recorded for a lost battle? | A zero-point mastery row with the reason `ENCOUNTER_NOT_WON` |
+| CE-28 | A skill with no die face it can act on | Refused with `NO_LEGAL_FACE`; the skill stays learned |
+| CE-10 | Can discovery move backwards? | No: hidden, hinted, discovered, only forward; each distinct clue counts once |
+
+Ten fixtures still need a decision (CE-09, 18, 25, 29, 30, 31, 32, 35, 36, 40); each is settled in
+the phase that first needs it. The three codes v0.2 proposed are marked approved in the registry.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 
