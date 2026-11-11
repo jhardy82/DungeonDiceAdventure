@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 500 tests: unit, T01-T16 fixtures, integration, headless UI and graphics
+python -m pytest                 # 622 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -172,6 +172,7 @@ python -m pytest -W error --cov=battle_dice.core --cov=battle_dice.content --cov
 | `tests/fixtures` | One module per PRD fixture, `test_t01_solo_basic.py` to `test_t16_seed_replay.py` |
 | `tests/integration` | Full two-battle runs for every party size, invariants after every command, both outcomes; run-log replay and three runs pinned by hash |
 | `tests/ui` | Scripted mouse run at 1280x720 and keyboard-only run at 960x540 through every screen; every documented key; reaction panel, pause menu and readable text at both sizes; sprite manifest, licences, whole-number scaling and animation |
+| `tests/spec` | Class Evolution specification (not game code): the vocation catalog against shipped content, the save database script, the example save, the code registry and the 40 acceptance fixtures |
 
 ## Headless simulation and replay
 
@@ -234,11 +235,27 @@ tools/                build_sprites.py: rebuilds the sprite set from Kenney's Ti
                       update_replay_pin.py: regenerates the pinned-run hashes after an intended change
 scripts/              Start-BattleDice.ps1 launcher (Windows)
 packaging/            PyInstaller entry point and spec for the standalone app
+                      class_evolution/: checkers for the Class Evolution specification
 docs/DECISION_LOG.md  interpretations, authored catalogs, deviations, measured evidence
+docs/class_evolution/ Class Evolution FDD v0.2: specification only, awaiting owner approval
 ```
 
 Changing balance means editing `src/battle_dice/content/data/*.json` (bump `content_version`,
 run `python tools/update_replay_pin.py`, rerun the tests, add a decision-log entry). No numeric balance value is hard-coded in the engine.
+
+## Class Evolution (specification only)
+
+`docs/class_evolution/FDD_v0.2.md` is a proposed design for class evolution: 14 vocations, mastery,
+unlocks and a save database. **It is not in the game.** Nothing under `src/` reads it, and the
+feature gate `class_evolution_v1` is off. The specification is executable and checked in CI:
+
+```
+python tools/class_evolution/validate_catalog.py      # the vocation catalog against shipped content
+python tools/class_evolution/check_persistence.py     # the save database script and the example save
+```
+
+Both print `OK`. The first also lists, as warnings, every rank and vocation that cannot be reached
+on shipped content yet. No build work starts until the owner approves the document.
 
 ## Scope
 

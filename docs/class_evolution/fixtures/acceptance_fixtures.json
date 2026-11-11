@@ -1,0 +1,4469 @@
+{
+  "document_id": "BD-FDD-CE-001",
+  "fdd_version": "0.2",
+  "fixture_format": 2,
+  "status": "BEHAVIORAL_SPECIFICATION_NOT_EXECUTED",
+  "baseline": {
+    "rules_version": "1.1.1",
+    "content_version": "1.3.1",
+    "rng_algorithm": "BD-PCG32-v1",
+    "replay_pin": "tests/golden/replay_pin.json",
+    "definition": "With the feature gate off, the replay pin tests/golden/replay_pin.json reproduces byte for byte."
+  },
+  "conventions": [
+    "A case is: given this state, when this one command or trusted event is applied, then this result and state.",
+    "A command is the game's envelope {type, command_id, state_revision, params}. For a hero command state_revision is hero.revision; for a run command (StartRun, ChooseUpgrade, SetActionPlan) it is the engine's run revision.",
+    "given.history lists earlier steps in order, each with its outcome; they are applied to the given state before 'when'. An 'aborted' step failed inside its transaction and was rolled back.",
+    "A hero has a mastery row (rank 1, 0 points) for every unlocked vocation unless the case says otherwise. 'run': null means the profile has no unfinished run (v0.1 phase PARTY_SETUP).",
+    "then.state is partial: only what is listed is asserted. Entries of a list are matched by their id (hero_id, vocation_id, item_id, die_instance_id).",
+    "These lists are complete, not partial: unlocked_vocations, equipped_skills, item_consumptions, quests_completed, mastery_award_events, run_die_upgrades, processed_commands and then.events (which is also ordered).",
+    "claim_event 'events[0]' means the event_id of the first event in then.events.",
+    "A rejected result changes nothing: no row, no revision, no random draw. error_code and denial_reason values come from docs/class_evolution/persistence/error_codes.json.",
+    "then.duplicate true is the replay result of the registry: accepted, the stored result returned, no second effect.",
+    "Vocation, skill, item, quest, die and encounter ids are those of the v0.1 vocation catalog. Catalog version, rules and RNG are the baseline's.",
+    "A case with needs_design_decision gives the best structured form available; the sentence says what must be decided before it can become a test."
+  ],
+  "cases": [
+    {
+      "id": "CE-01",
+      "title": "MVP feature gate",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "feature_gate": {
+          "class_evolution_v1": false
+        },
+        "baseline": {
+          "rules_version": "1.1.1",
+          "content_version": "1.3.1",
+          "rng_algorithm": "BD-PCG32-v1",
+          "replay_pin": "tests/golden/replay_pin.json"
+        }
+      },
+      "when": {
+        "event": {
+          "type": "ReplayPinnedRuns",
+          "pin_path": "tests/golden/replay_pin.json"
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "replay": {
+            "pin_path": "tests/golden/replay_pin.json",
+            "runs_reproduced": "all",
+            "events_hash_matches_pin": true,
+            "final_state_hash_matches_pin": true,
+            "progression_rows_written": 0
+          }
+        },
+        "invariants": [
+          "Squire, Apprentice and Scout stats, starting dice, enemy AI, reactions and rerolls are those of content 1.3.1.",
+          "No progression state is read while the gate is off."
+        ]
+      },
+      "needs_design_decision": "Where the class_evolution_v1 gate lives (content file, settings or build flag) and whether the progression database is opened at all while it is off.",
+      "notes": "Baseline: With the feature gate off, the replay pin tests/golden/replay_pin.json reproduces byte for byte. Today tests/integration/test_replay_logs.py checks the pin."
+    },
+    {
+      "id": "CE-02",
+      "title": "Global discovery is not eligibility",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "guardian",
+              "discovery_state": "discovered"
+            }
+          ]
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "squire",
+            "revision": 3,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 7,
+                "points": 10
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "PreviewVocation",
+          "command_id": "cmd-ce02-1",
+          "state_revision": 3,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "guardian",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "preview": {
+            "target_vocation_id": "guardian",
+            "discovered": true,
+            "unlocked_for_hero": false,
+            "eligible_to_claim": false,
+            "blocked_by": [
+              {
+                "error_code": "PREREQUISITE_UNMET",
+                "routes": [
+                  {
+                    "route_id": "route_0",
+                    "unmet": [
+                      {
+                        "op": "MASTERY_AT_LEAST",
+                        "vocation_id": "squire",
+                        "rank": 8,
+                        "current_rank": 7
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 3,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout"
+              ]
+            }
+          ]
+        },
+        "events": []
+      },
+      "notes": "v0.1 named the reason MISSING_MASTERY(squire,8); it is PREREQUISITE_UNMET with the vocation and rank in the details. A preview is a pure read: it is accepted and reports why a claim would be rejected."
+    },
+    {
+      "id": "CE-03",
+      "title": "Guardian AND prerequisites met",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "guardian",
+              "discovery_state": "discovered"
+            }
+          ],
+          "items": []
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "squire",
+            "revision": 3,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "ClaimVocation",
+          "command_id": "cmd-ce03-1",
+          "state_revision": 3,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "guardian",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 4,
+              "active_vocation_id": "squire",
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout",
+                "guardian"
+              ],
+              "unlocks": [
+                {
+                  "vocation_id": "guardian",
+                  "unlock_route_id": "route_0"
+                }
+              ],
+              "mastery": [
+                {
+                  "vocation_id": "guardian",
+                  "rank": 1,
+                  "points": 0
+                },
+                {
+                  "vocation_id": "squire",
+                  "rank": 8,
+                  "points": 14
+                }
+              ]
+            }
+          ],
+          "profile": {
+            "profile_id": "profile_demo",
+            "item_consumptions": []
+          }
+        },
+        "events": [
+          {
+            "type": "VocationClaimed",
+            "hero_id": "hero_001",
+            "vocation_id": "guardian",
+            "route_id": "route_0",
+            "consumed_items": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "CE-04",
+      "title": "Duelist AND checks",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "duelist",
+              "discovery_state": "discovered"
+            }
+          ],
+          "items": []
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "squire",
+            "revision": 5,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "scout",
+                "rank": 7,
+                "points": 10
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "ClaimVocation",
+          "command_id": "cmd-ce04-1",
+          "state_revision": 5,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "duelist",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "rejected",
+        "error_code": "PREREQUISITE_UNMET",
+        "error_details": {
+          "routes": [
+            {
+              "route_id": "route_0",
+              "unmet": [
+                {
+                  "op": "MASTERY_AT_LEAST",
+                  "vocation_id": "scout",
+                  "rank": 8,
+                  "current_rank": 7
+                }
+              ]
+            }
+          ]
+        },
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 5,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout"
+              ],
+              "mastery": [
+                {
+                  "vocation_id": "squire",
+                  "rank": 8,
+                  "points": 14
+                },
+                {
+                  "vocation_id": "scout",
+                  "rank": 7,
+                  "points": 10
+                }
+              ]
+            }
+          ],
+          "profile": {
+            "profile_id": "profile_demo",
+            "items": [],
+            "item_consumptions": []
+          },
+          "processed_commands": []
+        },
+        "events": []
+      }
+    },
+    {
+      "id": "CE-05",
+      "title": "Champion compound lineage",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "champion",
+              "discovery_state": "discovered"
+            }
+          ]
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "guardian",
+            "revision": 20,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian",
+              "duelist"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "scout",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "duelist",
+                "rank": 8,
+                "points": 24
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "ClaimVocation",
+          "command_id": "cmd-ce05-1",
+          "state_revision": 20,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "champion",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 21,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout",
+                "guardian",
+                "duelist",
+                "champion"
+              ],
+              "unlocks": [
+                {
+                  "vocation_id": "champion",
+                  "unlock_route_id": "route_0"
+                }
+              ],
+              "mastery": [
+                {
+                  "vocation_id": "champion",
+                  "rank": 1,
+                  "points": 0
+                },
+                {
+                  "vocation_id": "squire",
+                  "rank": 8,
+                  "points": 14
+                },
+                {
+                  "vocation_id": "scout",
+                  "rank": 8,
+                  "points": 14
+                },
+                {
+                  "vocation_id": "guardian",
+                  "rank": 8,
+                  "points": 24
+                },
+                {
+                  "vocation_id": "duelist",
+                  "rank": 8,
+                  "points": 24
+                }
+              ]
+            }
+          ]
+        },
+        "events": [
+          {
+            "type": "VocationClaimed",
+            "hero_id": "hero_001",
+            "vocation_id": "champion",
+            "route_id": "route_0",
+            "consumed_items": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "CE-06",
+      "title": "Hero alternate quest route",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "hero",
+              "discovery_state": "discovered"
+            }
+          ],
+          "items": [],
+          "quests_completed": [
+            {
+              "quest_id": "trial_of_the_hero",
+              "qualifier_scope": "hero",
+              "qualifier_id": "hero_001"
+            }
+          ]
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "spellblade",
+            "revision": 30,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian",
+              "duelist",
+              "spellblade"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "apprentice",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "scout",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "duelist",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "spellblade",
+                "rank": 8,
+                "points": 24
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "ClaimVocation",
+          "command_id": "cmd-ce06-1",
+          "state_revision": 30,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "hero",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 31,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout",
+                "guardian",
+                "duelist",
+                "spellblade",
+                "hero"
+              ],
+              "unlocks": [
+                {
+                  "vocation_id": "hero",
+                  "unlock_route_id": "route_1"
+                }
+              ],
+              "mastery": [
+                {
+                  "vocation_id": "hero",
+                  "rank": 1,
+                  "points": 0
+                },
+                {
+                  "vocation_id": "squire",
+                  "rank": 8,
+                  "points": 14
+                },
+                {
+                  "vocation_id": "apprentice",
+                  "rank": 8,
+                  "points": 14
+                },
+                {
+                  "vocation_id": "scout",
+                  "rank": 8,
+                  "points": 14
+                },
+                {
+                  "vocation_id": "guardian",
+                  "rank": 8,
+                  "points": 24
+                },
+                {
+                  "vocation_id": "duelist",
+                  "rank": 8,
+                  "points": 24
+                },
+                {
+                  "vocation_id": "spellblade",
+                  "rank": 8,
+                  "points": 24
+                }
+              ]
+            }
+          ],
+          "profile": {
+            "profile_id": "profile_demo",
+            "item_consumptions": []
+          }
+        },
+        "events": [
+          {
+            "type": "VocationClaimed",
+            "hero_id": "hero_001",
+            "vocation_id": "hero",
+            "route_id": "route_1",
+            "consumed_items": []
+          }
+        ]
+      },
+      "notes": "route_1 is the second alternative of the Hero prerequisite: three mastered advanced vocations and the Trial of the Hero. Neither Champion nor Archmage is unlocked."
+    },
+    {
+      "id": "CE-07",
+      "title": "Hero capstone lineage route",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "hero",
+              "discovery_state": "discovered"
+            }
+          ],
+          "items": [],
+          "quests_completed": []
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "archmage",
+            "revision": 44,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian",
+              "duelist",
+              "arcanist",
+              "shadowbinder",
+              "champion",
+              "archmage"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "apprentice",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "scout",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "duelist",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "arcanist",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "shadowbinder",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "champion",
+                "rank": 8,
+                "points": 35
+              },
+              {
+                "vocation_id": "archmage",
+                "rank": 8,
+                "points": 35
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "ClaimVocation",
+          "command_id": "cmd-ce07-1",
+          "state_revision": 44,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "hero",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 45,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout",
+                "guardian",
+                "duelist",
+                "arcanist",
+                "shadowbinder",
+                "champion",
+                "archmage",
+                "hero"
+              ],
+              "unlocks": [
+                {
+                  "vocation_id": "hero",
+                  "unlock_route_id": "route_0"
+                }
+              ],
+              "mastery": [
+                {
+                  "vocation_id": "hero",
+                  "rank": 1,
+                  "points": 0
+                }
+              ]
+            }
+          ],
+          "profile": {
+            "profile_id": "profile_demo",
+            "quests_completed": [],
+            "item_consumptions": []
+          }
+        },
+        "events": [
+          {
+            "type": "VocationClaimed",
+            "hero_id": "hero_001",
+            "vocation_id": "hero",
+            "route_id": "route_0",
+            "consumed_items": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "CE-08",
+      "title": "Hero cannot bypass all routes",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "hero",
+              "discovery_state": "discovered"
+            }
+          ],
+          "items": [],
+          "quests_completed": []
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "archmage",
+            "revision": 40,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian",
+              "duelist",
+              "arcanist",
+              "shadowbinder",
+              "champion",
+              "archmage"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "apprentice",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "scout",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "duelist",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "arcanist",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "shadowbinder",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "champion",
+                "rank": 8,
+                "points": 35
+              },
+              {
+                "vocation_id": "archmage",
+                "rank": 7,
+                "points": 27
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "ClaimVocation",
+          "command_id": "cmd-ce08-1",
+          "state_revision": 40,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "hero",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "rejected",
+        "error_code": "PREREQUISITE_UNMET",
+        "error_details": {
+          "routes": [
+            {
+              "route_id": "route_0",
+              "unmet": [
+                {
+                  "op": "MASTERY_AT_LEAST",
+                  "vocation_id": "archmage",
+                  "rank": 8,
+                  "current_rank": 7
+                }
+              ]
+            },
+            {
+              "route_id": "route_1",
+              "unmet": [
+                {
+                  "op": "QUEST_COMPLETE",
+                  "quest_id": "trial_of_the_hero"
+                }
+              ]
+            }
+          ]
+        },
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 40,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout",
+                "guardian",
+                "duelist",
+                "arcanist",
+                "shadowbinder",
+                "champion",
+                "archmage"
+              ]
+            }
+          ],
+          "processed_commands": []
+        },
+        "events": []
+      },
+      "notes": "v0.1 said 'two advanced rank 8' together with Archmage at rank 7. Archmage cannot be unlocked without mastering Arcanist and Shadowbinder, so this state has four mastered advanced vocations; the second route still fails because the Trial is not complete."
+    },
+    {
+      "id": "CE-09",
+      "title": "Hidden UI state no leakage",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "trickster",
+              "discovery_state": "hidden",
+              "clue_count": 0
+            },
+            {
+              "vocation_id": "dragon_knight",
+              "discovery_state": "hidden",
+              "clue_count": 0
+            }
+          ]
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "squire",
+            "revision": 0,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 1,
+                "points": 0
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "event": {
+          "type": "BuildCareerTreeView",
+          "profile_id": "profile_demo",
+          "hero_id": "hero_001"
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "view_model": {
+            "career_tree": {
+              "listed_vocation_ids": [
+                "squire",
+                "apprentice",
+                "scout",
+                "guardian",
+                "duelist",
+                "arcanist",
+                "spellblade",
+                "shadowbinder",
+                "ranger",
+                "champion",
+                "archmage",
+                "hero"
+              ],
+              "absent_vocation_ids": [
+                "trickster",
+                "dragon_knight"
+              ],
+              "forbidden_strings": [
+                "trickster",
+                "Trickster",
+                "jester_mask",
+                "crooked_mirror",
+                "A crooked reflection hides an unlikely profession."
+              ]
+            }
+          }
+        }
+      },
+      "needs_design_decision": "The career-tree view model does not exist yet: its shape, and whether a hidden secret vocation shows as an anonymous placeholder or not at all, must be decided."
+    },
+    {
+      "id": "CE-10",
+      "title": "Secret clue progression",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "trickster",
+              "discovery_state": "hidden",
+              "clue_count": 0
+            }
+          ]
+        }
+      },
+      "when": {
+        "event": {
+          "type": "ApplyDiscoverySignal",
+          "profile_id": "profile_demo",
+          "signal": "item_found:jester_mask"
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "profile": {
+            "profile_id": "profile_demo",
+            "discovery": [
+              {
+                "vocation_id": "trickster",
+                "discovery_state": "discovered",
+                "clue_count": 1
+              }
+            ]
+          }
+        },
+        "events": [
+          {
+            "type": "DiscoveryChanged",
+            "vocation_id": "trickster",
+            "from": "hidden",
+            "to": "discovered",
+            "signal": "item_found:jester_mask"
+          }
+        ]
+      },
+      "needs_design_decision": "Whether discovery only moves forward (a later 'hinted' signal must not downgrade 'discovered') and what clue_count counts; the fixture follows the catalog's signal_to_state map and counts one per distinct signal.",
+      "notes": "The other authored signal, quest_hint:crooked_mirror, leads to 'hinted': the clue text is shown and the prerequisite stays hidden."
+    },
+    {
+      "id": "CE-11",
+      "title": "Item claim atomicity",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "dragon_knight",
+              "discovery_state": "discovered"
+            }
+          ],
+          "items": [
+            {
+              "item_id": "drake_scale",
+              "quantity": 1
+            }
+          ],
+          "item_consumptions": []
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "revision": 9,
+            "eligibility_state": "eligible",
+            "active_vocation_id": "spellblade",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "spellblade"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "apprentice",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "spellblade",
+                "rank": 8,
+                "points": 24
+              }
+            ]
+          }
+        ],
+        "run": null,
+        "processed_commands": []
+      },
+      "when": {
+        "command": {
+          "type": "ClaimVocation",
+          "command_id": "cmd-ce11-1",
+          "state_revision": 9,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "dragon_knight",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "profile": {
+            "profile_id": "profile_demo",
+            "items": [
+              {
+                "item_id": "drake_scale",
+                "quantity": 0
+              }
+            ],
+            "item_consumptions": [
+              {
+                "hero_id": "hero_001",
+                "item_id": "drake_scale",
+                "quantity": 1,
+                "claim_event": "events[0]"
+              }
+            ]
+          },
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 10,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout",
+                "spellblade",
+                "dragon_knight"
+              ],
+              "unlocks": [
+                {
+                  "vocation_id": "dragon_knight",
+                  "unlock_route_id": "route_0"
+                }
+              ],
+              "mastery": [
+                {
+                  "vocation_id": "dragon_knight",
+                  "rank": 1,
+                  "points": 0
+                }
+              ]
+            }
+          ],
+          "processed_commands": [
+            {
+              "command_id": "cmd-ce11-1",
+              "type": "ClaimVocation",
+              "result": "accepted"
+            }
+          ]
+        },
+        "events": [
+          {
+            "type": "VocationClaimed",
+            "hero_id": "hero_001",
+            "vocation_id": "dragon_knight",
+            "route_id": "route_0",
+            "consumed_items": [
+              {
+                "item_id": "drake_scale",
+                "quantity": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "CE-12",
+      "title": "Item missing blocks claim",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "dragon_knight",
+              "discovery_state": "discovered"
+            }
+          ],
+          "items": [
+            {
+              "item_id": "drake_scale",
+              "quantity": 0
+            }
+          ],
+          "item_consumptions": []
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "revision": 9,
+            "eligibility_state": "eligible",
+            "active_vocation_id": "spellblade",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "spellblade"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "apprentice",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "spellblade",
+                "rank": 8,
+                "points": 24
+              }
+            ]
+          }
+        ],
+        "run": null,
+        "processed_commands": []
+      },
+      "when": {
+        "command": {
+          "type": "ClaimVocation",
+          "command_id": "cmd-ce12-1",
+          "state_revision": 9,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "dragon_knight",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "rejected",
+        "error_code": "ITEM_INSUFFICIENT",
+        "error_details": {
+          "item_id": "drake_scale",
+          "quantity_required": 1,
+          "quantity_held": 0
+        },
+        "state": {
+          "profile": {
+            "profile_id": "profile_demo",
+            "items": [
+              {
+                "item_id": "drake_scale",
+                "quantity": 0
+              }
+            ],
+            "item_consumptions": []
+          },
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 9,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout",
+                "spellblade"
+              ]
+            }
+          ],
+          "processed_commands": []
+        },
+        "events": []
+      }
+    },
+    {
+      "id": "CE-13",
+      "title": "Other heroes require own tokens",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "dragon_knight",
+              "discovery_state": "discovered"
+            }
+          ],
+          "items": [
+            {
+              "item_id": "drake_scale",
+              "quantity": 0
+            }
+          ],
+          "item_consumptions": [
+            {
+              "hero_id": "hero_001",
+              "item_id": "drake_scale",
+              "quantity": 1,
+              "claim_event": "profile_demo:7"
+            }
+          ]
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "revision": 10,
+            "eligibility_state": "eligible",
+            "active_vocation_id": "spellblade",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "spellblade",
+              "dragon_knight"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "apprentice",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "spellblade",
+                "rank": 8,
+                "points": 24
+              }
+            ]
+          },
+          {
+            "hero_id": "hero_002",
+            "revision": 4,
+            "eligibility_state": "eligible",
+            "active_vocation_id": "spellblade",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "spellblade"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "apprentice",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "spellblade",
+                "rank": 8,
+                "points": 24
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "ClaimVocation",
+          "command_id": "cmd-ce13-1",
+          "state_revision": 4,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_002",
+            "target_vocation_id": "dragon_knight",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "rejected",
+        "error_code": "ITEM_INSUFFICIENT",
+        "error_details": {
+          "item_id": "drake_scale",
+          "quantity_required": 1,
+          "quantity_held": 0
+        },
+        "state": {
+          "profile": {
+            "profile_id": "profile_demo",
+            "items": [
+              {
+                "item_id": "drake_scale",
+                "quantity": 0
+              }
+            ],
+            "item_consumptions": [
+              {
+                "hero_id": "hero_001",
+                "item_id": "drake_scale",
+                "quantity": 1,
+                "claim_event": "profile_demo:7"
+              }
+            ]
+          },
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 10,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout",
+                "spellblade",
+                "dragon_knight"
+              ]
+            },
+            {
+              "hero_id": "hero_002",
+              "revision": 4,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout",
+                "spellblade"
+              ]
+            }
+          ]
+        },
+        "events": []
+      },
+      "notes": "Discovery is shared by the profile; the token is paid per hero."
+    },
+    {
+      "id": "CE-14",
+      "title": "Cheapest satisfied OR route",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "trickster",
+              "discovery_state": "discovered"
+            }
+          ],
+          "items": [
+            {
+              "item_id": "jester_mask",
+              "quantity": 1
+            }
+          ],
+          "item_consumptions": [],
+          "quests_completed": [
+            {
+              "quest_id": "crooked_mirror",
+              "qualifier_scope": "profile",
+              "qualifier_id": "profile_demo"
+            }
+          ]
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "scout",
+            "revision": 6,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "scout",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "apprentice",
+                "rank": 8,
+                "points": 14
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "ClaimVocation",
+          "command_id": "cmd-ce14-1",
+          "state_revision": 6,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "trickster",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "profile": {
+            "profile_id": "profile_demo",
+            "items": [
+              {
+                "item_id": "jester_mask",
+                "quantity": 1
+              }
+            ],
+            "item_consumptions": []
+          },
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 7,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout",
+                "trickster"
+              ],
+              "unlocks": [
+                {
+                  "vocation_id": "trickster",
+                  "unlock_route_id": "route_0"
+                }
+              ]
+            }
+          ]
+        },
+        "events": [
+          {
+            "type": "VocationClaimed",
+            "hero_id": "hero_001",
+            "vocation_id": "trickster",
+            "route_id": "route_0",
+            "consumed_items": []
+          }
+        ]
+      },
+      "notes": "Both routes are satisfied. route_0 (Scout mastered and Crooked Mirror complete) consumes nothing, so it is chosen before route_1 (Apprentice mastered and one jester_mask)."
+    },
+    {
+      "id": "CE-15",
+      "title": "Retain cross-vocation rank",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "active_vocation_id": "squire",
+            "revision": 5,
+            "eligibility_state": "eligible",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 1,
+                "points": 0
+              }
+            ]
+          }
+        ],
+        "run": null,
+        "history": [
+          {
+            "command": {
+              "type": "ChangeVocation",
+              "command_id": "cmd-ce15-1",
+              "state_revision": 5,
+              "params": {
+                "profile_id": "profile_demo",
+                "hero_id": "hero_001",
+                "target_vocation_id": "guardian",
+                "catalog_version": "1.3.1"
+              }
+            },
+            "outcome": "accepted",
+            "state_after": {
+              "heroes": [
+                {
+                  "hero_id": "hero_001",
+                  "active_vocation_id": "guardian",
+                  "revision": 6,
+                  "mastery": [
+                    {
+                      "vocation_id": "squire",
+                      "rank": 8,
+                      "points": 14
+                    },
+                    {
+                      "vocation_id": "guardian",
+                      "rank": 1,
+                      "points": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "when": {
+        "command": {
+          "type": "ChangeVocation",
+          "command_id": "cmd-ce15-2",
+          "state_revision": 6,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "squire",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "active_vocation_id": "squire",
+              "revision": 7,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout",
+                "guardian"
+              ],
+              "mastery": [
+                {
+                  "vocation_id": "squire",
+                  "rank": 8,
+                  "points": 14
+                },
+                {
+                  "vocation_id": "guardian",
+                  "rank": 1,
+                  "points": 0
+                }
+              ]
+            }
+          ]
+        },
+        "events": [
+          {
+            "type": "VocationChanged",
+            "hero_id": "hero_001",
+            "from": "guardian",
+            "to": "squire"
+          }
+        ]
+      },
+      "notes": "No run is active, which is the v0.1 phase PARTY_SETUP. Mastery is never reset or halved by a switch."
+    },
+    {
+      "id": "CE-16",
+      "title": "Battle-time switch illegal",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "active_vocation_id": "squire",
+            "revision": 5,
+            "eligibility_state": "eligible",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              }
+            ],
+            "combat": {
+              "hp": 9,
+              "max_hp": 15,
+              "state": "standing"
+            }
+          }
+        ],
+        "run": {
+          "run_id": "run_0001",
+          "phase": "battle",
+          "revision": 41
+        }
+      },
+      "when": {
+        "command": {
+          "type": "ChangeVocation",
+          "command_id": "cmd-ce16-1",
+          "state_revision": 5,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "guardian",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "rejected",
+        "error_code": "PHASE_LOCKED",
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "active_vocation_id": "squire",
+              "revision": 5
+            }
+          ],
+          "run": {
+            "run_id": "run_0001",
+            "phase": "battle",
+            "revision": 41
+          },
+          "processed_commands": []
+        },
+        "unchanged": [
+          "run.action_gauges",
+          "run.rolled_dice",
+          "run.rng_streams",
+          "heroes.dice",
+          "heroes.equipped_skills"
+        ],
+        "events": []
+      },
+      "notes": "v0.1 'phase=combat' is the engine phase 'battle'."
+    },
+    {
+      "id": "CE-17",
+      "title": "One active vocation only",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "guardian",
+            "revision": 8,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian",
+              "duelist"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "scout",
+                "rank": 8,
+                "points": 14
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "ChangeVocation",
+          "command_id": "cmd-ce17-1",
+          "state_revision": 8,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "duelist",
+            "catalog_version": "1.3.1",
+            "vocation_slot": "secondary"
+          }
+        }
+      },
+      "then": {
+        "result": "rejected",
+        "error_code": "UNSUPPORTED_SECONDARY_VOCATION",
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "active_vocation_id": "guardian",
+              "revision": 8
+            }
+          ],
+          "processed_commands": []
+        },
+        "events": []
+      },
+      "notes": "Duelist is unlocked for this hero, so the only reason for the rejection is the second slot."
+    },
+    {
+      "id": "CE-18",
+      "title": "New class dice eligibility",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "active_vocation_id": "squire",
+            "revision": 5,
+            "eligibility_state": "eligible",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 1,
+                "points": 0
+              }
+            ],
+            "dice": [
+              {
+                "die_instance_id": "hero_001-iron_d6-1",
+                "definition_id": "iron_d6",
+                "location": "equipped",
+                "slot_index": 0
+              },
+              {
+                "die_instance_id": "hero_001-oath_d4-1",
+                "definition_id": "oath_d4",
+                "location": "equipped",
+                "slot_index": 1
+              },
+              {
+                "die_instance_id": "hero_001-guardian_d6-1",
+                "definition_id": "guardian_d6",
+                "location": "bench"
+              },
+              {
+                "die_instance_id": "hero_001-guardian_d4-1",
+                "definition_id": "guardian_d4",
+                "location": "bench"
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "ChangeVocation",
+          "command_id": "cmd-ce18-1",
+          "state_revision": 5,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "guardian",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "active_vocation_id": "guardian",
+              "revision": 6,
+              "dice": [
+                {
+                  "die_instance_id": "hero_001-iron_d6-1",
+                  "definition_id": "iron_d6",
+                  "location": "bench"
+                },
+                {
+                  "die_instance_id": "hero_001-oath_d4-1",
+                  "definition_id": "oath_d4",
+                  "location": "bench"
+                },
+                {
+                  "die_instance_id": "hero_001-guardian_d6-1",
+                  "definition_id": "guardian_d6",
+                  "location": "equipped",
+                  "slot_index": 0
+                },
+                {
+                  "die_instance_id": "hero_001-guardian_d4-1",
+                  "definition_id": "guardian_d4",
+                  "location": "equipped",
+                  "slot_index": 1
+                }
+              ],
+              "owned_dice_count": 4
+            }
+          ]
+        },
+        "events": [
+          {
+            "type": "VocationChanged",
+            "hero_id": "hero_001",
+            "from": "squire",
+            "to": "guardian",
+            "displaced_dice_ids": [
+              "hero_001-iron_d6-1",
+              "hero_001-oath_d4-1"
+            ]
+          }
+        ]
+      },
+      "needs_design_decision": "Die compatibility is not defined beyond the per-die affinity_tags of the catalog; the fixture assumes a die fits only a vocation named in its tags, which sends both Squire dice to the bench."
+    },
+    {
+      "id": "CE-19",
+      "title": "Legacy mandatory upgrade stays equipped",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "active_vocation_id": "squire",
+            "revision": 5,
+            "eligibility_state": "eligible",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 1,
+                "points": 0
+              }
+            ],
+            "dice": [
+              {
+                "die_instance_id": "hero_001-iron_d6-1",
+                "definition_id": "iron_d6",
+                "location": "equipped",
+                "slot_index": 0
+              },
+              {
+                "die_instance_id": "hero_001-oath_d4-1",
+                "definition_id": "oath_d4",
+                "location": "equipped",
+                "slot_index": 1
+              },
+              {
+                "die_instance_id": "hero_001-guardian_d6-1",
+                "definition_id": "guardian_d6",
+                "location": "bench"
+              },
+              {
+                "die_instance_id": "hero_001-guardian_d4-1",
+                "definition_id": "guardian_d4",
+                "location": "bench"
+              }
+            ]
+          }
+        ],
+        "run": {
+          "run_id": "run_0001",
+          "phase": "upgrade",
+          "revision": 300
+        },
+        "run_die_upgrades": [],
+        "history": [
+          {
+            "command": {
+              "type": "ChangeVocation",
+              "command_id": "cmd-ce19-1",
+              "state_revision": 5,
+              "params": {
+                "profile_id": "profile_demo",
+                "hero_id": "hero_001",
+                "target_vocation_id": "guardian",
+                "catalog_version": "1.3.1"
+              }
+            },
+            "outcome": "accepted",
+            "state_after": {
+              "heroes": [
+                {
+                  "hero_id": "hero_001",
+                  "active_vocation_id": "guardian",
+                  "revision": 6,
+                  "dice": [
+                    {
+                      "die_instance_id": "hero_001-iron_d6-1",
+                      "definition_id": "iron_d6",
+                      "location": "bench"
+                    },
+                    {
+                      "die_instance_id": "hero_001-oath_d4-1",
+                      "definition_id": "oath_d4",
+                      "location": "bench"
+                    },
+                    {
+                      "die_instance_id": "hero_001-guardian_d6-1",
+                      "definition_id": "guardian_d6",
+                      "location": "equipped",
+                      "slot_index": 0
+                    },
+                    {
+                      "die_instance_id": "hero_001-guardian_d4-1",
+                      "definition_id": "guardian_d4",
+                      "location": "equipped",
+                      "slot_index": 1
+                    }
+                  ]
+                }
+              ],
+              "run": {
+                "run_id": "run_0001",
+                "phase": "upgrade"
+              }
+            }
+          }
+        ]
+      },
+      "when": {
+        "command": {
+          "type": "ChooseUpgrade",
+          "command_id": "cmd-ce19-2",
+          "state_revision": 300,
+          "params": {
+            "hero_id": "hero_001",
+            "die_id": "hero_001-guardian_d6-1",
+            "offer_id": "hero_001:hero_001-guardian_d6-1:1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "run": {
+            "run_id": "run_0001",
+            "phase": "equipment"
+          },
+          "run_die_upgrades": [
+            {
+              "run_id": "run_0001",
+              "hero_id": "hero_001",
+              "die_instance_id": "hero_001-guardian_d6-1",
+              "permanent": false
+            }
+          ],
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "active_vocation_id": "guardian",
+              "dice": [
+                {
+                  "die_instance_id": "hero_001-guardian_d6-1",
+                  "definition_id": "guardian_d6",
+                  "location": "equipped",
+                  "slot_index": 0,
+                  "swap_locked": true
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "needs_design_decision": "Whether ChangeVocation is legal in the engine phase 'upgrade' (before the mandatory upgrade), in 'equipment' (after it) or both; the fixture assumes 'upgrade' only, following the v0.1 order recovery, switch, upgrade, swap.",
+      "notes": "ChooseUpgrade, its parameters and the offer id format are the shipped ones. The shipped engine already moves to 'equipment' after the upgrade and refuses to swap out the upgraded die."
+    },
+    {
+      "id": "CE-20",
+      "title": "One mastery base per eligible victory",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "active_vocation_id": "guardian",
+            "revision": 6,
+            "eligibility_state": "eligible",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 1,
+                "points": 0
+              }
+            ]
+          }
+        ],
+        "run": {
+          "run_id": "run_0001",
+          "phase": "upgrade",
+          "revision": 300
+        },
+        "encounter": {
+          "encounter_id": "training_02",
+          "threat_rating": 2,
+          "mastery_eligible": true,
+          "outcome": "victory"
+        },
+        "mastery_award_events": []
+      },
+      "when": {
+        "event": {
+          "type": "AwardEncounterMastery",
+          "run_id": "run_0001",
+          "encounter_id": "training_02",
+          "hero_id": "hero_001",
+          "vocation_id": "guardian",
+          "deployed_at_encounter_start": true,
+          "challenge_id": "prevent_3_damage",
+          "challenge_evidence_count": 0
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "mastery_award_events": [
+            {
+              "run_id": "run_0001",
+              "encounter_id": "training_02",
+              "hero_id": "hero_001",
+              "vocation_id": "guardian",
+              "base_points": 1,
+              "challenge_points": 0,
+              "threat_rating": 2,
+              "denial_reason": null
+            }
+          ],
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "mastery": [
+                {
+                  "vocation_id": "guardian",
+                  "rank": 1,
+                  "points": 1
+                }
+              ]
+            }
+          ]
+        },
+        "events": [
+          {
+            "type": "MasteryAwarded",
+            "hero_id": "hero_001",
+            "vocation_id": "guardian",
+            "base_points": 1,
+            "challenge_points": 0,
+            "points_after": 1,
+            "rank_after": 1
+          }
+        ]
+      },
+      "notes": "Guardian at rank 1 needs threat 2; rank 2 starts at 2 points."
+    },
+    {
+      "id": "CE-21",
+      "title": "Rank advances after bonus",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "squire",
+            "revision": 0,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 1,
+                "points": 0
+              }
+            ]
+          }
+        ],
+        "run": {
+          "run_id": "run_0001",
+          "phase": "upgrade",
+          "revision": 300
+        },
+        "encounter": {
+          "encounter_id": "training_01",
+          "threat_rating": 1,
+          "mastery_eligible": true,
+          "outcome": "victory"
+        },
+        "mastery_award_events": []
+      },
+      "when": {
+        "event": {
+          "type": "AwardEncounterMastery",
+          "run_id": "run_0001",
+          "encounter_id": "training_01",
+          "hero_id": "hero_001",
+          "vocation_id": "squire",
+          "deployed_at_encounter_start": true,
+          "challenge_id": "protect_ally",
+          "challenge_evidence_count": 1
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "mastery_award_events": [
+            {
+              "run_id": "run_0001",
+              "encounter_id": "training_01",
+              "hero_id": "hero_001",
+              "vocation_id": "squire",
+              "base_points": 1,
+              "challenge_points": 1,
+              "threat_rating": 1,
+              "denial_reason": null
+            }
+          ],
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "mastery": [
+                {
+                  "vocation_id": "squire",
+                  "rank": 3,
+                  "points": 2
+                }
+              ]
+            }
+          ]
+        },
+        "events": [
+          {
+            "type": "MasteryAwarded",
+            "hero_id": "hero_001",
+            "vocation_id": "squire",
+            "base_points": 1,
+            "challenge_points": 1,
+            "points_after": 2,
+            "rank_after": 3
+          }
+        ]
+      },
+      "notes": "The Squire challenge protect_ally was met once."
+    },
+    {
+      "id": "CE-22",
+      "title": "Challenge spam does not farm",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "squire",
+            "revision": 0,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 1,
+                "points": 0
+              }
+            ]
+          }
+        ],
+        "run": {
+          "run_id": "run_0001",
+          "phase": "upgrade",
+          "revision": 300
+        },
+        "encounter": {
+          "encounter_id": "training_01",
+          "threat_rating": 1,
+          "mastery_eligible": true,
+          "outcome": "victory"
+        },
+        "mastery_award_events": []
+      },
+      "when": {
+        "event": {
+          "type": "AwardEncounterMastery",
+          "run_id": "run_0001",
+          "encounter_id": "training_01",
+          "hero_id": "hero_001",
+          "vocation_id": "squire",
+          "deployed_at_encounter_start": true,
+          "challenge_id": "protect_ally",
+          "challenge_evidence_count": 8
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "mastery_award_events": [
+            {
+              "run_id": "run_0001",
+              "encounter_id": "training_01",
+              "hero_id": "hero_001",
+              "vocation_id": "squire",
+              "base_points": 1,
+              "challenge_points": 1,
+              "threat_rating": 1,
+              "denial_reason": null
+            }
+          ],
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "mastery": [
+                {
+                  "vocation_id": "squire",
+                  "rank": 3,
+                  "points": 2
+                }
+              ]
+            }
+          ]
+        },
+        "events": [
+          {
+            "type": "MasteryAwarded",
+            "hero_id": "hero_001",
+            "vocation_id": "squire",
+            "base_points": 1,
+            "challenge_points": 1,
+            "points_after": 2,
+            "rank_after": 3
+          }
+        ]
+      },
+      "notes": "protect_ally was met eight times in the encounter; the bonus is still one point and the total two."
+    },
+    {
+      "id": "CE-23",
+      "title": "Threat cap gives exactly zero",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "revision": 60,
+            "eligibility_state": "eligible",
+            "active_vocation_id": "champion",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian",
+              "duelist",
+              "champion"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "scout",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "duelist",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "champion",
+                "rank": 7,
+                "points": 27
+              }
+            ]
+          }
+        ],
+        "run": {
+          "run_id": "run_0001",
+          "phase": "upgrade",
+          "revision": 300
+        },
+        "encounter": {
+          "encounter_id": "training_03",
+          "threat_rating": 3,
+          "mastery_eligible": true,
+          "outcome": "victory"
+        },
+        "mastery_award_events": []
+      },
+      "when": {
+        "event": {
+          "type": "AwardEncounterMastery",
+          "run_id": "run_0001",
+          "encounter_id": "training_03",
+          "hero_id": "hero_001",
+          "vocation_id": "champion",
+          "deployed_at_encounter_start": true,
+          "challenge_id": "block_and_counter",
+          "challenge_evidence_count": 1
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "mastery_award_events": [
+            {
+              "run_id": "run_0001",
+              "encounter_id": "training_03",
+              "hero_id": "hero_001",
+              "vocation_id": "champion",
+              "base_points": 0,
+              "challenge_points": 0,
+              "threat_rating": 3,
+              "denial_reason": "UNDER_THREAT_CAP"
+            }
+          ],
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "mastery": [
+                {
+                  "vocation_id": "champion",
+                  "rank": 7,
+                  "points": 27
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "notes": "Champion at rank 7 needs threat 5; the encounter has 3. The challenge was met and still earns nothing."
+    },
+    {
+      "id": "CE-24",
+      "title": "No mastery on defeat or flee",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "squire",
+            "revision": 0,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 2,
+                "points": 1
+              }
+            ]
+          }
+        ],
+        "run": {
+          "run_id": "run_0001",
+          "phase": "defeat",
+          "revision": 280
+        },
+        "encounter": {
+          "encounter_id": "training_01",
+          "threat_rating": 1,
+          "mastery_eligible": true,
+          "outcome": "defeat"
+        },
+        "mastery_award_events": []
+      },
+      "when": {
+        "event": {
+          "type": "AwardEncounterMastery",
+          "run_id": "run_0001",
+          "encounter_id": "training_01",
+          "hero_id": "hero_001",
+          "vocation_id": "squire",
+          "deployed_at_encounter_start": true,
+          "challenge_id": "protect_ally",
+          "challenge_evidence_count": 1
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "mastery_award_events": [
+            {
+              "run_id": "run_0001",
+              "encounter_id": "training_01",
+              "hero_id": "hero_001",
+              "vocation_id": "squire",
+              "base_points": 0,
+              "challenge_points": 0,
+              "threat_rating": 1,
+              "denial_reason": "ENCOUNTER_NOT_WON"
+            }
+          ],
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "mastery": [
+                {
+                  "vocation_id": "squire",
+                  "rank": 2,
+                  "points": 1
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "needs_design_decision": "v0.1 names no denial reason for a lost encounter and the shipped engine has no flee outcome; the fixture proposes ENCOUNTER_NOT_WON for a defeat and leaves flee out until such an outcome exists."
+    },
+    {
+      "id": "CE-25",
+      "title": "Earlier victory persists after later loss",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "guardian",
+              "discovery_state": "discovered"
+            }
+          ]
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "squire",
+            "revision": 0,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 1,
+                "points": 0
+              }
+            ],
+            "dice": [
+              {
+                "die_instance_id": "hero_001-iron_d6-1",
+                "definition_id": "iron_d6",
+                "location": "equipped",
+                "slot_index": 0
+              },
+              {
+                "die_instance_id": "hero_001-oath_d4-1",
+                "definition_id": "oath_d4",
+                "location": "equipped",
+                "slot_index": 1
+              }
+            ]
+          }
+        ],
+        "run": {
+          "run_id": "run_0001",
+          "phase": "battle",
+          "revision": 520
+        },
+        "run_die_upgrades": [
+          {
+            "run_id": "run_0001",
+            "hero_id": "hero_001",
+            "die_instance_id": "hero_001-iron_d6-1",
+            "permanent": false
+          }
+        ],
+        "history": [
+          {
+            "event": {
+              "type": "AwardEncounterMastery",
+              "run_id": "run_0001",
+              "encounter_id": "training_01",
+              "hero_id": "hero_001",
+              "vocation_id": "squire",
+              "deployed_at_encounter_start": true,
+              "challenge_id": "protect_ally",
+              "challenge_evidence_count": 1
+            },
+            "outcome": "accepted",
+            "state_after": {
+              "heroes": [
+                {
+                  "hero_id": "hero_001",
+                  "mastery": [
+                    {
+                      "vocation_id": "squire",
+                      "rank": 3,
+                      "points": 2
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "when": {
+        "event": {
+          "type": "RunEnded",
+          "run_id": "run_0001",
+          "outcome": "defeat"
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "run": {
+            "run_id": "run_0001",
+            "phase": "defeat",
+            "completed": true
+          },
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "mastery": [
+                {
+                  "vocation_id": "squire",
+                  "rank": 3,
+                  "points": 2
+                }
+              ],
+              "dice": [
+                {
+                  "die_instance_id": "hero_001-iron_d6-1",
+                  "definition_id": "iron_d6",
+                  "location": "equipped",
+                  "slot_index": 0,
+                  "run_upgrade_applies": false
+                }
+              ]
+            }
+          ],
+          "run_die_upgrades": [
+            {
+              "run_id": "run_0001",
+              "hero_id": "hero_001",
+              "die_instance_id": "hero_001-iron_d6-1",
+              "permanent": false
+            }
+          ],
+          "profile": {
+            "profile_id": "profile_demo",
+            "discovery": [
+              {
+                "vocation_id": "guardian",
+                "discovery_state": "discovered"
+              }
+            ]
+          }
+        }
+      },
+      "needs_design_decision": "Whether 'run-only upgrade removed' means the run_die_upgrade rows are deleted at run end or kept as history and no longer applied; the fixture assumes they are kept and stop applying once the run is complete."
+    },
+    {
+      "id": "CE-26",
+      "title": "Mastery bonus caps",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "squire",
+            "revision": 12,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian",
+              "arcanist"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "apprentice",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "arcanist",
+                "rank": 8,
+                "points": 24
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "PreviewVocation",
+          "command_id": "cmd-ce26-1",
+          "state_revision": 12,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "squire",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "preview": {
+            "target_vocation_id": "squire",
+            "unlocked_for_hero": true,
+            "requested_stat_bonus": {
+              "max_hp": 2,
+              "max_mana": 2,
+              "speed": 0
+            },
+            "permanent_stat_bonus": {
+              "max_hp": 2,
+              "max_mana": 1,
+              "speed": 0
+            },
+            "effective_stats": {
+              "max_hp": 16,
+              "max_mana": 4,
+              "speed": 7,
+              "base_initiative": 5,
+              "max_corruption": 6
+            }
+          },
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 12
+            }
+          ]
+        },
+        "events": []
+      },
+      "notes": "Squire base stats are the shipped 1.3.1 values: 14 HP, 3 mana, 7 speed, initiative 5. Squire and Guardian each give +1 HP, Apprentice and Arcanist each ask for +1 mana; the mana cap is 1."
+    },
+    {
+      "id": "CE-27",
+      "title": "Budget reject atomicity",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "spellblade",
+            "revision": 14,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian",
+              "spellblade"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "apprentice",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "scout",
+                "rank": 4,
+                "points": 3
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "spellblade",
+                "rank": 1,
+                "points": 0
+              }
+            ],
+            "learned_skills": [
+              "squire_anchor",
+              "apprentice_focus",
+              "scout_marksman",
+              "guardian_field_medic"
+            ],
+            "equipped_skills": [
+              {
+                "slot_index": 0,
+                "skill_id": "squire_anchor"
+              },
+              {
+                "slot_index": 1,
+                "skill_id": "guardian_field_medic"
+              }
+            ],
+            "inheritance_capacity_max": 4,
+            "inheritance_capacity_used": 4,
+            "dice": [
+              {
+                "die_instance_id": "hero_001-spellblade_d6-1",
+                "definition_id": "spellblade_d6",
+                "location": "equipped",
+                "slot_index": 0
+              },
+              {
+                "die_instance_id": "hero_001-spellblade_d4-1",
+                "definition_id": "spellblade_d4",
+                "location": "equipped",
+                "slot_index": 1
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "EquipInheritedSkill",
+          "command_id": "cmd-ce27-1",
+          "state_revision": 14,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "skill_id": "scout_marksman",
+            "slot_index": 2,
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "rejected",
+        "error_code": "CAPACITY_EXCEEDED",
+        "error_details": {
+          "capacity_max": 4,
+          "capacity_used": 4,
+          "capacity_requested": 6
+        },
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 14,
+              "equipped_skills": [
+                {
+                  "slot_index": 0,
+                  "skill_id": "squire_anchor"
+                },
+                {
+                  "slot_index": 1,
+                  "skill_id": "guardian_field_medic"
+                }
+              ],
+              "inheritance_capacity_used": 4
+            }
+          ],
+          "processed_commands": []
+        },
+        "events": []
+      },
+      "notes": "v0.1 placed this case on Guardian. Field Medic is Guardian's own skill and costs no capacity while Guardian is active (FDD 6.4), so the total there would be 3, not 6. Spellblade has the same capacity 4 and a Healing face for Field Medic."
+    },
+    {
+      "id": "CE-28",
+      "title": "Learned is not executable",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "duelist",
+            "revision": 22,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian",
+              "duelist"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "scout",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "duelist",
+                "rank": 1,
+                "points": 0
+              }
+            ],
+            "learned_skills": [
+              "squire_anchor",
+              "scout_marksman",
+              "guardian_field_medic"
+            ],
+            "equipped_skills": [],
+            "dice": [
+              {
+                "die_instance_id": "hero_001-duelist_d6-1",
+                "definition_id": "duelist_d6",
+                "location": "equipped",
+                "slot_index": 0
+              },
+              {
+                "die_instance_id": "hero_001-duelist_d4-1",
+                "definition_id": "duelist_d4",
+                "location": "equipped",
+                "slot_index": 1
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "EquipInheritedSkill",
+          "command_id": "cmd-ce28-1",
+          "state_revision": 22,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "skill_id": "guardian_field_medic",
+            "slot_index": 0,
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "rejected",
+        "error_code": "NO_LEGAL_FACE",
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 22,
+              "learned_skills": [
+                "squire_anchor",
+                "scout_marksman",
+                "guardian_field_medic"
+              ],
+              "equipped_skills": []
+            }
+          ]
+        },
+        "invariants": [
+          "The skill stays learned.",
+          "The hero has no Healing action in combat: the skill adds no face and no action."
+        ],
+        "events": []
+      },
+      "needs_design_decision": "Whether equipping a face-modifier skill with no eligible face is rejected with NO_LEGAL_FACE (assumed here) or accepted and shown as inert.",
+      "notes": "Neither Duelist die has a Healing face."
+    },
+    {
+      "id": "CE-29",
+      "title": "Insufficient mana is a trap not loss",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "catalog": {
+          "catalog_version": "1.3.1",
+          "overrides": [
+            {
+              "path": "vocations.champion.base_stats.max_mana",
+              "value": 0
+            }
+          ]
+        },
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "revision": 61,
+            "eligibility_state": "eligible",
+            "active_vocation_id": "champion",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian",
+              "duelist",
+              "champion"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "scout",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "duelist",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "champion",
+                "rank": 1,
+                "points": 0
+              }
+            ],
+            "learned_skills": [
+              "squire_anchor",
+              "scout_marksman",
+              "guardian_field_medic",
+              "duelist_footwork"
+            ],
+            "dice": [
+              {
+                "die_instance_id": "hero_001-champion_d8-1",
+                "definition_id": "champion_d8",
+                "location": "equipped",
+                "slot_index": 0
+              },
+              {
+                "die_instance_id": "hero_001-champion_d6-1",
+                "definition_id": "champion_d6",
+                "location": "equipped",
+                "slot_index": 1
+              }
+            ],
+            "equipped_skills": [
+              {
+                "slot_index": 0,
+                "skill_id": "guardian_field_medic"
+              }
+            ],
+            "combat": {
+              "mana": 0,
+              "max_mana": 0,
+              "state": "standing",
+              "rolled_faces": [
+                {
+                  "die_instance_id": "hero_001-champion_d8-1",
+                  "face_index": 6,
+                  "action_id": "heal2"
+                }
+              ]
+            }
+          },
+          {
+            "hero_id": "hero_002",
+            "active_vocation_id": "scout",
+            "combat": {
+              "hp": 0,
+              "state": "downed"
+            }
+          }
+        ],
+        "run": {
+          "run_id": "run_0001",
+          "phase": "battle",
+          "revision": 77
+        }
+      },
+      "when": {
+        "command": {
+          "type": "SetActionPlan",
+          "command_id": "cmd-ce29-1",
+          "state_revision": 77,
+          "params": {
+            "actions": [
+              {
+                "die_id": "hero_001-champion_d8-1",
+                "target_ids": [
+                  "hero_002"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "then": {
+        "result": "rejected",
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "combat": {
+                "mana": 0,
+                "max_mana": 0
+              }
+            },
+            {
+              "hero_id": "hero_002",
+              "combat": {
+                "hp": 0,
+                "state": "downed"
+              }
+            }
+          ],
+          "face_options": [
+            {
+              "die_instance_id": "hero_001-champion_d8-1",
+              "face_index": 6,
+              "action_id": "heal2",
+              "visible": true,
+              "revive_option_enabled": false,
+              "disabled_reason": "insufficient_mana"
+            }
+          ],
+          "run": {
+            "run_id": "run_0001",
+            "phase": "battle",
+            "revision": 77
+          }
+        },
+        "invariants": [
+          "Mana never goes below zero.",
+          "The downed hero is not revived.",
+          "The skill stays learned and equipped."
+        ]
+      },
+      "needs_design_decision": "No authored vocation has max_mana 0 and the shipped engine rejects action plans with free text, not codes; the catalog override used here and the code or reason for a face that is disabled for lack of mana must be decided."
+    },
+    {
+      "id": "CE-30",
+      "title": "Revival tags are mandatory",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "revision": 61,
+            "eligibility_state": "eligible",
+            "active_vocation_id": "champion",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian",
+              "duelist",
+              "champion"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "scout",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "duelist",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "champion",
+                "rank": 1,
+                "points": 0
+              }
+            ],
+            "learned_skills": [
+              "squire_anchor",
+              "scout_marksman",
+              "guardian_field_medic",
+              "duelist_footwork"
+            ],
+            "dice": [
+              {
+                "die_instance_id": "hero_001-champion_d8-1",
+                "definition_id": "champion_d8",
+                "location": "equipped",
+                "slot_index": 0
+              },
+              {
+                "die_instance_id": "hero_001-champion_d6-1",
+                "definition_id": "champion_d6",
+                "location": "equipped",
+                "slot_index": 1
+              }
+            ],
+            "equipped_skills": [],
+            "combat": {
+              "state": "standing",
+              "rolled_faces": [
+                {
+                  "die_instance_id": "hero_001-champion_d8-1",
+                  "face_index": 6,
+                  "action_id": "heal2"
+                }
+              ]
+            }
+          },
+          {
+            "hero_id": "hero_002",
+            "active_vocation_id": "scout",
+            "combat": {
+              "hp": 0,
+              "state": "downed"
+            }
+          }
+        ],
+        "run": {
+          "run_id": "run_0001",
+          "phase": "battle",
+          "revision": 77
+        }
+      },
+      "when": {
+        "command": {
+          "type": "SetActionPlan",
+          "command_id": "cmd-ce30-1",
+          "state_revision": 77,
+          "params": {
+            "actions": [
+              {
+                "die_id": "hero_001-champion_d8-1",
+                "target_ids": [
+                  "hero_002"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "then": {
+        "result": "rejected",
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_002",
+              "combat": {
+                "hp": 0,
+                "state": "downed"
+              }
+            }
+          ],
+          "run": {
+            "run_id": "run_0001",
+            "phase": "battle",
+            "revision": 77
+          },
+          "revive_capable_action_ids": [
+            "sq_rally",
+            "ap_mend"
+          ]
+        },
+        "invariants": [
+          "Squire Rally and Apprentice Mend can still target a downed hero when their resource and target conditions are met."
+        ]
+      },
+      "needs_design_decision": "The shipped engine rejects an illegal action plan with free text and no code, so whether this rejection gets a registry code, and which, must be decided."
+    },
+    {
+      "id": "CE-31",
+      "title": "Reaction stages unchanged",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "eligibility_state": "eligible",
+            "active_vocation_id": "duelist",
+            "revision": 23,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "duelist"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "scout",
+                "rank": 8,
+                "points": 14
+              }
+            ],
+            "combat": {
+              "state": "standing"
+            }
+          }
+        ],
+        "run": {
+          "run_id": "run_0001",
+          "phase": "battle",
+          "revision": 90
+        },
+        "encounter": {
+          "encounter_id": "training_02",
+          "threat_rating": 2,
+          "intent": {
+            "intent_id": "intent_1",
+            "hostile": true,
+            "target_ids": [
+              "hero_001"
+            ]
+          }
+        }
+      },
+      "when": {
+        "event": {
+          "type": "ResolveReactionStages",
+          "run_id": "run_0001",
+          "intent_id": "intent_1"
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "reactions": {
+            "stage_order": [
+              "guard",
+              "resource",
+              "interrupt",
+              "enemy_resolution"
+            ],
+            "max_reactions_per_hero_per_intent": 1,
+            "nested_reaction_windows": 0
+          }
+        }
+      },
+      "needs_design_decision": "Duelist's native reaction (rx_duelist_parry, interrupt stage) is authored in the catalog only and has no engine effect yet, so the exact event list of this case cannot be pinned until that effect is defined."
+    },
+    {
+      "id": "CE-32",
+      "title": "Deterministic stream preservation",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "baseline": {
+          "rules_version": "1.1.1",
+          "content_version": "1.3.1",
+          "rng_algorithm": "BD-PCG32-v1",
+          "replay_pin": "tests/golden/replay_pin.json"
+        },
+        "recorded_session": {
+          "seed_decimal": "12345",
+          "includes": [
+            "ChangeVocation",
+            "StartRun",
+            "two encounters"
+          ],
+          "command_log": "to be recorded"
+        }
+      },
+      "when": {
+        "event": {
+          "type": "ReplayRecordedSession",
+          "times": 2
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "determinism": {
+            "progression_events_byte_identical": true,
+            "final_state_hash_identical": true,
+            "rng_draws_on_rejected_commands": 0
+          }
+        }
+      },
+      "needs_design_decision": "The recorded command sequence, the canonical encoding of progression events and the fields left out of every hash (wall-clock timestamps) must be fixed before this case can name expected hash values."
+    },
+    {
+      "id": "CE-33",
+      "title": "Idempotent claim and reward",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "dragon_knight",
+              "discovery_state": "discovered"
+            }
+          ],
+          "items": [
+            {
+              "item_id": "drake_scale",
+              "quantity": 0
+            }
+          ],
+          "item_consumptions": [
+            {
+              "hero_id": "hero_001",
+              "item_id": "drake_scale",
+              "quantity": 1,
+              "claim_event": "profile_demo:7"
+            }
+          ]
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "revision": 11,
+            "eligibility_state": "eligible",
+            "active_vocation_id": "dragon_knight",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "spellblade",
+              "dragon_knight"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "apprentice",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "spellblade",
+                "rank": 8,
+                "points": 24
+              },
+              {
+                "vocation_id": "dragon_knight",
+                "rank": 1,
+                "points": 1
+              }
+            ]
+          }
+        ],
+        "run": {
+          "run_id": "run_0001",
+          "phase": "upgrade",
+          "revision": 300
+        },
+        "encounter": {
+          "encounter_id": "training_04",
+          "threat_rating": 4,
+          "mastery_eligible": true,
+          "outcome": "victory"
+        },
+        "mastery_award_events": [
+          {
+            "run_id": "run_0001",
+            "encounter_id": "training_04",
+            "hero_id": "hero_001",
+            "vocation_id": "dragon_knight",
+            "base_points": 1,
+            "challenge_points": 0,
+            "threat_rating": 4,
+            "denial_reason": null
+          }
+        ],
+        "processed_commands": [
+          {
+            "command_id": "cmd-ce33-1",
+            "type": "ClaimVocation",
+            "result": "accepted"
+          }
+        ],
+        "history": [
+          {
+            "event": {
+              "type": "AwardEncounterMastery",
+              "run_id": "run_0001",
+              "encounter_id": "training_04",
+              "hero_id": "hero_001",
+              "vocation_id": "dragon_knight",
+              "deployed_at_encounter_start": true,
+              "challenge_id": "drake_burst",
+              "challenge_evidence_count": 0
+            },
+            "outcome": "accepted",
+            "duplicate": true,
+            "state_after": {
+              "mastery_award_events": [
+                {
+                  "run_id": "run_0001",
+                  "encounter_id": "training_04",
+                  "hero_id": "hero_001",
+                  "vocation_id": "dragon_knight",
+                  "base_points": 1,
+                  "challenge_points": 0,
+                  "threat_rating": 4,
+                  "denial_reason": null
+                }
+              ],
+              "heroes": [
+                {
+                  "hero_id": "hero_001",
+                  "revision": 11,
+                  "mastery": [
+                    {
+                      "vocation_id": "dragon_knight",
+                      "rank": 1,
+                      "points": 1
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "when": {
+        "command": {
+          "type": "ClaimVocation",
+          "command_id": "cmd-ce33-1",
+          "state_revision": 9,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "dragon_knight",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "duplicate": true,
+        "state": {
+          "profile": {
+            "profile_id": "profile_demo",
+            "items": [
+              {
+                "item_id": "drake_scale",
+                "quantity": 0
+              }
+            ],
+            "item_consumptions": [
+              {
+                "hero_id": "hero_001",
+                "item_id": "drake_scale",
+                "quantity": 1,
+                "claim_event": "profile_demo:7"
+              }
+            ]
+          },
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 11,
+              "mastery": [
+                {
+                  "vocation_id": "dragon_knight",
+                  "rank": 1,
+                  "points": 1
+                }
+              ]
+            }
+          ],
+          "mastery_award_events": [
+            {
+              "run_id": "run_0001",
+              "encounter_id": "training_04",
+              "hero_id": "hero_001",
+              "vocation_id": "dragon_knight",
+              "base_points": 1,
+              "challenge_points": 0,
+              "threat_rating": 4,
+              "denial_reason": null
+            }
+          ],
+          "processed_commands": [
+            {
+              "command_id": "cmd-ce33-1",
+              "type": "ClaimVocation",
+              "result": "accepted"
+            }
+          ]
+        },
+        "events": []
+      },
+      "notes": "cmd-ce33-1 was accepted when the hero's revision was 9. Sent again unchanged it returns the stored result; its old state_revision is not a conflict. The repeated award for the same run, encounter, hero and vocation is acknowledged in the same way."
+    },
+    {
+      "id": "CE-34",
+      "title": "Version mismatch recovery",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "catalog": {
+          "catalog_version": "1.3.1",
+          "installed": [
+            {
+              "catalog_version": "0.1.0-proposed",
+              "state": "retired",
+              "content_sha256": "c4890349aa5435bccd3c54884b45139b61f5c07b05986f9626150537556ad961"
+            },
+            {
+              "catalog_version": "1.3.1",
+              "state": "active"
+            }
+          ],
+          "migration_manifest": []
+        },
+        "profile": {
+          "profile_id": "profile_demo",
+          "catalog_version": "0.1.0-proposed"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "catalog_version": "0.1.0-proposed",
+            "active_vocation_id": "guardian",
+            "revision": 6,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 3,
+                "points": 5
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "event": {
+          "type": "LoadProfile",
+          "profile_id": "profile_demo"
+        }
+      },
+      "then": {
+        "result": "rejected",
+        "error_code": "CONTENT_MIGRATION_REQUIRED",
+        "error_details": {
+          "saved_catalog_version": "0.1.0-proposed",
+          "active_catalog_version": "1.3.1"
+        },
+        "state": {
+          "profile": {
+            "profile_id": "profile_demo",
+            "catalog_version": "0.1.0-proposed"
+          },
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "catalog_version": "0.1.0-proposed",
+              "active_vocation_id": "guardian",
+              "revision": 6,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout",
+                "guardian"
+              ],
+              "mastery": [
+                {
+                  "vocation_id": "squire",
+                  "rank": 8,
+                  "points": 14
+                },
+                {
+                  "vocation_id": "guardian",
+                  "rank": 3,
+                  "points": 5
+                }
+              ]
+            }
+          ]
+        },
+        "invariants": [
+          "No row of the save is changed or deleted.",
+          "No vocation is substituted for another."
+        ]
+      }
+    },
+    {
+      "id": "CE-35",
+      "title": "Party configuration unchanged",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "feature_gate": {
+          "class_evolution_v1": true
+        },
+        "party_matrix": [
+          [
+            "squire"
+          ],
+          [
+            "squire",
+            "squire"
+          ],
+          [
+            "scout",
+            "scout",
+            "apprentice"
+          ],
+          [
+            "squire",
+            "squire",
+            "apprentice",
+            "apprentice"
+          ],
+          [
+            "squire",
+            "squire",
+            "scout",
+            "scout",
+            "scout"
+          ]
+        ]
+      },
+      "when": {
+        "command": {
+          "type": "StartRun",
+          "command_id": "cmd-ce35-1",
+          "state_revision": 0,
+          "params": {
+            "seed": 12345,
+            "party": [
+              {
+                "class_id": "squire",
+                "row": "front"
+              },
+              {
+                "class_id": "squire",
+                "row": "front"
+              },
+              {
+                "class_id": "scout",
+                "row": "back"
+              },
+              {
+                "class_id": "scout",
+                "row": "back"
+              },
+              {
+                "class_id": "scout",
+                "row": "back"
+              }
+            ]
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "run": {
+            "phase": "battle",
+            "party_size": 5
+          }
+        },
+        "invariants": [
+          "Every party of the matrix starts a run.",
+          "Every combatant has exactly one active vocation.",
+          "Two heroes of one party may have the same active vocation."
+        ]
+      },
+      "needs_design_decision": "How Class Evolution heroes enter the shipped StartRun party parameter (class ids today, hero ids with build snapshots later) is undecided; the fixture lists the party matrix and sends the shipped command for the five-hero party."
+    },
+    {
+      "id": "CE-36",
+      "title": "Progression threat reachability",
+      "priority": "P0",
+      "mode": "static_content_validation",
+      "given": {
+        "catalog": {
+          "catalog_version": "1.3.1",
+          "overrides": [
+            {
+              "path": "encounter_pool",
+              "value": [
+                "training_01",
+                "training_02",
+                "training_03"
+              ]
+            }
+          ]
+        }
+      },
+      "when": {
+        "event": {
+          "type": "ValidateCatalog"
+        }
+      },
+      "then": {
+        "result": "rejected",
+        "error_code": "TRAINING_DEAD_END",
+        "error_details": {
+          "vocation_group": "advanced",
+          "rank": 7,
+          "required_threat": 4,
+          "max_available_threat": 3
+        }
+      },
+      "needs_design_decision": "The shipped game has two fixed battles and no threat ratings, so which encounters count as available, and their ratings, must be authored before the validator can run on real content.",
+      "notes": "With only training_01 to training_03 the highest threat is 3. Other ranks fail on this pool as well; the case names the one v0.1 used."
+    },
+    {
+      "id": "CE-37",
+      "title": "No class unlock for guest",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "trickster",
+              "discovery_state": "discovered"
+            }
+          ],
+          "items": [
+            {
+              "item_id": "jester_mask",
+              "quantity": 1
+            }
+          ],
+          "item_consumptions": []
+        },
+        "heroes": [
+          {
+            "hero_id": "guest_001",
+            "eligibility_state": "guest",
+            "active_vocation_id": "apprentice",
+            "revision": 2,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "apprentice",
+                "rank": 8,
+                "points": 14
+              }
+            ]
+          }
+        ],
+        "run": null
+      },
+      "when": {
+        "command": {
+          "type": "ClaimVocation",
+          "command_id": "cmd-ce37-1",
+          "state_revision": 2,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "guest_001",
+            "target_vocation_id": "trickster",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "rejected",
+        "error_code": "HERO_NOT_ELIGIBLE",
+        "state": {
+          "profile": {
+            "profile_id": "profile_demo",
+            "items": [
+              {
+                "item_id": "jester_mask",
+                "quantity": 1
+              }
+            ],
+            "item_consumptions": []
+          },
+          "heroes": [
+            {
+              "hero_id": "guest_001",
+              "revision": 2,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout"
+              ]
+            }
+          ],
+          "processed_commands": []
+        },
+        "events": []
+      },
+      "notes": "v0.1 named the code CHARACTER_NOT_ELIGIBLE. The guest meets the item route (Apprentice mastered, one jester_mask), so its guest state is the only reason for the rejection."
+    },
+    {
+      "id": "CE-38",
+      "title": "Transactional rollback",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo",
+          "discovery": [
+            {
+              "vocation_id": "dragon_knight",
+              "discovery_state": "discovered"
+            }
+          ],
+          "items": [
+            {
+              "item_id": "drake_scale",
+              "quantity": 1
+            }
+          ],
+          "item_consumptions": []
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "revision": 9,
+            "eligibility_state": "eligible",
+            "active_vocation_id": "spellblade",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "spellblade"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "apprentice",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "spellblade",
+                "rank": 8,
+                "points": 24
+              }
+            ]
+          }
+        ],
+        "run": null,
+        "processed_commands": [],
+        "history": [
+          {
+            "command": {
+              "type": "ClaimVocation",
+              "command_id": "cmd-ce38-1",
+              "state_revision": 9,
+              "params": {
+                "profile_id": "profile_demo",
+                "hero_id": "hero_001",
+                "target_vocation_id": "dragon_knight",
+                "catalog_version": "1.3.1"
+              }
+            },
+            "outcome": "aborted",
+            "fault_injection": {
+              "after": "item_decrement",
+              "before": "unlock_insert"
+            },
+            "state_after": {
+              "profile": {
+                "profile_id": "profile_demo",
+                "items": [
+                  {
+                    "item_id": "drake_scale",
+                    "quantity": 1
+                  }
+                ],
+                "item_consumptions": []
+              },
+              "heroes": [
+                {
+                  "hero_id": "hero_001",
+                  "revision": 9,
+                  "unlocked_vocations": [
+                    "squire",
+                    "apprentice",
+                    "scout",
+                    "spellblade"
+                  ]
+                }
+              ],
+              "processed_commands": []
+            }
+          }
+        ]
+      },
+      "when": {
+        "command": {
+          "type": "ClaimVocation",
+          "command_id": "cmd-ce38-1",
+          "state_revision": 9,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "dragon_knight",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "duplicate": false,
+        "state": {
+          "profile": {
+            "profile_id": "profile_demo",
+            "items": [
+              {
+                "item_id": "drake_scale",
+                "quantity": 0
+              }
+            ],
+            "item_consumptions": [
+              {
+                "hero_id": "hero_001",
+                "item_id": "drake_scale",
+                "quantity": 1,
+                "claim_event": "events[0]"
+              }
+            ]
+          },
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "revision": 10,
+              "unlocked_vocations": [
+                "squire",
+                "apprentice",
+                "scout",
+                "spellblade",
+                "dragon_knight"
+              ]
+            }
+          ],
+          "processed_commands": [
+            {
+              "command_id": "cmd-ce38-1",
+              "type": "ClaimVocation",
+              "result": "accepted"
+            }
+          ]
+        },
+        "events": [
+          {
+            "type": "VocationClaimed",
+            "hero_id": "hero_001",
+            "vocation_id": "dragon_knight",
+            "route_id": "route_0",
+            "consumed_items": [
+              {
+                "item_id": "drake_scale",
+                "quantity": 1
+              }
+            ]
+          }
+        ]
+      },
+      "notes": "The first attempt fails inside the transaction and is rolled back: it is neither accepted nor rejected and its command id is not recorded. The same command id then succeeds once."
+    },
+    {
+      "id": "CE-39",
+      "title": "Class changes after recovery",
+      "priority": "P1",
+      "mode": "automated_integration",
+      "given": {
+        "profile": {
+          "profile_id": "profile_demo"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "active_vocation_id": "squire",
+            "revision": 5,
+            "eligibility_state": "eligible",
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout",
+              "guardian"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "squire",
+                "rank": 8,
+                "points": 14
+              },
+              {
+                "vocation_id": "guardian",
+                "rank": 1,
+                "points": 0
+              }
+            ],
+            "permanent_stat_bonus": {
+              "max_hp": 1,
+              "max_mana": 0,
+              "speed": 0
+            },
+            "combat": {
+              "hp": 8,
+              "max_hp": 15,
+              "mana": 3,
+              "max_mana": 3,
+              "corruption": 2,
+              "state": "standing"
+            }
+          }
+        ],
+        "run": {
+          "run_id": "run_0001",
+          "phase": "upgrade",
+          "revision": 300
+        }
+      },
+      "when": {
+        "command": {
+          "type": "ChangeVocation",
+          "command_id": "cmd-ce39-1",
+          "state_revision": 5,
+          "params": {
+            "profile_id": "profile_demo",
+            "hero_id": "hero_001",
+            "target_vocation_id": "guardian",
+            "catalog_version": "1.3.1"
+          }
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "heroes": [
+            {
+              "hero_id": "hero_001",
+              "active_vocation_id": "guardian",
+              "revision": 6,
+              "combat": {
+                "hp": 10,
+                "max_hp": 18,
+                "mana": 3,
+                "max_mana": 3,
+                "corruption": 2,
+                "state": "standing"
+              }
+            }
+          ]
+        },
+        "invariants": [
+          "current' = ceil(current * new_max / old_max), clamped to 0..new_max.",
+          "A hero at 0 HP stays at 0 HP and downed: the conversion never revives.",
+          "Corruption is kept, capped at the new maximum."
+        ]
+      },
+      "needs_design_decision": "Shipped recovery already stands a downed hero up at 50% HP and refills mana before the 'upgrade' phase, so the rule that a downed hero stays down has no reachable state unless the switch may also happen before recovery; the fixture assumes after recovery.",
+      "notes": "Squire 14 HP (1.3.1) and Guardian 17 HP (v0.1 catalog), each +1 for the mastered Squire. 8 * 18 / 15 = 9.6, rounded up to 10."
+    },
+    {
+      "id": "CE-40",
+      "title": "MVP speed and action rules stable",
+      "priority": "P0",
+      "mode": "automated_integration",
+      "given": {
+        "feature_gate": {
+          "class_evolution_v1": true
+        },
+        "baseline": {
+          "rules_version": "1.1.1",
+          "content_version": "1.3.1",
+          "rng_algorithm": "BD-PCG32-v1",
+          "replay_pin": "tests/golden/replay_pin.json"
+        },
+        "heroes": [
+          {
+            "hero_id": "hero_001",
+            "active_vocation_id": "scout",
+            "revision": 0,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "scout",
+                "rank": 1,
+                "points": 0
+              }
+            ],
+            "permanent_stat_bonus": {
+              "max_hp": 0,
+              "max_mana": 0,
+              "speed": 0
+            }
+          },
+          {
+            "hero_id": "hero_002",
+            "active_vocation_id": "apprentice",
+            "revision": 0,
+            "unlocked_vocations": [
+              "squire",
+              "apprentice",
+              "scout"
+            ],
+            "mastery": [
+              {
+                "vocation_id": "apprentice",
+                "rank": 1,
+                "points": 0
+              }
+            ],
+            "permanent_stat_bonus": {
+              "max_hp": 0,
+              "max_mana": 0,
+              "speed": 0
+            }
+          }
+        ]
+      },
+      "when": {
+        "event": {
+          "type": "ReplayPinnedRuns",
+          "pin_path": "tests/golden/replay_pin.json"
+        }
+      },
+      "then": {
+        "result": "accepted",
+        "state": {
+          "replay": {
+            "pin_path": "tests/golden/replay_pin.json",
+            "runs_reproduced": "all",
+            "events_hash_matches_pin": true,
+            "final_state_hash_matches_pin": true
+          }
+        },
+        "invariants": [
+          "Action scheduling, rerolls, two-row targeting, seed streams and terminal priority are those of the baseline."
+        ]
+      },
+      "needs_design_decision": "Whether a fresh profile with the gate on must reproduce the pin exactly, final_state_hash included (assumed here), or only its combat events, since that hash changes as soon as any progression field joins the engine state.",
+      "notes": "Baseline: With the feature gate off, the replay pin tests/golden/replay_pin.json reproduces byte for byte. Here the gate is on and every hero is a novice with a default build and no mastery bonus."
+    }
+  ]
+}

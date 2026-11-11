@@ -1,0 +1,2335 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://battle-dice.invalid/schemas/vocation_catalog.schema.json",
+  "title": "Battle Dice class evolution: vocation catalog v0.2 (specification only; the game does not load it)",
+  "type": "object",
+  "required": [
+    "catalog_version",
+    "baseline",
+    "feature_gate",
+    "mastery",
+    "stat_caps",
+    "vocations",
+    "face_library",
+    "dice",
+    "schedules",
+    "passives",
+    "reactions",
+    "skills",
+    "items",
+    "quests",
+    "challenges",
+    "encounters",
+    "engine_gaps"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "catalog_version": {
+      "$ref": "#/$defs/version"
+    },
+    "baseline": {
+      "type": "object",
+      "description": "The shipped rules and content this catalog was written against. The validator compares both.",
+      "required": [
+        "rules_version",
+        "content_version"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rules_version": {
+          "$ref": "#/$defs/version"
+        },
+        "content_version": {
+          "$ref": "#/$defs/version"
+        }
+      }
+    },
+    "feature_gate": {
+      "const": "class_evolution_v1"
+    },
+    "mastery": {
+      "type": "object",
+      "required": [
+        "rank_count",
+        "points_per_eligible_win",
+        "challenge_bonus_per_encounter",
+        "rank_thresholds_by_group",
+        "threat_min_by_group_and_rank"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rank_count": {
+          "const": 8
+        },
+        "points_per_eligible_win": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9
+        },
+        "challenge_bonus_per_encounter": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9
+        },
+        "rank_thresholds_by_group": {
+          "$ref": "#/$defs/by_group_ranks",
+          "description": "Cumulative mastery points needed for ranks 1..rank_count."
+        },
+        "threat_min_by_group_and_rank": {
+          "$ref": "#/$defs/by_group_threat",
+          "description": "Entry r-1 is the lowest encounter threat that still awards mastery to a hero at rank r. The last entry is unused: a mastered vocation earns nothing."
+        }
+      }
+    },
+    "stat_caps": {
+      "type": "object",
+      "description": "Most a hero can ever gain per stat from all mastery rewards together.",
+      "required": [
+        "max_hp",
+        "max_mana",
+        "speed"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_hp": {
+          "$ref": "#/$defs/bounded_int"
+        },
+        "max_mana": {
+          "$ref": "#/$defs/bounded_int"
+        },
+        "speed": {
+          "$ref": "#/$defs/bounded_int"
+        }
+      }
+    },
+    "vocations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/vocation"
+      },
+      "minItems": 1
+    },
+    "face_library": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/id"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/face"
+      },
+      "description": "New faces only. A die may also use any face of the shipped dice.json by its id."
+    },
+    "dice": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/id"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/die"
+      }
+    },
+    "schedules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/schedule"
+      }
+    },
+    "passives": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/passive"
+      }
+    },
+    "reactions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/reaction"
+      }
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/skill"
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    },
+    "quests": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/quest"
+      }
+    },
+    "challenges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/challenge"
+      }
+    },
+    "encounters": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/encounter"
+      },
+      "minItems": 1
+    },
+    "engine_gaps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/engine_gap"
+      }
+    }
+  },
+  "$defs": {
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "bounded_int": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 999
+    },
+    "rank": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8
+    },
+    "threat": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "engine_support": {
+      "enum": [
+        "existing",
+        "new"
+      ],
+      "description": "existing: rules 1.1.1 already implement this. new: the engine must change first; an engine_gaps entry says how."
+    },
+    "row": {
+      "enum": [
+        "front",
+        "back"
+      ]
+    },
+    "category": {
+      "enum": [
+        "attack",
+        "defense",
+        "healing",
+        "status",
+        "resource",
+        "blank"
+      ]
+    },
+    "executable_category": {
+      "enum": [
+        "attack",
+        "defense",
+        "healing",
+        "status",
+        "resource"
+      ]
+    },
+    "status_kind": {
+      "enum": [
+        "poison",
+        "weaken",
+        "speed_up"
+      ]
+    },
+    "target_scope": {
+      "enum": [
+        "single_enemy",
+        "single_ally",
+        "self",
+        "all_enemies",
+        "all_allies",
+        "none"
+      ]
+    },
+    "range_type": {
+      "enum": [
+        "melee",
+        "ranged",
+        "ally",
+        "self",
+        "none"
+      ]
+    },
+    "face_tag": {
+      "enum": [
+        "all_enemies",
+        "basic",
+        "elite_resistant",
+        "hostile",
+        "interruptible",
+        "melee",
+        "ranged",
+        "revival",
+        "self_buff",
+        "spell",
+        "unreactable"
+      ]
+    },
+    "face_effect_type": {
+      "enum": [
+        "damage",
+        "shield",
+        "heal",
+        "apply_status",
+        "gain_mana",
+        "gain_corruption",
+        "remove_corruption"
+      ]
+    },
+    "reaction_effect_type": {
+      "enum": [
+        "shield",
+        "remove_corruption",
+        "gain_mana",
+        "interrupt"
+      ]
+    },
+    "reaction_stage": {
+      "enum": [
+        "guard",
+        "resource",
+        "interrupt"
+      ]
+    },
+    "reaction_trigger": {
+      "enum": [
+        "hostile_damage",
+        "hostile_any",
+        "hostile_interruptible"
+      ]
+    },
+    "reaction_target": {
+      "enum": [
+        "intent_target",
+        "intent"
+      ]
+    },
+    "die_size": {
+      "enum": [
+        4,
+        6,
+        8
+      ]
+    },
+    "die_role": {
+      "enum": [
+        "starting",
+        "sidegrade"
+      ]
+    },
+    "shipped_passive_type": {
+      "enum": [
+        "defense_die_bonus",
+        "spell_damage_at_corruption",
+        "combo_attack_bonus"
+      ]
+    },
+    "passive_type": {
+      "enum": [
+        "defense_die_bonus",
+        "spell_damage_at_corruption",
+        "combo_attack_bonus",
+        "ally_defense_die_bonus",
+        "reaction_shield_bonus",
+        "reaction_shield_bonus_at_corruption",
+        "attack_after_category_bonus",
+        "resource_die_mana_bonus",
+        "sequence_remove_corruption",
+        "healing_die_bonus",
+        "paid_reroll"
+      ]
+    },
+    "group": {
+      "enum": [
+        "novice",
+        "advanced",
+        "capstone",
+        "secret_sidegrade",
+        "secret_prestige"
+      ]
+    },
+    "stat": {
+      "enum": [
+        "max_hp",
+        "max_mana",
+        "speed"
+      ]
+    },
+    "face_effect": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/face_effect_type"
+        },
+        "target": {
+          "enum": [
+            "target",
+            "self"
+          ]
+        },
+        "amount": {
+          "$ref": "#/$defs/bounded_int"
+        },
+        "status": {
+          "$ref": "#/$defs/status_kind"
+        },
+        "duration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "apply_status"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "status",
+              "duration"
+            ]
+          }
+        }
+      ]
+    },
+    "face": {
+      "type": "object",
+      "description": "Exactly the shipped die-face shape (dice.json face_library), so a face can be moved into the game unchanged.",
+      "required": [
+        "name",
+        "category",
+        "power",
+        "target_scope",
+        "range_type",
+        "action_speed",
+        "mana_cost",
+        "effects",
+        "can_revive",
+        "tags"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "$ref": "#/$defs/category"
+        },
+        "power": {
+          "$ref": "#/$defs/bounded_int"
+        },
+        "target_scope": {
+          "$ref": "#/$defs/target_scope"
+        },
+        "range_type": {
+          "$ref": "#/$defs/range_type"
+        },
+        "action_speed": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9
+        },
+        "mana_cost": {
+          "$ref": "#/$defs/bounded_int"
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/face_effect"
+          }
+        },
+        "can_revive": {
+          "type": "boolean"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/face_tag"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "die": {
+      "type": "object",
+      "description": "The shipped die shape. affinity_class is the id of the new vocation that owns the die.",
+      "required": [
+        "name",
+        "affinity_class",
+        "size",
+        "role",
+        "definition_version",
+        "faces"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "affinity_class": {
+          "$ref": "#/$defs/id"
+        },
+        "size": {
+          "$ref": "#/$defs/die_size"
+        },
+        "role": {
+          "$ref": "#/$defs/die_role"
+        },
+        "definition_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "faces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 4,
+          "maxItems": 8,
+          "description": "Face ids from this catalog's face_library or the shipped dice.json. The validator requires exactly `size` of them."
+        }
+      }
+    },
+    "slot": {
+      "type": "object",
+      "required": [
+        "categories"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/executable_category"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "tags_any": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/face_tag"
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "When present, the face must carry at least one of these tags."
+        }
+      }
+    },
+    "schedule": {
+      "type": "object",
+      "description": "Slot model. A plan of one action is always legal. A plan of two or more actions needs max_actions or fewer actions, each fitting its own slot. With order 'slots' it must fill every slot and resolves in slot order. With order 'action_speed' it may use any of the slots and resolves by descending action speed, the player's order breaking ties. len(slots) equals max_actions. The shipped policies map to: single = one slot of every category; sequence = two slots, one category in the first; free = max_actions slots of every category, order 'action_speed', distinct_categories false.",
+      "required": [
+        "id",
+        "label",
+        "summary",
+        "max_actions",
+        "slots",
+        "distinct_categories",
+        "order",
+        "engine_support"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_actions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/slot"
+          },
+          "minItems": 1,
+          "maxItems": 6
+        },
+        "distinct_categories": {
+          "type": "boolean",
+          "description": "No two actions of one plan may share a category."
+        },
+        "order": {
+          "enum": [
+            "slots",
+            "action_speed"
+          ]
+        },
+        "engine_support": {
+          "$ref": "#/$defs/engine_support"
+        }
+      }
+    },
+    "passive": {
+      "type": "object",
+      "description": "A typed passive. The three shipped types keep the shipped fields; every other type is new to the engine.",
+      "required": [
+        "id",
+        "name",
+        "type",
+        "summary",
+        "engine_support"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/passive_type"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "defense_die_bonus"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "amount",
+              "summary",
+              "engine_support"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "const": "defense_die_bonus"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 999
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "engine_support": {
+                "$ref": "#/$defs/engine_support"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "spell_damage_at_corruption"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "amount",
+              "threshold",
+              "summary",
+              "engine_support"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "const": "spell_damage_at_corruption"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 999
+              },
+              "threshold": {
+                "$ref": "#/$defs/bounded_int"
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "engine_support": {
+                "$ref": "#/$defs/engine_support"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "combo_attack_bonus"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "amount",
+              "summary",
+              "engine_support"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "const": "combo_attack_bonus"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 999
+              },
+              "attack_tag_invariant": {
+                "$ref": "#/$defs/face_tag",
+                "description": "A content invariant, not an engine filter: every Attack face the vocation can roll (its dice and its upgrade family's reforge and imbue faces) must carry this tag. The validator enforces it."
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "engine_support": {
+                "$ref": "#/$defs/engine_support"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "ally_defense_die_bonus"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "amount",
+              "summary",
+              "engine_support"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "const": "ally_defense_die_bonus"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 999
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "engine_support": {
+                "const": "new"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "reaction_shield_bonus"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "amount",
+              "summary",
+              "engine_support"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "const": "reaction_shield_bonus"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 999
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "engine_support": {
+                "const": "new"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "reaction_shield_bonus_at_corruption"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "amount",
+              "threshold",
+              "summary",
+              "engine_support"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "const": "reaction_shield_bonus_at_corruption"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 999
+              },
+              "threshold": {
+                "$ref": "#/$defs/bounded_int"
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "engine_support": {
+                "const": "new"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "attack_after_category_bonus"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "amount",
+              "after_categories",
+              "summary",
+              "engine_support"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "const": "attack_after_category_bonus"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 999
+              },
+              "after_categories": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/executable_category"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "engine_support": {
+                "const": "new"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "resource_die_mana_bonus"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "amount",
+              "summary",
+              "engine_support"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "const": "resource_die_mana_bonus"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 999
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "engine_support": {
+                "const": "new"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "sequence_remove_corruption"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "amount",
+              "summary",
+              "engine_support"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "const": "sequence_remove_corruption"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 999
+              },
+              "final_categories": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/executable_category"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "engine_support": {
+                "const": "new"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "healing_die_bonus"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "amount",
+              "uses_per_encounter",
+              "summary",
+              "engine_support"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "const": "healing_die_bonus"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 999
+              },
+              "uses_per_encounter": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "engine_support": {
+                "const": "new"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "paid_reroll"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "mana_cost",
+              "corruption_gain",
+              "uses_per_activation",
+              "summary",
+              "engine_support"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "const": "paid_reroll"
+              },
+              "mana_cost": {
+                "$ref": "#/$defs/bounded_int"
+              },
+              "corruption_gain": {
+                "$ref": "#/$defs/bounded_int"
+              },
+              "uses_per_activation": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "engine_support": {
+                "const": "new"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reaction_effect": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/reaction_effect_type"
+        },
+        "target": {
+          "enum": [
+            "target",
+            "self"
+          ]
+        },
+        "amount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999
+        },
+        "resisted_damage_reduction": {
+          "$ref": "#/$defs/bounded_int"
+        },
+        "resisted_magnitude_reduction": {
+          "$ref": "#/$defs/bounded_int"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "interrupt"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "resisted_damage_reduction",
+              "resisted_magnitude_reduction"
+            ]
+          },
+          "else": {
+            "required": [
+              "amount"
+            ]
+          }
+        }
+      ]
+    },
+    "reaction": {
+      "type": "object",
+      "description": "The shipped reaction shape plus id and engine_support. Only reactions that differ from every shipped one are listed.",
+      "required": [
+        "id",
+        "name",
+        "stage",
+        "mana_cost",
+        "priority",
+        "requires_row",
+        "trigger",
+        "target",
+        "effects",
+        "summary",
+        "engine_support"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stage": {
+          "$ref": "#/$defs/reaction_stage"
+        },
+        "mana_cost": {
+          "$ref": "#/$defs/bounded_int"
+        },
+        "priority": {
+          "$ref": "#/$defs/bounded_int"
+        },
+        "requires_row": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/row"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trigger": {
+          "$ref": "#/$defs/reaction_trigger"
+        },
+        "target": {
+          "$ref": "#/$defs/reaction_target"
+        },
+        "requires_resource_change": {
+          "type": "boolean"
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/reaction_effect"
+          },
+          "minItems": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "engine_support": {
+          "$ref": "#/$defs/engine_support"
+        }
+      }
+    },
+    "skill": {
+      "type": "object",
+      "description": "A learned skill. Which vocation teaches it, and at which rank, is stated once, in that vocation's skills_learned.",
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "transfer",
+        "capacity_cost",
+        "summary",
+        "engine_support"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "passive",
+            "face_modifier",
+            "native_passive"
+          ]
+        },
+        "transfer": {
+          "enum": [
+            "any_class",
+            "compatible_healing",
+            "compatible_melee",
+            "compatible_ranged",
+            "active_only"
+          ]
+        },
+        "capacity_cost": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 12
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "engine_support": {
+          "const": "new"
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "type",
+        "stackable",
+        "awarded_by_encounter",
+        "summary"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": [
+            "unlock_token"
+          ]
+        },
+        "stackable": {
+          "type": "boolean"
+        },
+        "awarded_by_encounter": {
+          "$ref": "#/$defs/id"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "quest": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "type",
+        "scope",
+        "encounter_id",
+        "summary"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": [
+            "secret_discovery",
+            "progression_trial"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "profile",
+            "hero"
+          ]
+        },
+        "encounter_id": {
+          "$ref": "#/$defs/id"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "challenge": {
+      "type": "object",
+      "required": [
+        "id",
+        "summary"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "encounter": {
+      "type": "object",
+      "description": "A mastery-eligible encounter. 'shipped' is one of the two battles in the shipped encounters.json; 'to_author' needs an enemy line-up the game does not have yet and cannot be used for training until it does.",
+      "required": [
+        "id",
+        "threat_rating",
+        "source",
+        "notes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "threat_rating": {
+          "$ref": "#/$defs/threat"
+        },
+        "source": {
+          "enum": [
+            "shipped",
+            "to_author"
+          ]
+        },
+        "shipped_ref": {
+          "type": "object",
+          "required": [
+            "battle"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "battle": {
+              "enum": [
+                1,
+                2
+              ]
+            }
+          }
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "shipped"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "required": [
+              "shipped_ref"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "shipped_ref"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "engine_gap": {
+      "type": "object",
+      "description": "Something v0.1 asks for that rules 1.1.1 cannot express. used_by entries are '<kind>:<id>'.",
+      "required": [
+        "id",
+        "used_by",
+        "needs",
+        "engine_file"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "used_by": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(face|schedule|passive|reaction|skill):[a-z][a-z0-9_]*$"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "needs": {
+          "type": "string",
+          "minLength": 1
+        },
+        "engine_file": {
+          "type": "string",
+          "pattern": "^src/battle_dice/[a-z_/]+\\.(py|json|schema\\.json)$"
+        }
+      }
+    },
+    "prerequisite": {
+      "description": "Boolean expression over one hero's progress. 'mastered' means the last rank of that vocation. Route ids: the alternatives of a top-level 'any' are route_0, route_1, ... in this order; any other prerequisite is the single route route_0. Alternatives may be appended, never reordered or removed.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "all"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "all": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/prerequisite"
+              },
+              "minItems": 2
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "any"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "any": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/prerequisite"
+              },
+              "minItems": 2
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "mastered"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "mastered": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "quest"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "quest": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "item",
+            "quantity",
+            "consume"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "item": {
+              "$ref": "#/$defs/id"
+            },
+            "quantity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 99
+            },
+            "consume": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "mastered_count"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "mastered_count": {
+              "type": "object",
+              "required": [
+                "group",
+                "minimum"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "group": {
+                  "$ref": "#/$defs/group"
+                },
+                "minimum": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 99
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "discovery_signal": {
+      "type": "object",
+      "required": [
+        "kind",
+        "state"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "quest_hint",
+            "quest_complete",
+            "item_found",
+            "mastery_rank"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "quest_hint"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "kind",
+              "quest_id",
+              "state"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "quest_hint"
+              },
+              "quest_id": {
+                "$ref": "#/$defs/id"
+              },
+              "state": {
+                "$ref": "#/$defs/discovery_state"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "quest_complete"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "kind",
+              "quest_id",
+              "state"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "quest_complete"
+              },
+              "quest_id": {
+                "$ref": "#/$defs/id"
+              },
+              "state": {
+                "$ref": "#/$defs/discovery_state"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "item_found"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "kind",
+              "item_id",
+              "state"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "item_found"
+              },
+              "item_id": {
+                "$ref": "#/$defs/id"
+              },
+              "state": {
+                "$ref": "#/$defs/discovery_state"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "mastery_rank"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "kind",
+              "vocation_id",
+              "rank",
+              "state"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "mastery_rank"
+              },
+              "vocation_id": {
+                "$ref": "#/$defs/id"
+              },
+              "rank": {
+                "$ref": "#/$defs/rank"
+              },
+              "state": {
+                "$ref": "#/$defs/discovery_state"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "discovery_state": {
+      "enum": [
+        "hinted",
+        "discovered"
+      ]
+    },
+    "discovery": {
+      "type": "object",
+      "required": [
+        "rule"
+      ],
+      "properties": {
+        "rule": {
+          "enum": [
+            "visible_from_start",
+            "on_signal"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "rule": {
+                "const": "visible_from_start"
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "rule"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "const": "visible_from_start"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "rule": {
+                "const": "on_signal"
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "required": [
+              "rule",
+              "clue",
+              "signals"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "const": "on_signal"
+              },
+              "clue": {
+                "type": "string",
+                "minLength": 1
+              },
+              "signals": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/discovery_signal"
+                },
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "mastery_reward": {
+      "type": "object",
+      "required": [
+        "stat",
+        "amount"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "stat": {
+          "$ref": "#/$defs/stat"
+        },
+        "amount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 99
+        }
+      }
+    },
+    "skill_learned": {
+      "type": "object",
+      "required": [
+        "skill_id",
+        "rank"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "skill_id": {
+          "$ref": "#/$defs/id"
+        },
+        "rank": {
+          "$ref": "#/$defs/rank"
+        }
+      }
+    },
+    "novice_vocation": {
+      "type": "object",
+      "description": "A shipped class. Its name, stats, dice, schedule, passive and reaction are read from the shipped classes.json through class_id and must not be repeated here.",
+      "required": [
+        "id",
+        "group",
+        "wave",
+        "definition",
+        "class_id",
+        "inheritance_capacity",
+        "mastery_rewards",
+        "skills_learned",
+        "bonus_challenge_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "group": {
+          "const": "novice"
+        },
+        "wave": {
+          "const": 0
+        },
+        "definition": {
+          "const": "shipped"
+        },
+        "class_id": {
+          "$ref": "#/$defs/id"
+        },
+        "inheritance_capacity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 12
+        },
+        "mastery_rewards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mastery_reward"
+          },
+          "description": "Granted once, on mastery (the last rank). Empty: the skill is the reward."
+        },
+        "skills_learned": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/skill_learned"
+          }
+        },
+        "bonus_challenge_id": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "new_vocation": {
+      "type": "object",
+      "description": "A vocation the game does not have yet, written in the shipped class vocabulary.",
+      "required": [
+        "id",
+        "name",
+        "group",
+        "wave",
+        "visibility",
+        "prerequisite",
+        "max_hp",
+        "start_hp",
+        "speed",
+        "base_initiative",
+        "max_mana",
+        "start_mana",
+        "max_corruption",
+        "start_corruption",
+        "rerolls",
+        "dice_capacity",
+        "suggested_row",
+        "starting_dice",
+        "bench_dice",
+        "schedule_id",
+        "passive_id",
+        "reaction_id",
+        "upgrade_family",
+        "inheritance_capacity",
+        "mastery_rewards",
+        "skills_learned",
+        "bonus_challenge_id",
+        "discovery"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "group": {
+          "enum": [
+            "advanced",
+            "capstone",
+            "secret_sidegrade",
+            "secret_prestige"
+          ]
+        },
+        "wave": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "visibility": {
+          "enum": [
+            "public",
+            "secret"
+          ]
+        },
+        "prerequisite": {
+          "$ref": "#/$defs/prerequisite"
+        },
+        "max_hp": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999
+        },
+        "start_hp": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999
+        },
+        "speed": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999
+        },
+        "base_initiative": {
+          "$ref": "#/$defs/bounded_int"
+        },
+        "max_mana": {
+          "$ref": "#/$defs/bounded_int"
+        },
+        "start_mana": {
+          "$ref": "#/$defs/bounded_int"
+        },
+        "max_corruption": {
+          "$ref": "#/$defs/bounded_int"
+        },
+        "start_corruption": {
+          "$ref": "#/$defs/bounded_int"
+        },
+        "rerolls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9
+        },
+        "dice_capacity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "suggested_row": {
+          "$ref": "#/$defs/row"
+        },
+        "starting_dice": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "bench_dice": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "schedule_id": {
+          "$ref": "#/$defs/id"
+        },
+        "passive_id": {
+          "$ref": "#/$defs/id"
+        },
+        "reaction_id": {
+          "$ref": "#/$defs/id",
+          "description": "A reaction of this catalog or of the shipped classes.json."
+        },
+        "upgrade_family": {
+          "$ref": "#/$defs/id",
+          "description": "The shipped class whose reforge and imbue tables this vocation uses."
+        },
+        "inheritance_capacity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 12
+        },
+        "mastery_rewards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mastery_reward"
+          },
+          "description": "Granted once, on mastery (the last rank). Empty: the skill is the reward."
+        },
+        "skills_learned": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/skill_learned"
+          }
+        },
+        "bonus_challenge_id": {
+          "$ref": "#/$defs/id"
+        },
+        "discovery": {
+          "$ref": "#/$defs/discovery"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "group": {
+                "enum": [
+                  "secret_sidegrade",
+                  "secret_prestige"
+                ]
+              }
+            },
+            "required": [
+              "group"
+            ]
+          },
+          "then": {
+            "properties": {
+              "visibility": {
+                "const": "secret"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "visibility": {
+                "const": "public"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "vocation": {
+      "type": "object",
+      "required": [
+        "id",
+        "group"
+      ],
+      "properties": {
+        "group": {
+          "$ref": "#/$defs/group"
+        }
+      },
+      "if": {
+        "properties": {
+          "group": {
+            "const": "novice"
+          }
+        },
+        "required": [
+          "group"
+        ]
+      },
+      "then": {
+        "$ref": "#/$defs/novice_vocation"
+      },
+      "else": {
+        "$ref": "#/$defs/new_vocation"
+      }
+    },
+    "by_group_ranks": {
+      "type": "object",
+      "required": [
+        "novice",
+        "advanced",
+        "capstone",
+        "secret_sidegrade",
+        "secret_prestige"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "novice": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "minItems": 8,
+          "maxItems": 8
+        },
+        "advanced": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "minItems": 8,
+          "maxItems": 8
+        },
+        "capstone": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "minItems": 8,
+          "maxItems": 8
+        },
+        "secret_sidegrade": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "minItems": 8,
+          "maxItems": 8
+        },
+        "secret_prestige": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "minItems": 8,
+          "maxItems": 8
+        }
+      }
+    },
+    "by_group_threat": {
+      "type": "object",
+      "required": [
+        "novice",
+        "advanced",
+        "capstone",
+        "secret_sidegrade",
+        "secret_prestige"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "novice": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/threat"
+          },
+          "minItems": 8,
+          "maxItems": 8
+        },
+        "advanced": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/threat"
+          },
+          "minItems": 8,
+          "maxItems": 8
+        },
+        "capstone": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/threat"
+          },
+          "minItems": 8,
+          "maxItems": 8
+        },
+        "secret_sidegrade": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/threat"
+          },
+          "minItems": 8,
+          "maxItems": 8
+        },
+        "secret_prestige": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/threat"
+          },
+          "minItems": 8,
+          "maxItems": 8
+        }
+      }
+    }
+  }
+}

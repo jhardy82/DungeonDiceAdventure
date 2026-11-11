@@ -1,0 +1,2153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://battle-dice.invalid/class_evolution/acceptance_fixtures.schema.json",
+  "title": "Battle Dice Class Evolution acceptance fixtures (FDD v0.2)",
+  "description": "Strict schema for acceptance_fixtures.json. The errorCode enum is generated from docs/class_evolution/persistence/error_codes.json; a test keeps the two equal.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "document_id",
+    "fdd_version",
+    "fixture_format",
+    "status",
+    "baseline",
+    "conventions",
+    "cases"
+  ],
+  "properties": {
+    "document_id": {
+      "const": "BD-FDD-CE-001"
+    },
+    "fdd_version": {
+      "const": "0.2"
+    },
+    "fixture_format": {
+      "const": 2
+    },
+    "status": {
+      "const": "BEHAVIORAL_SPECIFICATION_NOT_EXECUTED"
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules_version": {
+          "const": "1.1.1"
+        },
+        "content_version": {
+          "const": "1.3.1"
+        },
+        "rng_algorithm": {
+          "const": "BD-PCG32-v1"
+        },
+        "replay_pin": {
+          "const": "tests/golden/replay_pin.json"
+        },
+        "definition": {
+          "const": "With the feature gate off, the replay pin tests/golden/replay_pin.json reproduces byte for byte."
+        }
+      },
+      "required": [
+        "rules_version",
+        "content_version",
+        "rng_algorithm",
+        "replay_pin",
+        "definition"
+      ]
+    },
+    "conventions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 20,
+        "pattern": "[.]$"
+      },
+      "minItems": 1
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/case"
+      },
+      "minItems": 40,
+      "maxItems": 40
+    }
+  },
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "PHASE_LOCKED",
+        "NOT_DISCOVERED",
+        "HERO_NOT_ELIGIBLE",
+        "PREREQUISITE_UNMET",
+        "ITEM_INSUFFICIENT",
+        "CAPACITY_EXCEEDED",
+        "INCOMPATIBLE_DIE",
+        "NO_LEGAL_FACE",
+        "CONTENT_MIGRATION_REQUIRED",
+        "REVISION_CONFLICT",
+        "UNSUPPORTED_SECONDARY_VOCATION",
+        "COMMAND_ID_REUSED",
+        "UNDER_THREAT_CAP",
+        "ENCOUNTER_NOT_WON",
+        "TRAINING_DEAD_END",
+        "UNLOCK_DEAD_END"
+      ]
+    },
+    "vocationId": {
+      "enum": [
+        "squire",
+        "apprentice",
+        "scout",
+        "guardian",
+        "duelist",
+        "arcanist",
+        "spellblade",
+        "shadowbinder",
+        "ranger",
+        "champion",
+        "archmage",
+        "hero",
+        "trickster",
+        "dragon_knight"
+      ]
+    },
+    "skillId": {
+      "enum": [
+        "squire_anchor",
+        "apprentice_focus",
+        "scout_marksman",
+        "guardian_field_medic",
+        "duelist_footwork",
+        "arcanist_reservoir",
+        "spellblade_edge",
+        "shadowbinder_hex",
+        "ranger_mark",
+        "champion_guard",
+        "archmage_ritual",
+        "heroic_resolve",
+        "trickster_luck",
+        "dragonhide"
+      ]
+    },
+    "itemId": {
+      "enum": [
+        "jester_mask",
+        "drake_scale"
+      ]
+    },
+    "questId": {
+      "enum": [
+        "crooked_mirror",
+        "trial_of_the_hero"
+      ]
+    },
+    "encounterId": {
+      "enum": [
+        "training_01",
+        "training_02",
+        "training_03",
+        "training_04",
+        "training_05",
+        "masked_mimic_trial",
+        "trial_of_the_hero"
+      ]
+    },
+    "dieDefinitionId": {
+      "enum": [
+        "iron_d6",
+        "oath_d4",
+        "arcane_d6",
+        "focus_d4",
+        "striker_d8",
+        "tools_d4",
+        "guardian_d6",
+        "guardian_d4",
+        "duelist_d6",
+        "duelist_d4",
+        "arcanist_d6",
+        "arcanist_d4",
+        "spellblade_d6",
+        "spellblade_d4",
+        "shadow_d6",
+        "shadow_d4",
+        "ranger_d8",
+        "ranger_d4",
+        "champion_d8",
+        "champion_d6",
+        "archmage_d6",
+        "archmage_d4",
+        "archmage_support_d4",
+        "hero_d8",
+        "hero_d6",
+        "trickster_d8",
+        "trickster_d4",
+        "dragon_d8",
+        "dragon_d6"
+      ]
+    },
+    "routeId": {
+      "type": "string",
+      "pattern": "^route_[0-9]+$"
+    },
+    "heroId": {
+      "type": "string",
+      "pattern": "^(hero|guest)_[0-9]{3}$"
+    },
+    "commandId": {
+      "type": "string",
+      "pattern": "^cmd-ce[0-9]{2}-[0-9]+$"
+    },
+    "discoveryState": {
+      "enum": [
+        "hidden",
+        "hinted",
+        "discovered"
+      ]
+    },
+    "runPhase": {
+      "enum": [
+        "battle",
+        "upgrade",
+        "equipment",
+        "victory",
+        "defeat"
+      ]
+    },
+    "statsFull": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_hp": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_mana": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "speed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "base_initiative": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_corruption": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "max_hp",
+        "max_mana",
+        "speed",
+        "base_initiative",
+        "max_corruption"
+      ]
+    },
+    "statsBonus": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_hp": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_mana": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "speed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "max_hp",
+        "max_mana",
+        "speed"
+      ]
+    },
+    "itemQuantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "item_id": {
+          "$ref": "#/$defs/itemId"
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "item_id",
+        "quantity"
+      ]
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "MASTERY_AT_LEAST"
+            },
+            "vocation_id": {
+              "$ref": "#/$defs/vocationId"
+            },
+            "rank": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "current_rank": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            }
+          },
+          "required": [
+            "op",
+            "vocation_id",
+            "rank",
+            "current_rank"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "QUEST_COMPLETE"
+            },
+            "quest_id": {
+              "$ref": "#/$defs/questId"
+            }
+          },
+          "required": [
+            "op",
+            "quest_id"
+          ]
+        }
+      ]
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "route_id": {
+            "$ref": "#/$defs/routeId"
+          },
+          "unmet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/condition"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "route_id",
+          "unmet"
+        ]
+      },
+      "minItems": 1
+    },
+    "errorDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "routes": {
+          "$ref": "#/$defs/routes"
+        },
+        "item_id": {
+          "$ref": "#/$defs/itemId"
+        },
+        "quantity_required": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "quantity_held": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "capacity_max": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "capacity_used": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "capacity_requested": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "saved_catalog_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "active_catalog_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vocation_group": {
+          "enum": [
+            "novice",
+            "advanced",
+            "capstone",
+            "secret_sidegrade",
+            "secret_prestige"
+          ]
+        },
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "required_threat": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "max_available_threat": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        }
+      }
+    },
+    "discoveryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "vocation_id": {
+          "$ref": "#/$defs/vocationId"
+        },
+        "discovery_state": {
+          "$ref": "#/$defs/discoveryState"
+        },
+        "clue_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "vocation_id",
+        "discovery_state"
+      ]
+    },
+    "questEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "quest_id": {
+          "$ref": "#/$defs/questId"
+        },
+        "qualifier_scope": {
+          "enum": [
+            "profile",
+            "hero"
+          ]
+        },
+        "qualifier_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "quest_id",
+        "qualifier_scope",
+        "qualifier_id"
+      ]
+    },
+    "consumptionEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hero_id": {
+          "$ref": "#/$defs/heroId"
+        },
+        "item_id": {
+          "$ref": "#/$defs/itemId"
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "claim_event": {
+          "type": "string",
+          "pattern": "^(events\\[[0-9]+\\]|[a-z_]+:[0-9]+)$"
+        }
+      },
+      "required": [
+        "hero_id",
+        "item_id",
+        "quantity",
+        "claim_event"
+      ]
+    },
+    "profileState": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile_id": {
+          "const": "profile_demo"
+        },
+        "catalog_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "discovery": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/discoveryEntry"
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/itemQuantity"
+          }
+        },
+        "item_consumptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/consumptionEntry"
+          }
+        },
+        "quests_completed": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/questEntry"
+          }
+        }
+      },
+      "required": [
+        "profile_id"
+      ]
+    },
+    "masteryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "vocation_id": {
+          "$ref": "#/$defs/vocationId"
+        },
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "points": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "vocation_id",
+        "rank",
+        "points"
+      ]
+    },
+    "dieEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "die_instance_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "definition_id": {
+          "$ref": "#/$defs/dieDefinitionId"
+        },
+        "location": {
+          "enum": [
+            "equipped",
+            "bench"
+          ]
+        },
+        "slot_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "swap_locked": {
+          "type": "boolean"
+        },
+        "run_upgrade_applies": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "die_instance_id",
+        "definition_id",
+        "location"
+      ]
+    },
+    "equippedSkill": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "slot_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skill_id": {
+          "$ref": "#/$defs/skillId"
+        }
+      },
+      "required": [
+        "slot_index",
+        "skill_id"
+      ]
+    },
+    "rolledFace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "die_instance_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "face_index": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "action_id": {
+          "enum": [
+            "blank",
+            "sq_attack2",
+            "sq_attack1",
+            "sq_shield3",
+            "sq_shield2",
+            "sq_rally",
+            "gain_mana1",
+            "gain_mana2",
+            "ap_spell3",
+            "ap_mend",
+            "weaken1",
+            "cleanse2",
+            "shield2",
+            "sc_attack2",
+            "sc_attack1",
+            "poison1",
+            "heavy_shield4",
+            "melee3",
+            "melee2",
+            "ranged3",
+            "ranged2",
+            "heal2",
+            "heal3",
+            "spell4",
+            "spell3",
+            "shield3",
+            "remove_corruption1",
+            "spend_corruption_strike",
+            "gain_corruption1",
+            "siphon_mana1",
+            "all_shield2",
+            "hero_rally",
+            "drake_strike4",
+            "trick_sting2"
+          ]
+        }
+      },
+      "required": [
+        "die_instance_id",
+        "face_index",
+        "action_id"
+      ]
+    },
+    "combatState": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hp": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_hp": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mana": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_mana": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "corruption": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "state": {
+          "enum": [
+            "standing",
+            "downed"
+          ]
+        },
+        "rolled_faces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rolledFace"
+          }
+        }
+      }
+    },
+    "heroState": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hero_id": {
+          "$ref": "#/$defs/heroId"
+        },
+        "catalog_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "eligibility_state": {
+          "enum": [
+            "eligible",
+            "locked",
+            "guest"
+          ]
+        },
+        "active_vocation_id": {
+          "$ref": "#/$defs/vocationId"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unlocked_vocations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/vocationId"
+          },
+          "uniqueItems": true
+        },
+        "unlocks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "vocation_id": {
+                "$ref": "#/$defs/vocationId"
+              },
+              "unlock_route_id": {
+                "$ref": "#/$defs/routeId"
+              }
+            },
+            "required": [
+              "vocation_id",
+              "unlock_route_id"
+            ]
+          }
+        },
+        "mastery": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/masteryEntry"
+          }
+        },
+        "learned_skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/skillId"
+          },
+          "uniqueItems": true
+        },
+        "equipped_skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/equippedSkill"
+          }
+        },
+        "inheritance_capacity_max": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inheritance_capacity_used": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dice": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dieEntry"
+          }
+        },
+        "owned_dice_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "permanent_stat_bonus": {
+          "$ref": "#/$defs/statsBonus"
+        },
+        "combat": {
+          "$ref": "#/$defs/combatState"
+        }
+      },
+      "required": [
+        "hero_id"
+      ]
+    },
+    "runState": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "const": "run_0001"
+        },
+        "phase": {
+          "$ref": "#/$defs/runPhase"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "party_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        }
+      }
+    },
+    "encounterState": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "encounter_id": {
+          "$ref": "#/$defs/encounterId"
+        },
+        "threat_rating": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "mastery_eligible": {
+          "type": "boolean"
+        },
+        "outcome": {
+          "enum": [
+            "victory",
+            "defeat"
+          ]
+        },
+        "intent": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "intent_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "hostile": {
+              "type": "boolean"
+            },
+            "target_ids": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/heroId"
+              }
+            }
+          },
+          "required": [
+            "intent_id",
+            "hostile",
+            "target_ids"
+          ]
+        }
+      },
+      "required": [
+        "encounter_id",
+        "threat_rating"
+      ]
+    },
+    "awardRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "const": "run_0001"
+        },
+        "encounter_id": {
+          "$ref": "#/$defs/encounterId"
+        },
+        "hero_id": {
+          "$ref": "#/$defs/heroId"
+        },
+        "vocation_id": {
+          "$ref": "#/$defs/vocationId"
+        },
+        "base_points": {
+          "enum": [
+            0,
+            1
+          ]
+        },
+        "challenge_points": {
+          "enum": [
+            0,
+            1
+          ]
+        },
+        "threat_rating": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "denial_reason": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/errorCode"
+            }
+          ]
+        }
+      },
+      "required": [
+        "run_id",
+        "encounter_id",
+        "hero_id",
+        "vocation_id",
+        "base_points",
+        "challenge_points",
+        "threat_rating",
+        "denial_reason"
+      ]
+    },
+    "runDieUpgrade": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "const": "run_0001"
+        },
+        "hero_id": {
+          "$ref": "#/$defs/heroId"
+        },
+        "die_instance_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "permanent": {
+          "const": false
+        }
+      },
+      "required": [
+        "run_id",
+        "hero_id",
+        "die_instance_id",
+        "permanent"
+      ]
+    },
+    "processedCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "$ref": "#/$defs/commandId"
+        },
+        "type": {
+          "enum": [
+            "PreviewVocation",
+            "ClaimVocation",
+            "ChangeVocation",
+            "EquipInheritedSkill",
+            "UnequipInheritedSkill",
+            "EquipDie",
+            "ConfirmBuild"
+          ]
+        },
+        "result": {
+          "const": "accepted"
+        }
+      },
+      "required": [
+        "command_id",
+        "type",
+        "result"
+      ]
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules_version": {
+          "const": "1.1.1"
+        },
+        "content_version": {
+          "const": "1.3.1"
+        },
+        "rng_algorithm": {
+          "const": "BD-PCG32-v1"
+        },
+        "replay_pin": {
+          "const": "tests/golden/replay_pin.json"
+        }
+      },
+      "required": [
+        "rules_version",
+        "content_version",
+        "rng_algorithm",
+        "replay_pin"
+      ]
+    },
+    "clientParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile_id": {
+          "const": "profile_demo"
+        },
+        "hero_id": {
+          "$ref": "#/$defs/heroId"
+        },
+        "catalog_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_vocation_id": {
+          "$ref": "#/$defs/vocationId"
+        },
+        "vocation_slot": {
+          "enum": [
+            "active",
+            "secondary"
+          ]
+        },
+        "skill_id": {
+          "$ref": "#/$defs/skillId"
+        },
+        "slot_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "die_instance_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "profile_id",
+        "hero_id",
+        "catalog_version"
+      ]
+    },
+    "shippedParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "party": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "class_id": {
+                "enum": [
+                  "squire",
+                  "apprentice",
+                  "scout"
+                ]
+              },
+              "row": {
+                "enum": [
+                  "front",
+                  "back"
+                ]
+              }
+            },
+            "required": [
+              "class_id",
+              "row"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5
+        },
+        "hero_id": {
+          "$ref": "#/$defs/heroId"
+        },
+        "die_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "offer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "die_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": [
+              "die_id"
+            ]
+          }
+        }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "command_id",
+        "state_revision",
+        "params"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "PreviewVocation",
+            "ClaimVocation",
+            "ChangeVocation",
+            "EquipInheritedSkill",
+            "UnequipInheritedSkill",
+            "EquipDie",
+            "ConfirmBuild",
+            "StartRun",
+            "ChooseUpgrade",
+            "SetActionPlan"
+          ]
+        },
+        "command_id": {
+          "$ref": "#/$defs/commandId"
+        },
+        "state_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "params": {
+          "type": "object"
+        }
+      },
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "PreviewVocation",
+              "ClaimVocation",
+              "ChangeVocation",
+              "EquipInheritedSkill",
+              "UnequipInheritedSkill",
+              "EquipDie",
+              "ConfirmBuild"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/clientParams"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/shippedParams"
+          }
+        }
+      }
+    },
+    "trustedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "ApplyDiscoverySignal",
+            "RecordQuestCompletion",
+            "AwardEncounterMastery",
+            "LoadProfile",
+            "ValidateCatalog",
+            "BuildCareerTreeView",
+            "ReplayPinnedRuns",
+            "ReplayRecordedSession",
+            "RunEnded",
+            "ResolveReactionStages"
+          ]
+        },
+        "profile_id": {
+          "const": "profile_demo"
+        },
+        "hero_id": {
+          "$ref": "#/$defs/heroId"
+        },
+        "run_id": {
+          "const": "run_0001"
+        },
+        "signal": {
+          "type": "string",
+          "pattern": "^[a-z_]+:[a-z0-9_:]+$"
+        },
+        "encounter_id": {
+          "$ref": "#/$defs/encounterId"
+        },
+        "vocation_id": {
+          "$ref": "#/$defs/vocationId"
+        },
+        "deployed_at_encounter_start": {
+          "type": "boolean"
+        },
+        "challenge_id": {
+          "enum": [
+            "protect_ally",
+            "resource_into_action",
+            "status_into_attack",
+            "prevent_3_damage",
+            "feint_finish",
+            "mana_cycle",
+            "charged_strike",
+            "hex_and_convert",
+            "mark_and_strike",
+            "block_and_counter",
+            "ritual_complete",
+            "adaptive_sequence",
+            "risk_manipulation",
+            "drake_burst"
+          ]
+        },
+        "challenge_evidence_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pin_path": {
+          "const": "tests/golden/replay_pin.json"
+        },
+        "times": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "outcome": {
+          "enum": [
+            "victory",
+            "defeat"
+          ]
+        },
+        "intent_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "$ref": "#/$defs/command"
+        },
+        "event": {
+          "$ref": "#/$defs/trustedEvent"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "command"
+          ]
+        },
+        {
+          "required": [
+            "event"
+          ]
+        }
+      ]
+    },
+    "expectedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "VocationClaimed",
+            "VocationChanged",
+            "DiscoveryChanged",
+            "MasteryAwarded"
+          ]
+        },
+        "hero_id": {
+          "$ref": "#/$defs/heroId"
+        },
+        "vocation_id": {
+          "$ref": "#/$defs/vocationId"
+        },
+        "route_id": {
+          "$ref": "#/$defs/routeId"
+        },
+        "consumed_items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/itemQuantity"
+          }
+        },
+        "from": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/vocationId"
+            },
+            {
+              "$ref": "#/$defs/discoveryState"
+            }
+          ]
+        },
+        "to": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/vocationId"
+            },
+            {
+              "$ref": "#/$defs/discoveryState"
+            }
+          ]
+        },
+        "signal": {
+          "type": "string"
+        },
+        "displaced_dice_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "base_points": {
+          "enum": [
+            0,
+            1
+          ]
+        },
+        "challenge_points": {
+          "enum": [
+            0,
+            1
+          ]
+        },
+        "points_after": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rank_after": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target_vocation_id": {
+          "$ref": "#/$defs/vocationId"
+        },
+        "discovered": {
+          "type": "boolean"
+        },
+        "unlocked_for_hero": {
+          "type": "boolean"
+        },
+        "eligible_to_claim": {
+          "type": "boolean"
+        },
+        "blocked_by": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "error_code": {
+                "$ref": "#/$defs/errorCode"
+              },
+              "routes": {
+                "$ref": "#/$defs/routes"
+              }
+            },
+            "required": [
+              "error_code"
+            ]
+          }
+        },
+        "requested_stat_bonus": {
+          "$ref": "#/$defs/statsBonus"
+        },
+        "permanent_stat_bonus": {
+          "$ref": "#/$defs/statsBonus"
+        },
+        "effective_stats": {
+          "$ref": "#/$defs/statsFull"
+        }
+      },
+      "required": [
+        "target_vocation_id"
+      ]
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "$ref": "#/$defs/profileState"
+        },
+        "heroes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/heroState"
+          },
+          "minItems": 1
+        },
+        "run": {
+          "$ref": "#/$defs/runState"
+        },
+        "mastery_award_events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/awardRow"
+          }
+        },
+        "run_die_upgrades": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/runDieUpgrade"
+          }
+        },
+        "processed_commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/processedCommand"
+          }
+        },
+        "preview": {
+          "$ref": "#/$defs/preview"
+        },
+        "view_model": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "career_tree": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "listed_vocation_ids": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/vocationId"
+                  },
+                  "uniqueItems": true
+                },
+                "absent_vocation_ids": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/vocationId"
+                  },
+                  "uniqueItems": true
+                },
+                "forbidden_strings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "required": [
+                "listed_vocation_ids",
+                "absent_vocation_ids",
+                "forbidden_strings"
+              ]
+            }
+          },
+          "required": [
+            "career_tree"
+          ]
+        },
+        "face_options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "die_instance_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "face_index": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "action_id": {
+                "enum": [
+                  "blank",
+                  "sq_attack2",
+                  "sq_attack1",
+                  "sq_shield3",
+                  "sq_shield2",
+                  "sq_rally",
+                  "gain_mana1",
+                  "gain_mana2",
+                  "ap_spell3",
+                  "ap_mend",
+                  "weaken1",
+                  "cleanse2",
+                  "shield2",
+                  "sc_attack2",
+                  "sc_attack1",
+                  "poison1",
+                  "heavy_shield4",
+                  "melee3",
+                  "melee2",
+                  "ranged3",
+                  "ranged2",
+                  "heal2",
+                  "heal3",
+                  "spell4",
+                  "spell3",
+                  "shield3",
+                  "remove_corruption1",
+                  "spend_corruption_strike",
+                  "gain_corruption1",
+                  "siphon_mana1",
+                  "all_shield2",
+                  "hero_rally",
+                  "drake_strike4",
+                  "trick_sting2"
+                ]
+              },
+              "visible": {
+                "type": "boolean"
+              },
+              "revive_option_enabled": {
+                "type": "boolean"
+              },
+              "disabled_reason": {
+                "enum": [
+                  "insufficient_mana"
+                ]
+              }
+            },
+            "required": [
+              "die_instance_id",
+              "face_index",
+              "action_id",
+              "visible"
+            ]
+          }
+        },
+        "revive_capable_action_ids": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "blank",
+              "sq_attack2",
+              "sq_attack1",
+              "sq_shield3",
+              "sq_shield2",
+              "sq_rally",
+              "gain_mana1",
+              "gain_mana2",
+              "ap_spell3",
+              "ap_mend",
+              "weaken1",
+              "cleanse2",
+              "shield2",
+              "sc_attack2",
+              "sc_attack1",
+              "poison1",
+              "heavy_shield4",
+              "melee3",
+              "melee2",
+              "ranged3",
+              "ranged2",
+              "heal2",
+              "heal3",
+              "spell4",
+              "spell3",
+              "shield3",
+              "remove_corruption1",
+              "spend_corruption_strike",
+              "gain_corruption1",
+              "siphon_mana1",
+              "all_shield2",
+              "hero_rally",
+              "drake_strike4",
+              "trick_sting2"
+            ]
+          }
+        },
+        "reactions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "stage_order": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "guard",
+                  "resource",
+                  "interrupt",
+                  "enemy_resolution"
+                ]
+              }
+            },
+            "max_reactions_per_hero_per_intent": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "nested_reaction_windows": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "stage_order",
+            "max_reactions_per_hero_per_intent",
+            "nested_reaction_windows"
+          ]
+        },
+        "replay": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pin_path": {
+              "const": "tests/golden/replay_pin.json"
+            },
+            "runs_reproduced": {
+              "const": "all"
+            },
+            "events_hash_matches_pin": {
+              "const": true
+            },
+            "final_state_hash_matches_pin": {
+              "const": true
+            },
+            "progression_rows_written": {
+              "const": 0
+            }
+          },
+          "required": [
+            "pin_path",
+            "runs_reproduced",
+            "events_hash_matches_pin",
+            "final_state_hash_matches_pin"
+          ]
+        },
+        "determinism": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "progression_events_byte_identical": {
+              "const": true
+            },
+            "final_state_hash_identical": {
+              "const": true
+            },
+            "rng_draws_on_rejected_commands": {
+              "const": 0
+            }
+          },
+          "required": [
+            "progression_events_byte_identical",
+            "final_state_hash_identical",
+            "rng_draws_on_rejected_commands"
+          ]
+        }
+      }
+    },
+    "historyStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome"
+      ],
+      "properties": {
+        "command": {
+          "$ref": "#/$defs/command"
+        },
+        "event": {
+          "$ref": "#/$defs/trustedEvent"
+        },
+        "outcome": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "aborted"
+          ]
+        },
+        "duplicate": {
+          "type": "boolean"
+        },
+        "error_code": {
+          "$ref": "#/$defs/errorCode"
+        },
+        "fault_injection": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "after": {
+              "enum": [
+                "item_decrement"
+              ]
+            },
+            "before": {
+              "enum": [
+                "unlock_insert"
+              ]
+            }
+          },
+          "required": [
+            "after",
+            "before"
+          ]
+        },
+        "state_after": {
+          "$ref": "#/$defs/state"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "command"
+          ]
+        },
+        {
+          "required": [
+            "event"
+          ]
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "aborted"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "fault_injection"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "fault_injection"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "rejected"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "error_code"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "error_code"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "given": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "feature_gate": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "class_evolution_v1": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "class_evolution_v1"
+          ]
+        },
+        "baseline": {
+          "$ref": "#/$defs/baseline"
+        },
+        "catalog": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "catalog_version": {
+              "const": "1.3.1"
+            },
+            "overrides": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "value": {}
+                },
+                "required": [
+                  "path",
+                  "value"
+                ]
+              },
+              "minItems": 1
+            },
+            "installed": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "catalog_version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "state": {
+                    "enum": [
+                      "active",
+                      "retired"
+                    ]
+                  },
+                  "content_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                },
+                "required": [
+                  "catalog_version",
+                  "state"
+                ]
+              }
+            },
+            "migration_manifest": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "to": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "from",
+                  "to"
+                ]
+              }
+            }
+          },
+          "required": [
+            "catalog_version"
+          ]
+        },
+        "profile": {
+          "$ref": "#/$defs/profileState"
+        },
+        "heroes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/heroState"
+          },
+          "minItems": 1
+        },
+        "run": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/runState"
+            }
+          ]
+        },
+        "encounter": {
+          "$ref": "#/$defs/encounterState"
+        },
+        "mastery_award_events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/awardRow"
+          }
+        },
+        "run_die_upgrades": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/runDieUpgrade"
+          }
+        },
+        "processed_commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/processedCommand"
+          }
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/historyStep"
+          },
+          "minItems": 1
+        },
+        "party_matrix": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "squire",
+                "apprentice",
+                "scout"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 5
+          },
+          "minItems": 5,
+          "maxItems": 5
+        },
+        "recorded_session": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "seed_decimal": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "includes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "command_log": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "seed_decimal",
+            "includes",
+            "command_log"
+          ]
+        }
+      }
+    },
+    "then": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result"
+      ],
+      "properties": {
+        "result": {
+          "enum": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        "error_code": {
+          "$ref": "#/$defs/errorCode"
+        },
+        "error_details": {
+          "$ref": "#/$defs/errorDetails"
+        },
+        "duplicate": {
+          "type": "boolean"
+        },
+        "state": {
+          "$ref": "#/$defs/state"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/expectedEvent"
+          }
+        },
+        "unchanged": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "invariants": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 20,
+            "pattern": "[.]$"
+          },
+          "minItems": 1
+        }
+      },
+      "if": {
+        "properties": {
+          "result": {
+            "const": "accepted"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "error_code"
+              ]
+            },
+            {
+              "required": [
+                "error_details"
+              ]
+            }
+          ]
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "duplicate"
+          ]
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "priority",
+        "mode",
+        "given",
+        "when",
+        "then"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^CE-(0[1-9]|[1-3][0-9]|40)$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "priority": {
+          "enum": [
+            "P0",
+            "P1"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "automated_integration",
+            "static_content_validation"
+          ]
+        },
+        "given": {
+          "$ref": "#/$defs/given"
+        },
+        "when": {
+          "$ref": "#/$defs/action"
+        },
+        "then": {
+          "$ref": "#/$defs/then"
+        },
+        "needs_design_decision": {
+          "type": "string",
+          "minLength": 20,
+          "pattern": "[.]$"
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "description": "A rejected case names its error_code unless a design decision is still needed to choose one.",
+      "if": {
+        "properties": {
+          "then": {
+            "properties": {
+              "result": {
+                "const": "rejected"
+              }
+            },
+            "not": {
+              "required": [
+                "error_code"
+              ]
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "needs_design_decision"
+        ]
+      }
+    }
+  }
+}

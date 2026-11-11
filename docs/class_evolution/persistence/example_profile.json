@@ -1,0 +1,1078 @@
+{
+  "schema_version": 2,
+  "document_id": "BD-FDD-CE-001",
+  "fdd_version": "0.2",
+  "status": "SPECIFICATION_ONLY",
+  "notes": [
+    "Carried over from the v0.1 example and completed so that it loads into progression.sql (schema version 2).",
+    "Baseline: rules 1.1.1, content 1.3.1, RNG BD-PCG32-v1. content_sha256 is the content_hash of the shipped 1.3.1 content as recorded in tests/golden/replay_pin.json.",
+    "Vocation, skill, item, quest, die and encounter ids, families, skill costs and Champion's numbers come from the v0.1 vocation catalog. Novice base stats come from the shipped 1.3.1 classes.json.",
+    "Illustrative values, not facts about any player: display_name, origin_vocation_id, every timestamp, every revision counter, the order of the progression events and the die instance ids.",
+    "The v0.1 run phase 'preparation' is mapped to the engine phase 'upgrade': battle 1 (training_04) is won and granted the drake_scale, the mandatory upgrade is not chosen yet, and training_05 is next.",
+    "The v0.1 current encounter id 'vault_05' is not in the catalog's encounter pool; it is replaced by 'training_05', which has the same threat rating 5.",
+    "The v0.1 example left the public vocations arcanist, shadowbinder, ranger and archmage out of the discovered list; they are visible from the start, so they are listed as discovered here.",
+    "No mastery_award_event row is recorded for battle 1: Champion was already rank 8. Whether a denied award row is written for a mastered vocation is an open design question.",
+    "unlock_evaluation and current_encounter are derived at read time and are not stored."
+  ],
+  "catalog": {
+    "catalog_version": "1.3.1",
+    "content_sha256": "83ec6408f6c2cdc0913215942ca2cdebd99e3d5ab2c4b3557db23c4a41123b41",
+    "content_sha256_source": "tests/golden/replay_pin.json content_hash",
+    "rules_version": "1.1.1",
+    "rng_version": "BD-PCG32-v1",
+    "state": "active",
+    "installed_at": "2026-11-01T09:00:00Z",
+    "global_permanent_bonus_caps": {
+      "max_hp": 2,
+      "max_mana": 1,
+      "speed": 1
+    },
+    "vocations": [
+      {
+        "vocation_id": "squire",
+        "display_name": "Squire",
+        "family": "novice",
+        "visibility": "public"
+      },
+      {
+        "vocation_id": "apprentice",
+        "display_name": "Apprentice",
+        "family": "novice",
+        "visibility": "public"
+      },
+      {
+        "vocation_id": "scout",
+        "display_name": "Scout",
+        "family": "novice",
+        "visibility": "public"
+      },
+      {
+        "vocation_id": "guardian",
+        "display_name": "Guardian",
+        "family": "advanced",
+        "visibility": "public"
+      },
+      {
+        "vocation_id": "duelist",
+        "display_name": "Duelist",
+        "family": "advanced",
+        "visibility": "public"
+      },
+      {
+        "vocation_id": "arcanist",
+        "display_name": "Arcanist",
+        "family": "advanced",
+        "visibility": "public"
+      },
+      {
+        "vocation_id": "spellblade",
+        "display_name": "Spellblade",
+        "family": "advanced",
+        "visibility": "public"
+      },
+      {
+        "vocation_id": "shadowbinder",
+        "display_name": "Shadowbinder",
+        "family": "advanced",
+        "visibility": "public"
+      },
+      {
+        "vocation_id": "ranger",
+        "display_name": "Ranger",
+        "family": "advanced",
+        "visibility": "public"
+      },
+      {
+        "vocation_id": "champion",
+        "display_name": "Champion",
+        "family": "capstone",
+        "visibility": "public"
+      },
+      {
+        "vocation_id": "archmage",
+        "display_name": "Archmage",
+        "family": "capstone",
+        "visibility": "public"
+      },
+      {
+        "vocation_id": "hero",
+        "display_name": "Hero",
+        "family": "capstone",
+        "visibility": "public"
+      },
+      {
+        "vocation_id": "trickster",
+        "display_name": "Trickster",
+        "family": "secret",
+        "visibility": "secret"
+      },
+      {
+        "vocation_id": "dragon_knight",
+        "display_name": "Dragon Knight",
+        "family": "secret",
+        "visibility": "secret"
+      }
+    ],
+    "skills": [
+      {
+        "skill_id": "squire_anchor",
+        "source_vocation_id": "squire",
+        "capacity_cost": 1
+      },
+      {
+        "skill_id": "apprentice_focus",
+        "source_vocation_id": "apprentice",
+        "capacity_cost": 2
+      },
+      {
+        "skill_id": "scout_marksman",
+        "source_vocation_id": "scout",
+        "capacity_cost": 2
+      },
+      {
+        "skill_id": "guardian_field_medic",
+        "source_vocation_id": "guardian",
+        "capacity_cost": 3
+      },
+      {
+        "skill_id": "duelist_footwork",
+        "source_vocation_id": "duelist",
+        "capacity_cost": 2
+      },
+      {
+        "skill_id": "arcanist_reservoir",
+        "source_vocation_id": "arcanist",
+        "capacity_cost": 2
+      },
+      {
+        "skill_id": "spellblade_edge",
+        "source_vocation_id": "spellblade",
+        "capacity_cost": 2
+      },
+      {
+        "skill_id": "shadowbinder_hex",
+        "source_vocation_id": "shadowbinder",
+        "capacity_cost": 2
+      },
+      {
+        "skill_id": "ranger_mark",
+        "source_vocation_id": "ranger",
+        "capacity_cost": 2
+      },
+      {
+        "skill_id": "champion_guard",
+        "source_vocation_id": "champion",
+        "capacity_cost": 0
+      },
+      {
+        "skill_id": "archmage_ritual",
+        "source_vocation_id": "archmage",
+        "capacity_cost": 0
+      },
+      {
+        "skill_id": "heroic_resolve",
+        "source_vocation_id": "hero",
+        "capacity_cost": 0
+      },
+      {
+        "skill_id": "trickster_luck",
+        "source_vocation_id": "trickster",
+        "capacity_cost": 2
+      },
+      {
+        "skill_id": "dragonhide",
+        "source_vocation_id": "dragon_knight",
+        "capacity_cost": 2
+      }
+    ]
+  },
+  "profile": {
+    "profile_id": "profile_demo",
+    "created_at": "2026-11-01T09:00:00Z",
+    "revision": 0,
+    "vocation_discovery": [
+      {
+        "vocation_id": "squire",
+        "discovery_state": "discovered",
+        "clue_count": 0,
+        "modified_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "vocation_id": "apprentice",
+        "discovery_state": "discovered",
+        "clue_count": 0,
+        "modified_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "vocation_id": "scout",
+        "discovery_state": "discovered",
+        "clue_count": 0,
+        "modified_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "vocation_id": "guardian",
+        "discovery_state": "discovered",
+        "clue_count": 0,
+        "modified_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "vocation_id": "duelist",
+        "discovery_state": "discovered",
+        "clue_count": 0,
+        "modified_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "vocation_id": "arcanist",
+        "discovery_state": "discovered",
+        "clue_count": 0,
+        "modified_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "vocation_id": "spellblade",
+        "discovery_state": "discovered",
+        "clue_count": 0,
+        "modified_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "vocation_id": "shadowbinder",
+        "discovery_state": "discovered",
+        "clue_count": 0,
+        "modified_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "vocation_id": "ranger",
+        "discovery_state": "discovered",
+        "clue_count": 0,
+        "modified_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "vocation_id": "champion",
+        "discovery_state": "discovered",
+        "clue_count": 0,
+        "modified_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "vocation_id": "archmage",
+        "discovery_state": "discovered",
+        "clue_count": 0,
+        "modified_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "vocation_id": "hero",
+        "discovery_state": "discovered",
+        "clue_count": 0,
+        "modified_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "vocation_id": "trickster",
+        "discovery_state": "hinted",
+        "clue_count": 1,
+        "modified_at": "2026-11-01T09:15:00Z"
+      },
+      {
+        "vocation_id": "dragon_knight",
+        "discovery_state": "discovered",
+        "clue_count": 2,
+        "modified_at": "2026-11-01T09:17:00Z"
+      }
+    ],
+    "inventory": [
+      {
+        "item_id": "drake_scale",
+        "quantity": 1,
+        "revision": 0
+      }
+    ],
+    "item_grants": [
+      {
+        "grant_id": "first_clear:training_04:hero_001:drake_scale",
+        "item_id": "drake_scale",
+        "quantity": 1,
+        "hero_id": "hero_001",
+        "run_id": "run_demo",
+        "encounter_id": "training_04",
+        "granted_at": "2026-11-01T09:16:00Z"
+      }
+    ],
+    "completed_profile_quests": []
+  },
+  "hero": {
+    "hero_id": "hero_001",
+    "display_name": "Demo Hero",
+    "origin_vocation_id": "squire",
+    "created_at": "2026-11-01T09:00:00Z",
+    "revision": 17,
+    "eligibility_state": "eligible",
+    "active_vocation_id": "champion",
+    "mastery": [
+      {
+        "vocation_id": "squire",
+        "rank": 8,
+        "points": 14,
+        "completed_at": "2026-11-01T09:03:00Z",
+        "revision": 14
+      },
+      {
+        "vocation_id": "apprentice",
+        "rank": 8,
+        "points": 14,
+        "completed_at": "2026-11-01T09:04:00Z",
+        "revision": 14
+      },
+      {
+        "vocation_id": "scout",
+        "rank": 8,
+        "points": 14,
+        "completed_at": "2026-11-01T09:05:00Z",
+        "revision": 14
+      },
+      {
+        "vocation_id": "guardian",
+        "rank": 8,
+        "points": 24,
+        "completed_at": "2026-11-01T09:10:00Z",
+        "revision": 24
+      },
+      {
+        "vocation_id": "duelist",
+        "rank": 8,
+        "points": 24,
+        "completed_at": "2026-11-01T09:11:00Z",
+        "revision": 24
+      },
+      {
+        "vocation_id": "spellblade",
+        "rank": 8,
+        "points": 24,
+        "completed_at": "2026-11-01T09:12:00Z",
+        "revision": 24
+      },
+      {
+        "vocation_id": "champion",
+        "rank": 8,
+        "points": 35,
+        "completed_at": "2026-11-01T09:14:00Z",
+        "revision": 35
+      }
+    ],
+    "character_unlocked": [
+      {
+        "vocation_id": "squire",
+        "unlock_route_id": "route_0",
+        "claim_event_id": "profile_demo:0",
+        "unlocked_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "vocation_id": "apprentice",
+        "unlock_route_id": "route_0",
+        "claim_event_id": "profile_demo:1",
+        "unlocked_at": "2026-11-01T09:01:00Z"
+      },
+      {
+        "vocation_id": "scout",
+        "unlock_route_id": "route_0",
+        "claim_event_id": "profile_demo:2",
+        "unlocked_at": "2026-11-01T09:02:00Z"
+      },
+      {
+        "vocation_id": "guardian",
+        "unlock_route_id": "route_0",
+        "claim_event_id": "profile_demo:6",
+        "unlocked_at": "2026-11-01T09:06:00Z"
+      },
+      {
+        "vocation_id": "duelist",
+        "unlock_route_id": "route_0",
+        "claim_event_id": "profile_demo:7",
+        "unlocked_at": "2026-11-01T09:07:00Z"
+      },
+      {
+        "vocation_id": "spellblade",
+        "unlock_route_id": "route_0",
+        "claim_event_id": "profile_demo:8",
+        "unlocked_at": "2026-11-01T09:08:00Z"
+      },
+      {
+        "vocation_id": "champion",
+        "unlock_route_id": "route_0",
+        "claim_event_id": "profile_demo:13",
+        "unlocked_at": "2026-11-01T09:13:00Z"
+      }
+    ],
+    "permanent_upgrades": [
+      {
+        "upgrade_id": "mastery_bonus:hero_001:squire",
+        "upgrade_kind": "mastery_stat_bonus",
+        "effect": {
+          "stat": "max_hp",
+          "amount": 1,
+          "source_vocation_id": "squire"
+        },
+        "source_event_id": "profile_demo:3",
+        "earned_at": "2026-11-01T09:03:00Z"
+      },
+      {
+        "upgrade_id": "mastery_bonus:hero_001:apprentice",
+        "upgrade_kind": "mastery_stat_bonus",
+        "effect": {
+          "stat": "max_mana",
+          "amount": 1,
+          "source_vocation_id": "apprentice"
+        },
+        "source_event_id": "profile_demo:4",
+        "earned_at": "2026-11-01T09:04:00Z"
+      },
+      {
+        "upgrade_id": "mastery_bonus:hero_001:scout",
+        "upgrade_kind": "mastery_stat_bonus",
+        "effect": {
+          "stat": "speed",
+          "amount": 1,
+          "source_vocation_id": "scout"
+        },
+        "source_event_id": "profile_demo:5",
+        "earned_at": "2026-11-01T09:05:00Z"
+      },
+      {
+        "upgrade_id": "mastery_bonus:hero_001:guardian",
+        "upgrade_kind": "mastery_stat_bonus",
+        "effect": {
+          "stat": "max_hp",
+          "amount": 1,
+          "source_vocation_id": "guardian"
+        },
+        "source_event_id": "profile_demo:10",
+        "earned_at": "2026-11-01T09:10:00Z"
+      }
+    ],
+    "permanent_stat_bonus": {
+      "max_hp": 2,
+      "max_mana": 1,
+      "speed": 1
+    },
+    "base_class_stats": {
+      "max_hp": 18,
+      "max_mana": 5,
+      "speed": 10,
+      "base_initiative": 6,
+      "max_corruption": 6
+    },
+    "effective_max_stats": {
+      "max_hp": 20,
+      "max_mana": 6,
+      "speed": 11,
+      "base_initiative": 6,
+      "max_corruption": 6
+    },
+    "effective_max_stats_if_active": {
+      "squire": {
+        "base": {
+          "max_hp": 14,
+          "max_mana": 3,
+          "speed": 7,
+          "base_initiative": 5,
+          "max_corruption": 6
+        },
+        "effective": {
+          "max_hp": 16,
+          "max_mana": 4,
+          "speed": 8,
+          "base_initiative": 5,
+          "max_corruption": 6
+        }
+      },
+      "apprentice": {
+        "base": {
+          "max_hp": 12,
+          "max_mana": 6,
+          "speed": 9,
+          "base_initiative": 4,
+          "max_corruption": 6
+        },
+        "effective": {
+          "max_hp": 14,
+          "max_mana": 7,
+          "speed": 10,
+          "base_initiative": 4,
+          "max_corruption": 6
+        }
+      },
+      "scout": {
+        "base": {
+          "max_hp": 9,
+          "max_mana": 4,
+          "speed": 10,
+          "base_initiative": 6,
+          "max_corruption": 6
+        },
+        "effective": {
+          "max_hp": 11,
+          "max_mana": 5,
+          "speed": 11,
+          "base_initiative": 6,
+          "max_corruption": 6
+        }
+      }
+    },
+    "inherited_skills": [
+      {
+        "slot_index": 0,
+        "skill_id": "squire_anchor",
+        "cost": 1
+      },
+      {
+        "slot_index": 1,
+        "skill_id": "guardian_field_medic",
+        "cost": 3
+      },
+      {
+        "slot_index": 2,
+        "skill_id": "scout_marksman",
+        "cost": 2
+      }
+    ],
+    "inheritance_capacity_max": 6,
+    "inheritance_capacity_used": 6,
+    "owned_dice": [
+      {
+        "die_instance_id": "hero_001-iron_d6-1",
+        "definition_id": "iron_d6",
+        "definition_version": 1,
+        "location": "bench",
+        "acquisition_key": "starter:squire:0",
+        "acquired_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "die_instance_id": "hero_001-oath_d4-1",
+        "definition_id": "oath_d4",
+        "definition_version": 1,
+        "location": "bench",
+        "acquisition_key": "starter:squire:1",
+        "acquired_at": "2026-11-01T09:00:00Z"
+      },
+      {
+        "die_instance_id": "hero_001-arcane_d6-1",
+        "definition_id": "arcane_d6",
+        "definition_version": 1,
+        "location": "bench",
+        "acquisition_key": "starter:apprentice:0",
+        "acquired_at": "2026-11-01T09:01:00Z"
+      },
+      {
+        "die_instance_id": "hero_001-focus_d4-1",
+        "definition_id": "focus_d4",
+        "definition_version": 1,
+        "location": "bench",
+        "acquisition_key": "starter:apprentice:1",
+        "acquired_at": "2026-11-01T09:01:00Z"
+      },
+      {
+        "die_instance_id": "hero_001-striker_d8-1",
+        "definition_id": "striker_d8",
+        "definition_version": 1,
+        "location": "bench",
+        "acquisition_key": "starter:scout:0",
+        "acquired_at": "2026-11-01T09:02:00Z"
+      },
+      {
+        "die_instance_id": "hero_001-tools_d4-1",
+        "definition_id": "tools_d4",
+        "definition_version": 1,
+        "location": "bench",
+        "acquisition_key": "starter:scout:1",
+        "acquired_at": "2026-11-01T09:02:00Z"
+      },
+      {
+        "die_instance_id": "hero_001-guardian_d6-1",
+        "definition_id": "guardian_d6",
+        "definition_version": 1,
+        "location": "bench",
+        "acquisition_key": "starter:guardian:0",
+        "acquired_at": "2026-11-01T09:06:00Z"
+      },
+      {
+        "die_instance_id": "hero_001-guardian_d4-1",
+        "definition_id": "guardian_d4",
+        "definition_version": 1,
+        "location": "bench",
+        "acquisition_key": "starter:guardian:1",
+        "acquired_at": "2026-11-01T09:06:00Z"
+      },
+      {
+        "die_instance_id": "hero_001-duelist_d6-1",
+        "definition_id": "duelist_d6",
+        "definition_version": 1,
+        "location": "bench",
+        "acquisition_key": "starter:duelist:0",
+        "acquired_at": "2026-11-01T09:07:00Z"
+      },
+      {
+        "die_instance_id": "hero_001-duelist_d4-1",
+        "definition_id": "duelist_d4",
+        "definition_version": 1,
+        "location": "bench",
+        "acquisition_key": "starter:duelist:1",
+        "acquired_at": "2026-11-01T09:07:00Z"
+      },
+      {
+        "die_instance_id": "hero_001-spellblade_d6-1",
+        "definition_id": "spellblade_d6",
+        "definition_version": 1,
+        "location": "bench",
+        "acquisition_key": "starter:spellblade:0",
+        "acquired_at": "2026-11-01T09:08:00Z"
+      },
+      {
+        "die_instance_id": "hero_001-spellblade_d4-1",
+        "definition_id": "spellblade_d4",
+        "definition_version": 1,
+        "location": "bench",
+        "acquisition_key": "starter:spellblade:1",
+        "acquired_at": "2026-11-01T09:08:00Z"
+      },
+      {
+        "die_instance_id": "hero_001-champion_d8-1",
+        "definition_id": "champion_d8",
+        "definition_version": 1,
+        "location": "equipped",
+        "acquisition_key": "starter:champion:0",
+        "acquired_at": "2026-11-01T09:13:00Z"
+      },
+      {
+        "die_instance_id": "hero_001-champion_d6-1",
+        "definition_id": "champion_d6",
+        "definition_version": 1,
+        "location": "equipped",
+        "acquisition_key": "starter:champion:1",
+        "acquired_at": "2026-11-01T09:13:00Z"
+      }
+    ],
+    "equipped_dice": [
+      {
+        "slot_index": 0,
+        "die_instance_id": "hero_001-champion_d8-1"
+      },
+      {
+        "slot_index": 1,
+        "die_instance_id": "hero_001-champion_d6-1"
+      }
+    ],
+    "learned_skills": [
+      {
+        "skill_id": "squire_anchor",
+        "acquired_from_vocation_id": "squire",
+        "learned_at": "2026-11-01T09:03:00Z"
+      },
+      {
+        "skill_id": "apprentice_focus",
+        "acquired_from_vocation_id": "apprentice",
+        "learned_at": "2026-11-01T09:04:00Z"
+      },
+      {
+        "skill_id": "scout_marksman",
+        "acquired_from_vocation_id": "scout",
+        "learned_at": "2026-11-01T09:05:00Z"
+      },
+      {
+        "skill_id": "guardian_field_medic",
+        "acquired_from_vocation_id": "guardian",
+        "learned_at": "2026-11-01T09:10:00Z"
+      },
+      {
+        "skill_id": "duelist_footwork",
+        "acquired_from_vocation_id": "duelist",
+        "learned_at": "2026-11-01T09:11:00Z"
+      },
+      {
+        "skill_id": "spellblade_edge",
+        "acquired_from_vocation_id": "spellblade",
+        "learned_at": "2026-11-01T09:12:00Z"
+      },
+      {
+        "skill_id": "champion_guard",
+        "acquired_from_vocation_id": "champion",
+        "learned_at": "2026-11-01T09:14:00Z"
+      }
+    ],
+    "hero_quest_completions": []
+  },
+  "progression_events": [
+    {
+      "event_seq": 0,
+      "event_id": "profile_demo:0",
+      "run_id": null,
+      "event_type": "VocationClaimed",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "squire",
+        "route_id": "route_0",
+        "consumed_items": []
+      },
+      "previous_event_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "event_hash": "63f1c895670640f91ab37298ba45fd05edd09db0ff72b6ac6a20187276b84086",
+      "created_at": "2026-11-01T09:00:00Z"
+    },
+    {
+      "event_seq": 1,
+      "event_id": "profile_demo:1",
+      "run_id": null,
+      "event_type": "VocationClaimed",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "apprentice",
+        "route_id": "route_0",
+        "consumed_items": []
+      },
+      "previous_event_hash": "63f1c895670640f91ab37298ba45fd05edd09db0ff72b6ac6a20187276b84086",
+      "event_hash": "d8893aec60c0769309df4bee023eb5c2ef7318bb8fbbac006e420033ce3a9892",
+      "created_at": "2026-11-01T09:01:00Z"
+    },
+    {
+      "event_seq": 2,
+      "event_id": "profile_demo:2",
+      "run_id": null,
+      "event_type": "VocationClaimed",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "scout",
+        "route_id": "route_0",
+        "consumed_items": []
+      },
+      "previous_event_hash": "d8893aec60c0769309df4bee023eb5c2ef7318bb8fbbac006e420033ce3a9892",
+      "event_hash": "d10d21a0ab2194b0969e797bc0e31e32e7fc706147fee22713ee6d92533cb0ae",
+      "created_at": "2026-11-01T09:02:00Z"
+    },
+    {
+      "event_seq": 3,
+      "event_id": "profile_demo:3",
+      "run_id": null,
+      "event_type": "VocationMastered",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "squire",
+        "mastery_points": 14
+      },
+      "previous_event_hash": "d10d21a0ab2194b0969e797bc0e31e32e7fc706147fee22713ee6d92533cb0ae",
+      "event_hash": "33cf85a56235716b43a08460233035f1dfd98b5255a3ef42df578b81dd0168a8",
+      "created_at": "2026-11-01T09:03:00Z"
+    },
+    {
+      "event_seq": 4,
+      "event_id": "profile_demo:4",
+      "run_id": null,
+      "event_type": "VocationMastered",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "apprentice",
+        "mastery_points": 14
+      },
+      "previous_event_hash": "33cf85a56235716b43a08460233035f1dfd98b5255a3ef42df578b81dd0168a8",
+      "event_hash": "e4df8049ebb026ff7b9abb1cb42513d20fa5b494a8c06cf3d4211b42046da67d",
+      "created_at": "2026-11-01T09:04:00Z"
+    },
+    {
+      "event_seq": 5,
+      "event_id": "profile_demo:5",
+      "run_id": null,
+      "event_type": "VocationMastered",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "scout",
+        "mastery_points": 14
+      },
+      "previous_event_hash": "e4df8049ebb026ff7b9abb1cb42513d20fa5b494a8c06cf3d4211b42046da67d",
+      "event_hash": "b8f73e4968ee8ab0c24e64c1089a0b08a8dcdfbf9814b407babe64d040566723",
+      "created_at": "2026-11-01T09:05:00Z"
+    },
+    {
+      "event_seq": 6,
+      "event_id": "profile_demo:6",
+      "run_id": null,
+      "event_type": "VocationClaimed",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "guardian",
+        "route_id": "route_0",
+        "consumed_items": []
+      },
+      "previous_event_hash": "b8f73e4968ee8ab0c24e64c1089a0b08a8dcdfbf9814b407babe64d040566723",
+      "event_hash": "4cf5f93d6182d95823c6d2c08b7483f13a2a749668a197b580ab5717f678d8f8",
+      "created_at": "2026-11-01T09:06:00Z"
+    },
+    {
+      "event_seq": 7,
+      "event_id": "profile_demo:7",
+      "run_id": null,
+      "event_type": "VocationClaimed",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "duelist",
+        "route_id": "route_0",
+        "consumed_items": []
+      },
+      "previous_event_hash": "4cf5f93d6182d95823c6d2c08b7483f13a2a749668a197b580ab5717f678d8f8",
+      "event_hash": "a1aacdc126969d385fb3bbbf9c2df66b54835b4585ee7d4730a7a83518efb939",
+      "created_at": "2026-11-01T09:07:00Z"
+    },
+    {
+      "event_seq": 8,
+      "event_id": "profile_demo:8",
+      "run_id": null,
+      "event_type": "VocationClaimed",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "spellblade",
+        "route_id": "route_0",
+        "consumed_items": []
+      },
+      "previous_event_hash": "a1aacdc126969d385fb3bbbf9c2df66b54835b4585ee7d4730a7a83518efb939",
+      "event_hash": "cb4b28f5ddd730de561380db06e997e5a9fabf44e3f7c829ea49829ce30892dd",
+      "created_at": "2026-11-01T09:08:00Z"
+    },
+    {
+      "event_seq": 9,
+      "event_id": "profile_demo:9",
+      "run_id": null,
+      "event_type": "DiscoveryChanged",
+      "payload": {
+        "vocation_id": "dragon_knight",
+        "from": "hidden",
+        "to": "hinted",
+        "signal": "mastery_rank:spellblade:4"
+      },
+      "previous_event_hash": "cb4b28f5ddd730de561380db06e997e5a9fabf44e3f7c829ea49829ce30892dd",
+      "event_hash": "0d676e63a177280f4b258bbc74765de9937d74af9a0314ece11662b54a8f5b71",
+      "created_at": "2026-11-01T09:09:00Z"
+    },
+    {
+      "event_seq": 10,
+      "event_id": "profile_demo:10",
+      "run_id": null,
+      "event_type": "VocationMastered",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "guardian",
+        "mastery_points": 24
+      },
+      "previous_event_hash": "0d676e63a177280f4b258bbc74765de9937d74af9a0314ece11662b54a8f5b71",
+      "event_hash": "feac33abad5bf0fa95f09c3e50af94442c1b290982dbf4b9cc3b70a598d47f60",
+      "created_at": "2026-11-01T09:10:00Z"
+    },
+    {
+      "event_seq": 11,
+      "event_id": "profile_demo:11",
+      "run_id": null,
+      "event_type": "VocationMastered",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "duelist",
+        "mastery_points": 24
+      },
+      "previous_event_hash": "feac33abad5bf0fa95f09c3e50af94442c1b290982dbf4b9cc3b70a598d47f60",
+      "event_hash": "7681ea415b889790a80cf7359349e3e68d943ccf7e69c04ac660b451adb7592d",
+      "created_at": "2026-11-01T09:11:00Z"
+    },
+    {
+      "event_seq": 12,
+      "event_id": "profile_demo:12",
+      "run_id": null,
+      "event_type": "VocationMastered",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "spellblade",
+        "mastery_points": 24
+      },
+      "previous_event_hash": "7681ea415b889790a80cf7359349e3e68d943ccf7e69c04ac660b451adb7592d",
+      "event_hash": "a03df5fd53b50bff8e3bc3fba25754f0e1a9fffec3134aa90de78258c765c080",
+      "created_at": "2026-11-01T09:12:00Z"
+    },
+    {
+      "event_seq": 13,
+      "event_id": "profile_demo:13",
+      "run_id": null,
+      "event_type": "VocationClaimed",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "champion",
+        "route_id": "route_0",
+        "consumed_items": []
+      },
+      "previous_event_hash": "a03df5fd53b50bff8e3bc3fba25754f0e1a9fffec3134aa90de78258c765c080",
+      "event_hash": "7ae3c2174d753430b9b8b9ceee97437bad3b73c1dffc460b345d2e5b1f114ed7",
+      "created_at": "2026-11-01T09:13:00Z"
+    },
+    {
+      "event_seq": 14,
+      "event_id": "profile_demo:14",
+      "run_id": null,
+      "event_type": "VocationMastered",
+      "payload": {
+        "hero_id": "hero_001",
+        "vocation_id": "champion",
+        "mastery_points": 35
+      },
+      "previous_event_hash": "7ae3c2174d753430b9b8b9ceee97437bad3b73c1dffc460b345d2e5b1f114ed7",
+      "event_hash": "4d92e801206d535e3a335efdf6de07c88c7e19c9de891c43c372cfab658ac25d",
+      "created_at": "2026-11-01T09:14:00Z"
+    },
+    {
+      "event_seq": 15,
+      "event_id": "profile_demo:15",
+      "run_id": null,
+      "event_type": "DiscoveryChanged",
+      "payload": {
+        "vocation_id": "trickster",
+        "from": "hidden",
+        "to": "hinted",
+        "signal": "quest_hint:crooked_mirror"
+      },
+      "previous_event_hash": "4d92e801206d535e3a335efdf6de07c88c7e19c9de891c43c372cfab658ac25d",
+      "event_hash": "8d68724feac2e0906c8955112db0a22904b57ade913df20584bb8bdf89cc75f3",
+      "created_at": "2026-11-01T09:15:00Z"
+    },
+    {
+      "event_seq": 16,
+      "event_id": "profile_demo:16",
+      "run_id": "run_demo",
+      "event_type": "ItemGranted",
+      "payload": {
+        "grant_id": "first_clear:training_04:hero_001:drake_scale",
+        "item_id": "drake_scale",
+        "quantity": 1,
+        "hero_id": "hero_001",
+        "encounter_id": "training_04"
+      },
+      "previous_event_hash": "8d68724feac2e0906c8955112db0a22904b57ade913df20584bb8bdf89cc75f3",
+      "event_hash": "178c524e9dc8322fd2b1bb75163aeddb68f6c4f29e10272edf17aecb8ea4c4a8",
+      "created_at": "2026-11-01T09:16:00Z"
+    },
+    {
+      "event_seq": 17,
+      "event_id": "profile_demo:17",
+      "run_id": "run_demo",
+      "event_type": "DiscoveryChanged",
+      "payload": {
+        "vocation_id": "dragon_knight",
+        "from": "hinted",
+        "to": "discovered",
+        "signal": "item_found:drake_scale"
+      },
+      "previous_event_hash": "178c524e9dc8322fd2b1bb75163aeddb68f6c4f29e10272edf17aecb8ea4c4a8",
+      "event_hash": "afc0b74e325746837468d48914bff5c86fc8b6f386de6bda24e6f57c0f493727",
+      "created_at": "2026-11-01T09:17:00Z"
+    }
+  ],
+  "unlock_evaluation": {
+    "champion": {
+      "discovered": true,
+      "unlocked_for_hero": true
+    },
+    "hero": {
+      "discovered": true,
+      "unlocked_for_hero": false,
+      "eligible_to_claim": false,
+      "error_code": "PREREQUISITE_UNMET",
+      "routes": [
+        {
+          "route_id": "route_0",
+          "unmet": [
+            {
+              "op": "MASTERY_AT_LEAST",
+              "vocation_id": "archmage",
+              "rank": 8
+            }
+          ]
+        },
+        {
+          "route_id": "route_1",
+          "unmet": [
+            {
+              "op": "QUEST_COMPLETE",
+              "quest_id": "trial_of_the_hero"
+            }
+          ]
+        }
+      ],
+      "reason": "neither (Champion+Archmage mastered) nor (three advanced mastered + Trial of the Hero) are satisfied"
+    },
+    "dragon_knight": {
+      "discovered": true,
+      "unlocked_for_hero": false,
+      "eligible_to_claim": true,
+      "route_id": "route_0",
+      "required_item": "drake_scale",
+      "item_consume_on_claim": true
+    }
+  },
+  "current_encounter": {
+    "id": "training_05",
+    "threat_rating": 5,
+    "mastery_eligible": true,
+    "active_vocation_rank": 8,
+    "progress_delta_if_victory": 0,
+    "note": "Champion is already mastered; mastery accrual to it is capped"
+  },
+  "run_state": {
+    "run_id": "run_demo",
+    "phase": "upgrade",
+    "revision": 0,
+    "catalog_version": "1.3.1",
+    "content_sha256": "83ec6408f6c2cdc0913215942ca2cdebd99e3d5ab2c4b3557db23c4a41123b41",
+    "rules_version": "1.1.1",
+    "rng_version": "BD-PCG32-v1",
+    "seed_decimal": "12345",
+    "build_sha256": "c574989e125a72c0756488a4b1838d030aafea217123ca12687de2e330472017",
+    "started_at": "2026-11-01T09:16:00Z",
+    "completed_at": null,
+    "first_encounter_id": "training_04",
+    "encounter_build_snapshots": [
+      {
+        "encounter_id": "training_04",
+        "hero_id": "hero_001",
+        "vocation_id": "champion",
+        "build": {
+          "hero_id": "hero_001",
+          "active_vocation_id": "champion",
+          "base_class_stats": {
+            "max_hp": 18,
+            "max_mana": 5,
+            "speed": 10,
+            "base_initiative": 6,
+            "max_corruption": 6
+          },
+          "effective_max_stats": {
+            "max_hp": 20,
+            "max_mana": 6,
+            "speed": 11,
+            "base_initiative": 6,
+            "max_corruption": 6
+          },
+          "schedule_id": "defense_then_attack",
+          "native_reaction_stage": "guard",
+          "reaction_id": "rx_champion_aegis",
+          "native_passive_id": "aegis",
+          "dice": [
+            {
+              "slot_index": 0,
+              "die_instance_id": "hero_001-champion_d8-1",
+              "definition_id": "champion_d8",
+              "definition_version": 1
+            },
+            {
+              "slot_index": 1,
+              "die_instance_id": "hero_001-champion_d6-1",
+              "definition_id": "champion_d6",
+              "definition_version": 1
+            }
+          ],
+          "inherited_skill_ids": [
+            "squire_anchor",
+            "guardian_field_medic",
+            "scout_marksman"
+          ]
+        },
+        "build_sha256": "a9a242ba06616d715c19eb40ea53fcd994c3c40cd4f3101198bb714482cd43e9"
+      }
+    ]
+  }
+}

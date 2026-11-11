@@ -1,0 +1,141 @@
+{
+  "document_id": "BD-FDD-CE-001",
+  "fdd_version": "0.2",
+  "registry_version": 1,
+  "status": "SPECIFICATION_ONLY",
+  "description": "The one registry of machine-readable codes for Class Evolution. A rejected command returns exactly one code and changes nothing: no row, no revision, no random draw. Fixtures, the persistence check and later the engine use these names and no others.",
+  "kinds": {
+    "command_rejection": "Returned as the error_code of a rejected client command.",
+    "award_denial": "Stored in mastery_award_event.denial_reason. The award event is accepted and records zero points.",
+    "load_failure": "Returned when a saved profile cannot be opened as it is. The save is left untouched.",
+    "content_validation": "Reported by the catalog validator at build time. No player ever sees it."
+  },
+  "codes": [
+    {
+      "code": "PHASE_LOCKED",
+      "kind": "command_rejection",
+      "meaning": "The run is in a phase that does not allow the command. Vocation and build commands are never allowed while run.phase is 'battle'.",
+      "raised_by": ["ClaimVocation", "ChangeVocation", "EquipInheritedSkill", "UnequipInheritedSkill", "EquipDie", "ConfirmBuild"]
+    },
+    {
+      "code": "NOT_DISCOVERED",
+      "kind": "command_rejection",
+      "meaning": "The profile has not discovered the vocation (its discovery state is 'hidden' or 'hinted'). The response carries no detail about the vocation.",
+      "raised_by": ["PreviewVocation", "ClaimVocation"]
+    },
+    {
+      "code": "HERO_NOT_ELIGIBLE",
+      "kind": "command_rejection",
+      "meaning": "The hero's eligibility_state is 'guest' or 'locked', so it cannot claim or change vocations.",
+      "raised_by": ["ClaimVocation", "ChangeVocation"],
+      "replaces": ["CHARACTER_NOT_ELIGIBLE"]
+    },
+    {
+      "code": "PREREQUISITE_UNMET",
+      "kind": "command_rejection",
+      "meaning": "No route of the vocation's prerequisite is satisfied for this hero, or (ChangeVocation) the hero has not claimed the vocation. error_details.routes lists, per route, each unmet mastery or quest condition; a missing mastery rank is {\"op\": \"MASTERY_AT_LEAST\", \"vocation_id\", \"rank\", \"current_rank\"}. PreviewVocation reports the same structure as blocked_by without being rejected.",
+      "raised_by": ["ClaimVocation", "ChangeVocation"],
+      "replaces": ["MISSING_MASTERY"]
+    },
+    {
+      "code": "ITEM_INSUFFICIENT",
+      "kind": "command_rejection",
+      "meaning": "Every mastery and quest condition of the chosen route is met, but the profile holds fewer of the route's item than the route consumes.",
+      "raised_by": ["ClaimVocation"]
+    },
+    {
+      "code": "CAPACITY_EXCEEDED",
+      "kind": "command_rejection",
+      "meaning": "The inherited skills would cost more than the active vocation's inheritance capacity. error_details gives capacity_max, capacity_used and capacity_requested.",
+      "raised_by": ["EquipInheritedSkill", "ConfirmBuild"]
+    },
+    {
+      "code": "INCOMPATIBLE_DIE",
+      "kind": "command_rejection",
+      "meaning": "The die cannot be equipped by the active vocation.",
+      "raised_by": ["EquipDie", "ConfirmBuild"]
+    },
+    {
+      "code": "NO_LEGAL_FACE",
+      "kind": "command_rejection",
+      "meaning": "The skill modifies a die face, and no equipped die of the active vocation has a face it can modify.",
+      "raised_by": ["EquipInheritedSkill", "ConfirmBuild"]
+    },
+    {
+      "code": "CONTENT_MIGRATION_REQUIRED",
+      "kind": "load_failure",
+      "meaning": "The save names a catalog version that is retired or unknown and the migration manifest has no mapping for it. Nothing is substituted and nothing is discarded.",
+      "raised_by": ["LoadProfile", "PreviewVocation", "ClaimVocation", "ChangeVocation", "EquipInheritedSkill", "UnequipInheritedSkill", "EquipDie", "ConfirmBuild"]
+    },
+    {
+      "code": "REVISION_CONFLICT",
+      "kind": "command_rejection",
+      "meaning": "The command's state_revision is not the current revision of the row it targets (hero.revision for hero commands).",
+      "raised_by": ["ClaimVocation", "ChangeVocation", "EquipInheritedSkill", "UnequipInheritedSkill", "EquipDie", "ConfirmBuild"]
+    },
+    {
+      "code": "UNSUPPORTED_SECONDARY_VOCATION",
+      "kind": "command_rejection",
+      "meaning": "The command asks for a second active vocation. A hero has exactly one.",
+      "raised_by": ["ChangeVocation"]
+    },
+    {
+      "code": "COMMAND_ID_REUSED",
+      "kind": "command_rejection",
+      "meaning": "The command_id was already accepted for a different command (another type or other params). This is the shipped engine's behaviour for run commands, carried over. Sending the same command again is not an error: see replay_result.",
+      "raised_by": ["ClaimVocation", "ChangeVocation", "EquipInheritedSkill", "UnequipInheritedSkill", "EquipDie", "ConfirmBuild"],
+      "status": "proposed"
+    },
+    {
+      "code": "UNDER_THREAT_CAP",
+      "kind": "award_denial",
+      "meaning": "The encounter was won, but its threat rating is below the minimum for the hero's active vocation at its current rank. Base and challenge points are both zero. The name is kept from v0.1; it means below the threat floor.",
+      "raised_by": ["AwardEncounterMastery"]
+    },
+    {
+      "code": "ENCOUNTER_NOT_WON",
+      "kind": "award_denial",
+      "meaning": "The encounter did not end in victory. Base and challenge points are both zero.",
+      "raised_by": ["AwardEncounterMastery"],
+      "status": "proposed"
+    },
+    {
+      "code": "TRAINING_DEAD_END",
+      "kind": "content_validation",
+      "meaning": "A vocation rank needs a threat rating that no available mastery-eligible encounter reaches, so the rank could never be trained.",
+      "raised_by": ["ValidateCatalog"]
+    },
+    {
+      "code": "UNLOCK_DEAD_END",
+      "kind": "content_validation",
+      "meaning": "A vocation could never be unlocked in the wave it is released in: its prerequisite names a vocation of a later wave, or a quest or item whose encounter is not shipped.",
+      "raised_by": ["ValidateCatalog"],
+      "status": "proposed"
+    }
+  ],
+  "replay_result": {
+    "replaces": ["DUPLICATE_COMMAND"],
+    "is_error": false,
+    "result": "accepted",
+    "duplicate": true,
+    "meaning": "A command whose command_id was already accepted, sent again unchanged, returns the result stored for the first acceptance with duplicate set to true. Nothing is written, no revision changes and no random number is drawn. Only accepted commands are stored, so a rejected or failed command can be sent again with the same command_id. The same holds for a trusted event with an identity that was already applied (a mastery award for the same run, encounter, hero and vocation; an item grant with the same grant_id).",
+    "stored_in": "processed_command.result_json"
+  },
+  "merged_codes": [
+    {"v0_1_code": "CHARACTER_NOT_ELIGIBLE", "use": "HERO_NOT_ELIGIBLE", "reason": "Same condition under two names (fixture CE-37 against the stated list)."},
+    {"v0_1_code": "MISSING_MASTERY", "use": "PREREQUISITE_UNMET", "reason": "A missing mastery rank is one kind of unmet prerequisite; the vocation and rank move into error_details (fixture CE-02)."},
+    {"v0_1_code": "DUPLICATE_COMMAND", "use": "replay_result", "reason": "A repeated command id returns the original result, so it is not an error."}
+  ],
+  "check_order": {
+    "status": "proposed",
+    "meaning": "When several conditions fail at once, the first one in this order is reported.",
+    "order": ["replay_result", "COMMAND_ID_REUSED", "CONTENT_MIGRATION_REQUIRED", "REVISION_CONFLICT", "PHASE_LOCKED", "HERO_NOT_ELIGIBLE", "UNSUPPORTED_SECONDARY_VOCATION", "NOT_DISCOVERED", "PREREQUISITE_UNMET", "ITEM_INSUFFICIENT", "INCOMPATIBLE_DIE", "NO_LEGAL_FACE", "CAPACITY_EXCEEDED"]
+  },
+  "unused_codes": [
+    {"code": "NOT_DISCOVERED", "reason": "No CE fixture claims or previews a vocation the profile has not discovered; CE-09 and CE-10 cover discovery through the view and the signal only."},
+    {"code": "INCOMPATIBLE_DIE", "reason": "No CE fixture equips a die by command; CE-18 covers the automatic move of incompatible dice to the bench."},
+    {"code": "REVISION_CONFLICT", "reason": "No CE fixture sends a stale state_revision; the persistence test suite exercises it against the database."},
+    {"code": "COMMAND_ID_REUSED", "reason": "No CE fixture reuses a command id for a different command; CE-33 and CE-38 cover the unchanged repeat only. The persistence test suite exercises it against the database."},
+    {"code": "UNLOCK_DEAD_END", "reason": "No CE fixture releases a vocation before its prerequisites; the catalog test suite exercises it wave by wave against the vocation catalog."}
+  ]
+}
