@@ -50,3 +50,5 @@ jobs:
           # The Class Evolution catalog is package data too: load it from the installed copy, gate on.
           python -m battle_dice --smoke-test --feature class_evolution_v1
           python -c "from battle_dice.content.loader import load_content; from battle_dice.content.vocations import load_vocation_catalog as load; c = load(load_content()); print('vocation catalog', c.version, sorted(c.builds))"
+          # The save-database script is package data as well: create a save from the installed copy.
+          python -c "from battle_dice.content.loader import load_content; from battle_dice.content.vocations import load_catalog; from battle_dice.career.catalog import CareerCatalog; from battle_dice.career.store import SqliteProfileStore as S; s = S(':memory:', CareerCatalog(load_catalog(), load_content())); print('save schema', s.schema_version()); s.close()"

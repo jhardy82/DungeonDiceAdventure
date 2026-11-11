@@ -33,7 +33,7 @@ from battle_dice.core.models import RunPhase
 ROOT = Path(__file__).resolve().parents[2]
 PERSISTENCE = ROOT / "docs" / "class_evolution" / "persistence"
 FIXTURES_DIR = ROOT / "docs" / "class_evolution" / "fixtures"
-DDL_PATH = PERSISTENCE / "progression.sql"
+DDL_PATH = ROOT / "src" / "battle_dice" / "career" / "schema" / "progression.sql"
 TS = "2026-11-02T10:00:00Z"
 HASH_A = "a" * 64
 PROFILE = "profile_demo"

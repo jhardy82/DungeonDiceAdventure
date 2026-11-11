@@ -1,7 +1,7 @@
 """Check the Class Evolution persistence contract (FDD v0.2). Specification only.
 
 Nothing in the shipped game uses this module. It executes the proposed schema
-(``docs/class_evolution/persistence/progression.sql``) in an in-memory SQLite database, loads
+(``src/battle_dice/career/schema/progression.sql``) in an in-memory SQLite database, loads
 the example profile and shows the reference transactions the schema is designed for:
 
 * ``create_database``: a new in-memory database with the schema and foreign keys on.
@@ -17,7 +17,6 @@ Run ``python tools/class_evolution/check_persistence.py``; it prints ``OK`` when
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 import sys
@@ -27,7 +26,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 PERSISTENCE_DIR = ROOT / "docs" / "class_evolution" / "persistence"
-DDL_PATH = PERSISTENCE_DIR / "progression.sql"
+DDL_PATH = ROOT / "src" / "battle_dice" / "career" / "schema" / "progression.sql"
 EXAMPLE_PATH = PERSISTENCE_DIR / "example_profile.json"
 
 #: Oldest SQLite the schema runs on: STRICT tables (3.37.0) and built-in json_valid (3.38.0).
@@ -78,17 +77,10 @@ class InjectedFailure(RuntimeError):
 # --------------------------------------------------------------------------------------------
 
 
-def canonical_json(value: Any) -> str:
-    """The game's canonical JSON (``battle_dice.content.loader.canonical_json``)."""
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-
-
-def sha256_hex(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def event_hash(previous_event_hash: str, event_id: str, event_type: str, event_json: str) -> str:
-    return sha256_hex("\n".join((previous_event_hash, event_id, event_type, event_json)))
+# One definition each: the game's save code (``battle_dice.career.store``) owns the hashing rules,
+# and this checker uses them, so the specification and the game cannot drift apart.
+from battle_dice.career.store import event_hash, sha256_hex  # noqa: E402
+from battle_dice.content.loader import canonical_json  # noqa: E402
 
 
 def build_hash(build: dict[str, Any]) -> str:

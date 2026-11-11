@@ -16,6 +16,7 @@ Phase 2 of Class Evolution keeps the state in memory. Nothing in the game calls 
 from __future__ import annotations
 
 import copy
+import hashlib
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -51,6 +52,11 @@ TRANSFER_NEEDS: dict[str, tuple[str, str]] = {
     "compatible_melee": ("tag", "melee"),
     "compatible_ranged": ("tag", "ranged"),
 }
+
+
+def command_fingerprint(command_type: str, params: Json) -> str:
+    """SHA-256 of the canonical command: what ``processed_command.command_sha256`` stores."""
+    return hashlib.sha256(canonical_json({"type": command_type, "params": params}).encode("utf-8")).hexdigest()
 
 
 class InjectedFault(RuntimeError):
@@ -110,7 +116,7 @@ class CareerService:
         handler = handlers.get(command_type)
         if handler is None:
             raise ValueError(f"Unknown career command '{command_type}'.")
-        fingerprint = canonical_json({"type": command_type, "params": params})
+        fingerprint = command_fingerprint(command_type, params)
         seen = self.state.processed.get(command_id)
         if seen is not None:
             if seen.type == command_type and seen.fingerprint in (None, fingerprint):
@@ -515,12 +521,16 @@ class CareerService:
             row = profile.discovery.get(vocation_id)
             if row is None:
                 row = profile.discovery[vocation_id] = DiscoveryRow(vocation_id)
-            if signal not in row.signals_seen:
+            counted = signal not in row.signals_seen
+            if counted:
                 row.signals_seen.append(signal)
                 row.clue_count += 1
             if DISCOVERY_ORDER.index(leads_to) > DISCOVERY_ORDER.index(row.state):  # only forward
                 previous, row.state = row.state, leads_to
                 self._emit("DiscoveryChanged", vocation_id=vocation_id, **{"from": previous, "to": leads_to}, signal=signal)
+            elif counted:
+                # A new clue that shows nothing new is still logged: the log is what remembers which clues were counted.
+                self._emit("DiscoveryClueCounted", vocation_id=vocation_id, signal=signal)
 
     # ----------------------------------------------------------------------------------------
     # Events and fault points

@@ -2,7 +2,7 @@
 
 Plain data only. The rules that change it are in :mod:`battle_dice.career.service`. Nothing here
 is stored yet: Phase 2 of Class Evolution keeps the state in memory, and Phase 3 puts the same
-shapes into the save database (``docs/class_evolution/persistence/progression.sql``).
+shapes into the save database (``career/schema/progression.sql``, written by ``career/store.py``).
 """
 
 from __future__ import annotations
@@ -56,7 +56,11 @@ class HeroRecord:
     equipped_skills: dict[int, str] = field(default_factory=dict)
     #: Owned dice. Empty means "the active vocation's starting dice" (no die has been moved yet).
     dice: list[DieInstance] = field(default_factory=list)
+    #: Values inside a run. Not saved: the run owns them and hands them over when a hero changes vocation.
     combat: CombatSnapshot | None = None
+    #: The starting class the hero was created as. Empty means the first vocation it unlocked.
+    origin_vocation_id: str = ""
+    display_name: str = ""
 
     def rank(self, vocation_id: str) -> int:
         row = self.mastery.get(vocation_id)

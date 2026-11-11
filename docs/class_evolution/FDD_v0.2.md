@@ -31,7 +31,8 @@
 | `src/battle_dice/content/class_evolution/vocation_catalog.json` | The 14 vocations in the engine's own vocabulary. Package data since Phase 1: the game loads it when the gate is on | `tools/class_evolution/validate_catalog.py`, 49 tests |
 | `src/battle_dice/content/class_evolution/vocation_catalog.schema.json` | Strict JSON Schema for the catalog | Same |
 | `src/battle_dice/content/vocations.py` | The validator, and the code that turns a playable vocation into a hero build | `tests/unit/test_vocations.py`, `tests/integration/test_class_evolution_runs.py` |
-| `docs/class_evolution/persistence/progression.sql` | The save database: 24 tables | `tools/class_evolution/check_persistence.py`, 73 tests |
+| `src/battle_dice/career/schema/progression.sql` | The save database: 24 tables. Package data since Phase 3: the game creates save files from it | `tools/class_evolution/check_persistence.py`, 73 tests |
+| `src/battle_dice/career/` | The progression rules (Phase 2) and the save store (Phase 3) | `tests/spec/test_class_evolution_rules.py`, `tests/spec/test_class_evolution_store.py`, `tests/unit/test_career.py` |
 | `docs/class_evolution/persistence/example_profile.json` | One worked save that loads into the database | Same |
 | `docs/class_evolution/persistence/error_codes.json` | The one list of machine-readable codes | Same |
 | `docs/class_evolution/fixtures/acceptance_fixtures.json` | The 40 acceptance cases as structured data, with a schema | Same |
@@ -248,7 +249,7 @@ names.
 
 - Every phase leaves the game shippable with the gate off.
 - Progress, with the evidence for each step, is recorded in `docs/DECISION_LOG.md` sections 7.11
-  (Phase 1) and 7.12 (Phase 2).
+  (Phase 1), 7.12 (Phase 2) and 7.13 (Phase 3).
 - The first playable evolution arrives before the expensive engine work of waves 3 to 5.
 
 ## 10. Decisions put to the owner, and the answers (2026-11-11)
