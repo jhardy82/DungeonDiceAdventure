@@ -734,10 +734,25 @@ def _encounter_problems(catalog: Json, shipped: Content) -> list[str]:
     return problems
 
 
-def training_dead_ends(catalog: Json) -> list[tuple[Json, int]]:
-    """``(vocation, rank)`` pairs where a hero at that rank has no shipped encounter that still awards mastery."""
+def available_threat(catalog: Json, pool: Iterable[str] | None = None) -> int:
+    """The highest threat rating a player can meet; ``-1`` when no encounter is available.
+
+    Owner decision of 2026-11-11 (fixture CE-36): the available encounters are the ones the catalog
+    marks ``shipped``, at the ratings the catalog gives them. ``pool`` names the available
+    encounters instead, for a check against a planned or a reduced set.
+    """
+    if pool is None:
+        ratings = [e["threat_rating"] for e in catalog["encounters"] if e["source"] == "shipped"]
+    else:
+        wanted = set(pool)
+        ratings = [e["threat_rating"] for e in catalog["encounters"] if e["id"] in wanted]
+    return max(ratings, default=-1)
+
+
+def training_dead_ends(catalog: Json, pool: Iterable[str] | None = None) -> list[tuple[Json, int]]:
+    """``(vocation, rank)`` pairs where a hero at that rank has no available encounter that still awards mastery."""
     mastery = catalog["mastery"]
-    best = max((e["threat_rating"] for e in catalog["encounters"] if e["source"] == "shipped"), default=-1)
+    best = available_threat(catalog, pool)
     dead = []
     for vocation in catalog["vocations"]:
         floors = mastery["threat_min_by_group_and_rank"][vocation["group"]]
@@ -745,6 +760,22 @@ def training_dead_ends(catalog: Json) -> list[tuple[Json, int]]:
             if floors[rank - 1] > best:
                 dead.append((vocation, rank))
     return dead
+
+
+def training_dead_end_details(catalog: Json, pool: Iterable[str] | None = None) -> list[Json]:
+    """Each training dead end as the ``error_details`` of ``TRAINING_DEAD_END``, in catalog order."""
+    best = available_threat(catalog, pool)
+    floors = catalog["mastery"]["threat_min_by_group_and_rank"]
+    return [
+        {
+            "vocation_id": vocation["id"],
+            "vocation_group": vocation["group"],
+            "rank": rank,
+            "required_threat": floors[vocation["group"]][rank - 1],
+            "max_available_threat": best,
+        }
+        for vocation, rank in training_dead_ends(catalog, pool)
+    ]
 
 
 def _release_lines(catalog: Json, wave: int | None) -> list[str]:

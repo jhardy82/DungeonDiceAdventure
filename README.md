@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 819 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 860 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -266,7 +266,8 @@ Both print `OK`. The first also lists, as warnings, every rank and vocation that
 on shipped content yet. The build follows the phases in section 9 of the document. Phases 1 to 3
 are done: the rules can run an evolved hero, decide claims, vocation changes, mastery, skills and
 dice, and save all of it to a file. No screen offers any of it yet, and the game itself does not
-open a save file yet.
+open a save file yet. Of the 40 acceptance cases 35 run as tests; the other five wait for Phase 4
+or a later wave (`docs/DECISION_LOG.md`, section 7.14).
 
 The gate is a launch setting. Switching it on changes nothing you can see today; it only hands the
 vocation catalog to the rules engine, and the main menu's status bar says so:

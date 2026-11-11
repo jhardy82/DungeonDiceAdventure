@@ -32,7 +32,15 @@ from battle_dice.career.model import (
     Profile,
     RunInfo,
 )
-from battle_dice.career.service import CareerResult, CareerService, InjectedFault, state_view
+from battle_dice.career.service import (
+    UNDISCOVERED_LABEL,
+    CareerResult,
+    CareerService,
+    InjectedFault,
+    career_tree_view,
+    state_view,
+)
+from battle_dice.content import vocations
 from battle_dice.content.vocations import load_catalog
 from tests.conftest import packaged_content
 
@@ -46,21 +54,26 @@ RUN_HERE = [
     "CE-16", "CE-17", "CE-18", "CE-20", "CE-21", "CE-22", "CE-23", "CE-24", "CE-26", "CE-27", "CE-28", "CE-33", "CE-37", "CE-38",
     "CE-39",
 ]
-#: Every other case, and where it is checked or will be.
-NOT_RUN_HERE = {
+#: Cases this module runs with a test of their own, because their step is not a career command.
+RUN_HERE_BY_NAME = ["CE-09", "CE-36"]
+#: Cases another module runs, and where.
+RUN_ELSEWHERE = {
     "CE-01": "the replay pin and tests/unit/test_vocations.py (gate off)",
-    "CE-09": "needs a decision; the career-tree view is Phase 4",
-    "CE-19": "the rules engine and owned dice together: Phase 4",
-    "CE-25": "saved run upgrades: Phase 3",
-    "CE-29": "needs a decision; a rules-engine case",
-    "CE-30": "needs a decision; a rules-engine case",
-    "CE-31": "needs a decision; a rules-engine case",
-    "CE-32": "needs a decision (what every hash covers)",
-    "CE-34": "loading a save: Phase 3",
-    "CE-35": "StartRun with saved heroes and build snapshots: Phase 4",
-    "CE-36": "the catalog validator: tests/spec/test_class_evolution_catalog.py",
+    "CE-25": "tests/spec/test_class_evolution_store.py (saved run upgrades)",
+    "CE-32": "tests/spec/test_class_evolution_determinism.py (a recorded session, replayed with different clocks)",
+    "CE-34": "tests/spec/test_class_evolution_store.py (a save of another catalog version)",
     "CE-40": "tests/integration/test_class_evolution_runs.py (gate on, starting classes: byte for byte)",
 }
+#: Cases no test can run yet, and what each waits for. Their rules are decided unless the text says otherwise.
+NOT_EXECUTABLE_YET = {
+    "CE-19": "the rules engine and owned dice together: Phase 4",
+    "CE-29": "names Champion dice (wave 4) and an inherited skill in battle (Phase 4); "
+             "its code and situation are tested on today's content in tests/unit/test_plan_codes.py",
+    "CE-30": "names Champion dice (wave 4); its code and situation are tested on today's content in tests/unit/test_plan_codes.py",
+    "CE-31": "still needs a decision: what Duelist's Parry does in the engine (wave 3)",
+    "CE-35": "StartRun with saved heroes and build snapshots: Phase 4",
+}
+NOT_RUN_HERE = {**RUN_ELSEWHERE, **NOT_EXECUTABLE_YET}
 #: Lists a case states in full; every other list is matched entry by entry on its id.
 COMPLETE_LISTS = {"unlocked_vocations", "equipped_skills", "item_consumptions", "quests_completed", "mastery_award_events",
                   "processed_commands"}
@@ -227,9 +240,119 @@ def test_acceptance_fixture(case_id: str, catalog: CareerCatalog) -> None:
         assert state_view(service) == before and len(service.state.events) == events_before, case_id
 
 
-def test_every_case_is_either_run_here_or_accounted_for() -> None:
-    assert sorted([*RUN_HERE, *NOT_RUN_HERE]) == sorted(CASES), "a fixture is neither run nor explained"
-    assert not set(RUN_HERE) & set(NOT_RUN_HERE)
+# --------------------------------------------------------------------------------------------
+# CE-09: the career tree shows an undiscovered secret as an anonymous entry
+# --------------------------------------------------------------------------------------------
+
+
+def test_ce09_a_hidden_secret_is_an_anonymous_entry_that_leaks_nothing(catalog: CareerCatalog) -> None:
+    case = CASES["CE-09"]
+    assert "needs_design_decision" not in case and case["when"]["event"]["type"] == "BuildCareerTreeView"
+    service = CareerService(catalog, load_state(case["given"], catalog))
+    before = state_view(service)
+    view = career_tree_view(service, case["when"]["event"]["hero_id"])
+    assert state_view(service) == before and not service.state.events, "building a view changes nothing"
+
+    expected = case["then"]["state"]["view_model"]["career_tree"]
+    entries = view["career_tree"]["entries"]
+    listed = [entry["vocation_id"] for entry in entries if entry["kind"] == "vocation"]
+    assert sorted(listed) == sorted(expected["listed_vocation_ids"]) and len(listed) == 12
+    anonymous = [{key: value for key, value in entry.items() if key != "kind"} for entry in entries if entry["kind"] != "vocation"]
+    assert anonymous == expected["anonymous_entries"] == [{"label": UNDISCOVERED_LABEL}] * 2
+    assert entries[-2:] == [{"kind": "undiscovered", "label": UNDISCOVERED_LABEL}] * 2, "the anonymous entries come last"
+    assert not set(expected["absent_vocation_ids"]) & set(listed)
+    text = json.dumps(view, ensure_ascii=False)
+    for forbidden in expected["forbidden_strings"]:
+        assert forbidden not in text, f"the view leaks {forbidden!r}"
+    # Every string that could give a secret away is on the case's list: ids, names, items, quests and clues.
+    for vocation_id in expected["absent_vocation_ids"]:
+        secret = catalog.vocations[vocation_id]
+        assert {vocation_id, secret["name"], secret["discovery"]["clue"]} <= set(expected["forbidden_strings"])
+
+
+def test_ce09_the_entry_of_a_listed_vocation_says_what_the_hero_has_reached(catalog: CareerCatalog) -> None:
+    service = CareerService(catalog, load_state(CASES["CE-09"]["given"], catalog))
+    hero = service.state.heroes["hero_001"]
+    hero.mastery["squire"] = MasteryRow("squire", 8, 14)
+    hero.mastery["apprentice"] = MasteryRow("apprentice", 7, 10)  # one rank short of mastery
+    by_id = {e["vocation_id"]: e for e in career_tree_view(service, "hero_001")["career_tree"]["entries"] if e["kind"] == "vocation"}
+    assert list(by_id) == [v for v in catalog.vocations if catalog.is_public(v)], "listed in catalog order"
+    assert by_id["squire"] == {"kind": "vocation", "vocation_id": "squire", "name": "Squire", "group": "novice",
+                               "unlocked": True, "active": True, "rank": 8, "mastered": True}
+    assert by_id["scout"]["unlocked"] and not by_id["scout"]["active"] and by_id["scout"]["rank"] == 1
+    assert (by_id["apprentice"]["rank"], by_id["apprentice"]["mastered"]) == (7, False)
+    assert by_id["guardian"] == {"kind": "vocation", "vocation_id": "guardian", "name": "Guardian", "group": "advanced",
+                                 "unlocked": False, "active": False, "rank": 0, "mastered": False}
+
+
+def test_ce09_a_hint_shows_the_clue_only_and_a_discovery_shows_the_vocation(catalog: CareerCatalog) -> None:
+    service = CareerService(catalog, load_state(CASES["CE-09"]["given"], catalog))
+    assert service.apply_discovery_signal({"type": "ApplyDiscoverySignal", "signal": "quest_hint:crooked_mirror"}).accepted
+    entries = career_tree_view(service, "hero_001")["career_tree"]["entries"]
+    clue = catalog.vocations["trickster"]["discovery"]["clue"]
+    # The hinted secret comes before the hidden one, whatever their order in the catalog.
+    assert entries[-2:] == [{"kind": "undiscovered", "label": UNDISCOVERED_LABEL, "clue": clue},
+                            {"kind": "undiscovered", "label": UNDISCOVERED_LABEL}]
+    text = json.dumps(entries, ensure_ascii=False)
+    for secret in ("trickster", "Trickster", "jester_mask", "crooked_mirror", "secret_sidegrade", "dragon_knight", "Dragon Knight"):
+        assert secret not in text
+
+    assert service.apply_discovery_signal({"type": "ApplyDiscoverySignal", "signal": "item_found:jester_mask"}).accepted
+    entries = career_tree_view(service, "hero_001")["career_tree"]["entries"]
+    assert [e for e in entries if e.get("vocation_id") == "trickster"] == [
+        {"kind": "vocation", "vocation_id": "trickster", "name": "Trickster", "group": "secret_sidegrade",
+         "unlocked": False, "active": False, "rank": 0, "mastered": False}]
+    assert entries[-1] == {"kind": "undiscovered", "label": UNDISCOVERED_LABEL} and len(entries) == 14
+    assert "Dragon Knight" not in json.dumps(entries)
+
+
+# --------------------------------------------------------------------------------------------
+# CE-36: a rank no available encounter can train is reported by the catalog validator
+# --------------------------------------------------------------------------------------------
+
+
+def test_ce36_an_advanced_vocation_cannot_reach_rank_8_on_the_available_encounters() -> None:
+    case = CASES["CE-36"]
+    assert "needs_design_decision" not in case and case["when"]["event"]["type"] == "ValidateCatalog"
+    raw = load_catalog()
+    (override,) = case["given"]["catalog"]["overrides"]
+    assert override["path"] == "encounter_pool"
+    expected, pool = case["then"]["error_details"], override["value"]
+    assert case["then"]["result"] == "rejected" and case["then"]["error_code"] in vocations.CONTENT_VALIDATION_CODES
+
+    for available in (pool, None):  # the case's pool, and the catalog as it stands (its shipped encounters)
+        details = vocations.training_dead_end_details(raw, available)
+        advanced = [entry for entry in details if entry["vocation_group"] == expected["vocation_group"]]
+        assert advanced and all({key: entry[key] for key in expected} == expected for entry in advanced), advanced
+        assert {entry["vocation_id"] for entry in advanced} == {v["id"] for v in raw["vocations"] if v["group"] == "advanced"}
+        assert vocations.available_threat(raw, available) == expected["max_available_threat"] == 3
+    # Every dead end on the available encounters, as (rank, threat that rank needs), group by group.
+    by_vocation: dict[str, list[tuple[int, int]]] = {}
+    for entry in vocations.training_dead_end_details(raw):
+        by_vocation.setdefault(entry["vocation_id"], []).append((entry["rank"], entry["required_threat"]))
+    assert by_vocation == {
+        **{v["id"]: [(7, 4)] for v in raw["vocations"] if v["group"] == "advanced"},
+        **{v["id"]: [(1, 4), (2, 4), (3, 4), (4, 5), (5, 5), (6, 5), (7, 5)] for v in raw["vocations"]
+           if v["group"] in ("capstone", "secret_prestige")},
+        "trickster": [(6, 4), (7, 4)],
+    }, "a starting class has no dead end; the others have exactly these"
+    # The decision: only encounters marked shipped count, at the catalog's ratings.
+    shipped = {e["id"]: e["threat_rating"] for e in raw["encounters"] if e["source"] == "shipped"}
+    assert shipped == {"training_01": 1, "training_03": 3} and set(shipped) <= set(pool)
+    # What the validator prints for the first wave is this dead end and nothing else.
+    lines = vocations.problems_only(vocations.validate(raw, packaged_content(), wave=1))
+    assert lines == [f"{case['then']['error_code']} guardian rank {expected['rank']}"]
+    # With a threat 4 encounter available the dead end is gone (the encounter Phase 4 is to author).
+    assert not [e for e in vocations.training_dead_end_details(raw, [*pool, "training_04"]) if e["vocation_group"] == "advanced"]
+    assert vocations.available_threat(raw, []) == -1
+
+
+def test_every_case_is_run_or_accounted_for() -> None:
+    assert sorted([*RUN_HERE, *RUN_HERE_BY_NAME, *NOT_RUN_HERE]) == sorted(CASES), "a fixture is neither run nor explained"
+    assert len({*RUN_HERE, *RUN_HERE_BY_NAME, *NOT_RUN_HERE}) == len(CASES) == 40, "a fixture is listed twice"
     still_open = {case_id for case_id, case in CASES.items() if "needs_design_decision" in case}
-    assert still_open <= set(NOT_RUN_HERE)
-    assert len(RUN_HERE) == 28
+    assert still_open == {"CE-31"} and still_open <= set(NOT_EXECUTABLE_YET)
+    assert len(RUN_HERE) == 28 and len(RUN_ELSEWHERE) == 5 and len(NOT_EXECUTABLE_YET) == 5
+    for case_id, where in RUN_ELSEWHERE.items():
+        named = [word for word in where.replace("(", " ").split() if word.startswith("tests/")]
+        assert named and all((ROOT / path).is_file() for path in named), f"{case_id}: {where}"

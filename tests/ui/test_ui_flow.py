@@ -590,6 +590,7 @@ def test_an_illegal_draft_still_lists_what_is_drafted(tmp_path):
     play.ctrl.draft = [{"die_id": "arcane_d6", "target_ids": [play.combat.side("enemy")[0].id]}]
     preview = play.ctrl.plan_preview()
     assert preview["problem"] and [entry["name"] for entry in preview["ordered"]] == ["Arcane Bolt"]
+    assert preview["problem_code"] == "INSUFFICIENT_MANA"  # the code beside the text (decision of 2026-11-11)
     play.app.frame(0)  # and the planner draws it without error
     assert play.ctrl.screen == Screen.BATTLE
 
@@ -665,7 +666,7 @@ def test_a_fault_while_editing_the_plan_reaches_the_error_screen(tmp_path, monke
     def boom(*args, **kwargs):
         raise RuntimeError("simulated preview fault")
 
-    monkeypatch.setattr(play.ctrl.engine, "preview_plan", boom)
+    monkeypatch.setattr(play.ctrl.engine, "check_plan", boom)  # what the plan preview of the app calls
     play.click("die:iron_d6:use")  # must not raise out of the event handler
     assert play.ctrl.screen == Screen.ERROR and "simulated preview fault" in play.ctrl.error_text
     play.click("error:menu")

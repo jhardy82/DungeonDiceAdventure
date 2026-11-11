@@ -28,6 +28,7 @@ import jsonschema
 import pytest
 
 from battle_dice.core import commands as game_commands
+from battle_dice.core import planning
 from battle_dice.core.models import RunPhase
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -69,8 +70,10 @@ V01_TABLES = [
 ADDED_TABLES = ["hero_die_instance", "item_grant", "schema_migration"]
 
 #: Decided by the owner on 2026-11-11 and no longer in this set: CE-01 (where the gate lives); CE-10,
-#: CE-19, CE-24, CE-28 and CE-39 (progression rules); CE-18, CE-25, CE-35 and CE-40 (dice, saving, run start).
-NEEDS_DESIGN_DECISION = {9, 29, 30, 31, 32, 36}
+#: CE-19, CE-24, CE-28 and CE-39 (progression rules); CE-18, CE-25, CE-35 and CE-40 (dice, saving, run start);
+#: CE-09, CE-29, CE-30, CE-32 and CE-36 (the career tree, plan codes, hashes, available encounters).
+#: CE-31 (what Duelist's Parry does) waits for the Duelist's wave.
+NEEDS_DESIGN_DECISION = {31}
 BASELINE_DEFINITION = (
     "With the feature gate off, the replay pin tests/golden/replay_pin.json reproduces byte for byte."
 )
@@ -1063,13 +1066,18 @@ def test_the_registry_resolves_the_v01_code_conflicts():
         "UNSUPPORTED_SECONDARY_VOCATION",
     }
     assert v01_stated <= set(REGISTRY_CODES)
-    assert set(REGISTRY_CODES) - v01_stated == {
+    plan_codes = {entry["code"] for entry in REGISTRY["codes"] if entry["kind"] == "plan_rejection"}
+    assert set(REGISTRY_CODES) - v01_stated - plan_codes == {
         "UNDER_THREAT_CAP",
         "TRAINING_DEAD_END",
         "UNLOCK_DEAD_END",
         "ENCOUNTER_NOT_WON",
         "COMMAND_ID_REUSED",
     }
+    # Added on 2026-11-11 (fixtures CE-29 and CE-30): the codes of a refused action plan, as the rules engine names them.
+    assert plan_codes == set(planning.PLAN_CODES) and len(plan_codes) == 11
+    assert REGISTRY["plan_check_order"]["order"] == list(planning.PLAN_CODES)
+    assert not plan_codes & set(REGISTRY["check_order"]["order"]), "a plan is checked by the engine, in its own order"
     # The catalog validator and the registry name the same content-validation codes.
     assert {entry["code"] for entry in REGISTRY["codes"] if entry["kind"] == "content_validation"} == set(
         catalog_tool.CONTENT_VALIDATION_CODES
@@ -1086,7 +1094,13 @@ def test_every_registry_code_is_used_by_a_fixture_or_listed_as_unused_with_a_rea
     unused = {entry["code"]: entry["reason"] for entry in REGISTRY["unused_codes"]}
     used = fixture_codes()
     assert set(REGISTRY_CODES) - used == set(unused)
-    assert len(unused) <= 5 and all(len(reason) > 20 for reason in unused.values())
+    assert all(len(reason) > 20 for reason in unused.values())
+    # A plan code no fixture uses must name the test that raises it; of every other kind at most five codes go unused.
+    plan_codes = set(planning.PLAN_CODES)
+    assert len(set(unused) - plan_codes) <= 5
+    assert plan_codes & used == {"INSUFFICIENT_MANA", "TARGET_DOWNED"}  # fixtures CE-29 and CE-30
+    for code in plan_codes & set(unused):
+        assert "tests/unit/test_plan_codes.py" in unused[code] and (ROOT / "tests" / "unit" / "test_plan_codes.py").is_file()
 
 
 # --------------------------------------------------------------------------------------------
@@ -1175,10 +1189,15 @@ def test_the_fixtures_are_ce_01_to_ce_40_exactly_once():
     assert [case["id"] for case in FIXTURES["cases"]] == [f"CE-{number:02d}" for number in range(1, 41)]
 
 
-def test_six_cases_still_need_a_design_decision():
+def test_one_case_still_needs_a_design_decision():
     needing = {int(case["id"][3:]) for case in FIXTURES["cases"] if "needs_design_decision" in case}
     assert needing == NEEDS_DESIGN_DECISION
-    assert len(needing) == 6 and len(FIXTURES["cases"]) - len(needing) == 34
+    assert len(needing) == 1 and len(FIXTURES["cases"]) - len(needing) == 39
+    # A decided case says so, with the date, where its open question used to be.
+    decided_today = ("CE-09", "CE-29", "CE-30", "CE-32", "CE-36")
+    for case in FIXTURES["cases"]:
+        if case["id"] in decided_today:
+            assert case["notes"].startswith("Decided by the owner on 2026-11-11: "), case["id"]
 
 
 def test_ce_01_and_ce_40_share_the_replay_pin_baseline():

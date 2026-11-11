@@ -91,7 +91,18 @@
         "UNDER_THREAT_CAP",
         "ENCOUNTER_NOT_WON",
         "TRAINING_DEAD_END",
-        "UNLOCK_DEAD_END"
+        "UNLOCK_DEAD_END",
+        "DIE_NOT_ROLLED",
+        "DIE_ALREADY_USED",
+        "FACE_NOT_AN_ACTION",
+        "NO_LEGAL_TARGET",
+        "WRONG_TARGET_COUNT",
+        "TARGET_UNKNOWN",
+        "TARGET_PROTECTED",
+        "TARGET_DOWNED",
+        "TARGET_NOT_LEGAL",
+        "SCHEDULE_VIOLATION",
+        "INSUFFICIENT_MANA"
       ]
     },
     "vocationId": {
@@ -1491,10 +1502,31 @@
                     "type": "string",
                     "minLength": 1
                   }
+                },
+                "anonymous_entries": {
+                  "description": "The entries that stand for undiscovered secret vocations, in view order. Complete, not partial.",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "label": {
+                        "const": "???"
+                      },
+                      "clue": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "label"
+                    ]
+                  }
                 }
               },
               "required": [
                 "listed_vocation_ids",
+                "anonymous_entries",
                 "absent_vocation_ids",
                 "forbidden_strings"
               ]
@@ -1563,9 +1595,7 @@
                 "type": "boolean"
               },
               "disabled_reason": {
-                "enum": [
-                  "insufficient_mana"
-                ]
+                "$ref": "#/$defs/errorCode"
               }
             },
             "required": [

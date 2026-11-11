@@ -479,15 +479,15 @@ class AppController:
     def plan_preview(self) -> dict[str, Any]:
         """Validated view of the draft: resolution order, costs, target fallback, or the problem."""
         engine = self.engine
-        result: dict[str, Any] = {"problem": None, "ordered": [], "mana_before": 0, "mana_after": 0}
+        result: dict[str, Any] = {"problem": None, "problem_code": None, "ordered": [], "mana_before": 0, "mana_after": 0}
         if engine is None or engine.combat.turn is None:
             return result
         hero = engine.combat.combatants[engine.combat.turn.hero_id]
         result["mana_before"] = result["mana_after"] = hero.mana
         if not self.draft:
             return result
-        intents, problem = engine.preview_plan(self.draft)
-        result["problem"] = problem
+        intents, problem, code = engine.check_plan(self.draft)
+        result["problem"], result["problem_code"] = problem, code
         if problem is not None:
             # Still list what is drafted, so the player can see which action to change.
             turn = engine.combat.turn
