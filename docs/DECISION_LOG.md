@@ -578,6 +578,27 @@ owner chose to keep Vanguard d4.
   same bytes; the content files are untouched; all earlier tests pass unchanged.
 - **Guard:** a test fails if any rule reads the class table directly again.
 
+**Phase 1, part B: schedules as ordered slots** (`src/battle_dice/core/schedule.py`).
+
+- **Before:** the planner hard-coded two shapes: one action, or two actions with one fixed first
+  category. Five of the catalog's ten schedules fit neither.
+- **After:** every schedule is a list of slots. Each slot accepts some categories and may require
+  a face tag. One action is always legal. Several actions are legal when they fill every slot in
+  order (a class combo), or, for schedules without an order, when each fits a slot of its own.
+- The shipped `scheduling` blocks in `classes.json` are read into this model unchanged; the
+  messages a player sees are word for word the same.
+- **Evidence that nothing changed:** the replaced code is kept in `tests/unit/test_schedule.py`
+  as a reference. For the three shipped schedules and the test-only "free" policy, every
+  multiset of up to four faces in every player order is decided, worded and ordered identically
+  (about 1.3 million cases). The replay pin is rewritten to the same bytes.
+- **Not switched on:** the five catalog schedules marked `new` stay listed as engine gaps. The
+  planner can now express them, but their screens, the simulated player and their passives are
+  delivered with their waves.
+- **Open question for the Archmage wave (new):** for a three-slot schedule, v0.1 says "three
+  actions only as Resource, Attack, then Healing or Defense; otherwise one". The model follows
+  that literally, so two of the three actions is not a legal plan. Whether "Resource then Attack"
+  alone should be legal is a design decision for wave 4.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

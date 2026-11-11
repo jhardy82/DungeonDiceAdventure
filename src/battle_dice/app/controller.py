@@ -498,11 +498,11 @@ class AppController:
                 )
             return result
         mana = hero.mana
-        first_category = engine.build(hero.id).scheduling.get("first_category")
+        opening = engine.build(hero.id).schedule.opening_categories
         for position, intent in enumerate(intents):
             face = engine.intent_face(intent)
             target = engine.combat.combatants[intent.committed_target_ids[0]] if intent.committed_target_ids else hero
-            combo = len(intents) == 2 and position == 1 and intents[0].category == first_category
+            combo = len(intents) == 2 and position == 1 and intents[0].category in opening
             mana -= face.mana_cost
             for effect in face.effects:
                 if effect["type"] == "gain_mana" and effect.get("target", "target") == "self":

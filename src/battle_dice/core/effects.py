@@ -193,13 +193,13 @@ def attack_bonus(ctx: Engine, actor: Combatant, face: FaceDefinition, intent: Ac
             return int(passive["amount"])
     if passive["type"] == "combo_attack_bonus" and intent is not None:
         turn = ctx.combat.turn
-        scheduling = ctx.build(actor.id).scheduling
+        opening = ctx.build(actor.id).schedule.opening_categories
         if (
             turn is not None
             and turn.hero_id == actor.id
             and len(turn.plan) == 2
             and turn.plan[1].id == intent.id
-            and scheduling.get("first_category") in turn.resolved_categories
+            and any(category in turn.resolved_categories for category in opening)
         ):
             return int(passive["amount"])
     return 0

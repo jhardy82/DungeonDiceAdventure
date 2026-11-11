@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 631 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 651 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -218,7 +218,9 @@ src/battle_dice/
   core/               pure rules engine (no pygame)
     engine.py           single mutation path: transactional, idempotent command handling
     timeline.py         speed-driven action-gauge scheduler
-    planning.py         class scheduling, plan validation, action-speed order
+    build.py            a hero's class data for one run (the only place the rules read it from)
+    schedule.py         action schedules as ordered slots
+    planning.py         plan validation, mana projection, legal-plan enumeration
     targeting.py        formation rules, offensive retarget, defensive cancel
     effects.py          damage, shields, statuses, mana, corruption, revival
     enemy_ai.py         priority tiers, seeded weighted choice, target selection

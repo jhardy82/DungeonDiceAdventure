@@ -113,7 +113,7 @@ class HeuristicPolicy:
         combat = engine.combat
         shield_cap = engine.content.balance["shield"]["cap"]
         passive = engine.build(hero.id).passive
-        first_category = engine.build(hero.id).scheduling.get("first_category")
+        opening = engine.build(hero.id).schedule.opening_categories
         hp: dict[str, int] = {}
         shields: dict[str, int] = {}
         status_credit: dict[str, float] = {}
@@ -139,7 +139,7 @@ class HeuristicPolicy:
                             and face.category == "attack"
                             and len(intents) == 2
                             and position == 1
-                            and intents[0].category == first_category
+                            and intents[0].category in opening
                         ):
                             dealt += int(passive["amount"])
                         hp_damage = min(max(0, dealt - target_shields), target_hp)
