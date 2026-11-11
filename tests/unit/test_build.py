@@ -31,7 +31,7 @@ def test_the_build_of_a_shipped_class_is_exactly_its_class_entry(class_id):
         assert getattr(build, name) == cls[name], name
     assert list(build.starting_dice) == cls["starting_dice"] and list(build.bench_dice) == cls["bench_dice"]
     assert build.scheduling == cls["scheduling"] and build.passive == cls["passive"]
-    assert build.reaction_id == cls["reaction"]
+    assert build.reaction_id == cls["reaction"] and build.reaction == content.reactions[cls["reaction"]]
     assert build.dice == {}, "a shipped class brings no dice of its own: they are in the content"
     with pytest.raises(dataclasses.FrozenInstanceError):
         build.max_hp = 99  # type: ignore[misc]
@@ -82,7 +82,8 @@ def test_the_rules_read_what_the_build_says_not_the_class_table():
     engine = start("scout", "scout", content=packaged_content())
     squire = build_from_class(engine.content, "squire")
     engine._builds["h01"] = dataclasses.replace(
-        engine.build("h01"), scheduling=squire.scheduling, passive=squire.passive, rerolls=0, reaction_id=squire.reaction_id
+        engine.build("h01"), scheduling=squire.scheduling, passive=squire.passive, rerolls=0, reaction_id=squire.reaction_id,
+        reaction=squire.reaction,
     )
     first, second = (view.combatant_view(engine, unit(engine, h)) for h in ("h01", "h02"))
     assert first["scheduling"]["label"] == "Single Commitment" and second["scheduling"]["label"] == "Exploit Combo"

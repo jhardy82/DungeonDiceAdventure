@@ -47,3 +47,6 @@ jobs:
           python -m battle_dice --smoke-test
           python -m battle_dice --version
           python -m battle_dice.sim.runner --seeds 1 --sizes 1
+          # The Class Evolution catalog is package data too: load it from the installed copy, gate on.
+          python -m battle_dice --smoke-test --feature class_evolution_v1
+          python -c "from battle_dice.content.loader import load_content; from battle_dice.content.vocations import load_vocation_catalog as load; c = load(load_content()); print('vocation catalog', c.version, sorted(c.builds))"

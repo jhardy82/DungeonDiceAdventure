@@ -1013,3 +1013,17 @@ def test_the_status_bar_names_the_rules_and_the_content_version_separately(tmp_p
     app.frame(0)
     label = f"rules {RULES_VERSION}   content {ctrl.content.content_version}"
     assert label in drawn and label not in shortened
+    assert not any("features" in text for text in drawn), "with every gate off the status bar is as it always was"
+
+
+@pytest.mark.parametrize("size", SIZES)
+def test_the_status_bar_names_an_enabled_feature_gate(tmp_path, monkeypatch, size):
+    """A screenshot or a bug report must show that the game was launched with a gate on."""
+    from battle_dice import RULES_VERSION
+
+    ctrl = AppController(fixed_seed=1, log_dir=tmp_path / "logs", features=["class_evolution_v1"])
+    app = GameApp(ctrl, size=size, headless=True, animations=False)
+    drawn, shortened = record_text(monkeypatch)
+    app.frame(0)
+    label = f"rules {RULES_VERSION}   content {ctrl.content.content_version}   features: class_evolution_v1"
+    assert label in drawn and label not in shortened

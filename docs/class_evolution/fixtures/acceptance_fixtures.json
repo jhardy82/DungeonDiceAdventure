@@ -62,8 +62,7 @@
           "No progression state is read while the gate is off."
         ]
       },
-      "needs_design_decision": "Where the class_evolution_v1 gate lives (content file, settings or build flag) and whether the progression database is opened at all while it is off.",
-      "notes": "Baseline: With the feature gate off, the replay pin tests/golden/replay_pin.json reproduces byte for byte. Today tests/integration/test_replay_logs.py checks the pin."
+      "notes": "Baseline: With the feature gate off, the replay pin tests/golden/replay_pin.json reproduces byte for byte. Today tests/integration/test_replay_logs.py checks the pin. Decided by the owner on 2026-11-11: the gate is a launch setting, off by default (--feature class_evolution_v1 or the environment variable BATTLE_DICE_FEATURES); it is not in any content file, so the content hash cannot move; while it is off the vocation catalog is not loaded and the progression database is not opened. tests/unit/test_vocations.py checks that the catalog module is never loaded with the gate off."
     },
     {
       "id": "CE-02",

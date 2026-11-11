@@ -181,6 +181,19 @@ jobs:
           if (-not (Select-String -Path $report -Pattern 'SMOKE TEST OK' -Quiet)) { Write-Error 'No success line in the smoke report.'; exit 1 }
           if (-not (Select-String -Path $report -Pattern 'frozen=True' -Quiet)) { Write-Error 'The smoke test did not run inside the packaged app.'; exit 1 }
 
+      # The Class Evolution catalog is package data. With the gate on, the app validates and loads it at
+      # start, so this proves the standalone build contains it. (The gate is off by default.)
+      - name: Smoke-test the standalone app with the Class Evolution gate on
+        shell: pwsh
+        run: |
+          $report = Join-Path $PWD 'smoke-exe-gate.txt'
+          $process = Start-Process -FilePath 'dist\BattleDice\BattleDice.exe' `
+            -ArgumentList '--smoke-test', '--feature', 'class_evolution_v1', '--smoke-out', "`"$report`"" -Wait -PassThru
+          if (Test-Path $report) { Get-Content $report }
+          if ($process.ExitCode -ne 0) { Write-Error "BattleDice.exe exited with code $($process.ExitCode)."; exit 1 }
+          if (-not (Select-String -Path $report -Pattern 'SMOKE TEST OK' -Quiet)) { Write-Error 'No success line in the smoke report.'; exit 1 }
+          if (-not (Select-String -Path $report -Pattern 'features=class_evolution_v1' -Quiet)) { Write-Error 'The gate was not on in the packaged app.'; exit 1 }
+
       # Upload the dist folder itself, so the downloaded zip unpacks straight to BattleDice\BattleDice.exe
       # (uploading a zip made here would give a zip inside the downloaded zip).
       - uses: actions/upload-artifact@v7

@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 651 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 700 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -215,6 +215,9 @@ version and run `python tools/update_replay_pin.py`.
 src/battle_dice/
   rng.py              BD-PCG32-v1: PCG-XSH-RR 64/32, SHA-256 stream derivation, unbiased bounded draws
   content/            JSON fixtures, JSON Schema, loader with cross-reference validation
+    class_evolution/    the vocation catalog and its schema (read only when the gate is on)
+    vocations.py        catalog validator; hero builds from the catalog
+  features.py         feature gates: launch settings, all off by default
   core/               pure rules engine (no pygame)
     engine.py           single mutation path: transactional, idempotent command handling
     timeline.py         speed-driven action-gauge scheduler
@@ -237,7 +240,7 @@ tools/                build_sprites.py: rebuilds the sprite set from Kenney's Ti
                       update_replay_pin.py: regenerates the pinned-run hashes after an intended change
 scripts/              Start-BattleDice.ps1 launcher (Windows)
 packaging/            PyInstaller entry point and spec for the standalone app
-                      class_evolution/: checkers for the Class Evolution specification
+                      class_evolution/: command lines for the catalog validator and the save-database check
 docs/DECISION_LOG.md  interpretations, authored catalogs, deviations, measured evidence
 docs/class_evolution/ Class Evolution FDD v0.2: approved design; being built behind a gate that is off
 ```
@@ -249,8 +252,8 @@ run `python tools/update_replay_pin.py`, rerun the tests, add a decision-log ent
 
 `docs/class_evolution/FDD_v0.2.md` is the approved design for class evolution: 14 vocations,
 mastery, unlocks and a save database. **It is not playable yet.** The feature gate
-`class_evolution_v1` is off, and with it off the game is byte for byte unchanged (the replay pin
-proves it on every change). The specification is executable and checked in CI:
+`class_evolution_v1` is off by default, and with it off the game is byte for byte unchanged (the
+replay pin proves it on every change). The specification is executable and checked in CI:
 
 ```
 python tools/class_evolution/validate_catalog.py      # the vocation catalog against shipped content
@@ -258,8 +261,17 @@ python tools/class_evolution/check_persistence.py     # the save database script
 ```
 
 Both print `OK`. The first also lists, as warnings, every rank and vocation that cannot be reached
-on shipped content yet. The build follows the phases in section 9 of the document; Phase 1
-(foundations, nothing visible to a player) is under way.
+on shipped content yet. The build follows the phases in section 9 of the document. Phase 1
+(foundations) is done: the rules can run an evolved hero, but no screen offers one yet.
+
+The gate is a launch setting. Switching it on changes nothing you can see today; it only hands the
+vocation catalog to the rules engine, and the main menu's status bar says so:
+
+```
+python -m battle_dice --feature class_evolution_v1
+```
+
+The environment variable `BATTLE_DICE_FEATURES=class_evolution_v1` does the same.
 
 ## Scope
 

@@ -11,7 +11,7 @@ from pathlib import Path
 SMOKE_PARTY = ("squire", "apprentice", "scout")
 
 
-def run_smoke_test(report_path: str | None = None) -> int:
+def run_smoke_test(report_path: str | None = None, features: frozenset[str] = frozenset()) -> int:
     """Headless self-check: play one full seeded run and exit 0 on success. It never opens a window.
 
     What it exercises: the bundled content and sprites load; the menus are driven by real key
@@ -32,11 +32,12 @@ def run_smoke_test(report_path: str | None = None) -> int:
 
         from battle_dice import RULES_VERSION
         from battle_dice.app.controller import AppController, Screen
+        from battle_dice.features import describe
         from battle_dice.sim.policies import HeuristicPolicy
         from battle_dice.ui.app import GameApp
 
         with tempfile.TemporaryDirectory(prefix="battle-dice-smoke-") as log_dir:
-            controller = AppController(fixed_seed=1, log_dir=log_dir)
+            controller = AppController(fixed_seed=1, log_dir=log_dir, features=features)
             app = GameApp(controller, headless=True)
             seen = {controller.screen}
 
@@ -95,6 +96,7 @@ def run_smoke_test(report_path: str | None = None) -> int:
                 f"SMOKE TEST OK: outcome={engine.state.outcome} frames={frames} events={len(engine.events)} "
                 f"screens={sorted(seen)} sprites={sprites} rules={RULES_VERSION} content={controller.content.content_version} "
                 f"python={sys.version.split()[0]} pygame-ce={pygame.version.ver} frozen={bool(getattr(sys, 'frozen', False))}"
+                + (f" {describe(features).replace(': ', '=').replace(', ', ',')}" if features else "")
             )
             pygame.quit()
         code = 0
@@ -120,17 +122,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--smoke-out", default=None, metavar="FILE",
                         help="with --smoke-test: also write the result text to FILE")
     parser.add_argument("--version", action="store_true", help="print the rules and content versions and exit")
+    parser.add_argument("--feature", action="append", default=[], metavar="NAME",
+                        help="switch on a feature gate for this launch (all are off by default); "
+                             "the environment variable BATTLE_DICE_FEATURES does the same")
     args = parser.parse_args(argv)
+
+    from battle_dice import features as gates
+
+    try:
+        enabled = gates.resolve(args.feature)
+    except ValueError as error:
+        parser.error(str(error))
 
     if args.version:
         from battle_dice import RULES_VERSION
         from battle_dice.content.loader import load_content
 
-        print(f"Battle Dice: rules {RULES_VERSION}, content {load_content().content_version}, Python {sys.version.split()[0]}")
+        line = f"Battle Dice: rules {RULES_VERSION}, content {load_content().content_version}, Python {sys.version.split()[0]}"
+        print(f"{line}, {gates.describe(enabled)}" if enabled else line)
         return 0
 
     if args.smoke_test:
-        return run_smoke_test(args.smoke_out)
+        return run_smoke_test(args.smoke_out, enabled)
 
     try:
         width, height = (int(part) for part in args.size.lower().split("x"))
@@ -142,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
     from battle_dice.app.controller import AppController
     from battle_dice.ui.app import GameApp
 
-    controller = AppController(fixed_seed=args.seed, log_dir=args.log_dir)
+    controller = AppController(fixed_seed=args.seed, log_dir=args.log_dir, features=enabled)
     try:
         GameApp(controller, size=(width, height), animations=not args.no_animation).run()
     except Exception:  # noqa: BLE001 - a windowed build has no console: leave the reason in a file

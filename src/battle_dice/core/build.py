@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from battle_dice.core.models import DieDefinition
 from battle_dice.core.schedule import Schedule
@@ -43,6 +43,8 @@ class HeroBuild:
     scheduling: dict[str, Any]
     passive: dict[str, Any]
     reaction_id: str
+    #: The reaction's definition (stage, cost, effects): the hero's own copy, so a build is complete in itself.
+    reaction: dict[str, Any]
     #: The class whose Reforge and Imbue catalogs this hero's upgrade offers are drawn from.
     upgrade_family: str
     #: Dice this build brings with it. Empty for a shipped class, whose dice are in the content.
@@ -52,6 +54,32 @@ class HeroBuild:
     def schedule(self) -> Schedule:
         """``scheduling`` in the slot model the rules use. ``scheduling`` stays the one source and the display block."""
         return Schedule.from_scheduling(self.scheduling)
+
+
+class BuildNotSupported(ValueError):
+    """The vocation exists but needs something the rules do not implement yet. The message names it."""
+
+
+class BuildSource(Protocol):
+    """Where builds beyond the shipped classes come from: the vocation catalog, when its feature gate is on."""
+
+    @property
+    def version(self) -> str:
+        """The source's own version (the catalog version)."""
+        ...
+
+    @property
+    def sha256(self) -> str:
+        """Hash of the source; a run with an evolved hero records it."""
+        ...
+
+    def known(self, vocation_id: str) -> bool:
+        """True when the source lists this vocation, supported or not."""
+        ...
+
+    def build(self, vocation_id: str) -> HeroBuild:
+        """The vocation's build. Raises :class:`BuildNotSupported` when the rules cannot run it yet."""
+        ...
 
 
 def build_from_class(content: Content, class_id: str) -> HeroBuild:
@@ -75,5 +103,6 @@ def build_from_class(content: Content, class_id: str) -> HeroBuild:
         scheduling=cls["scheduling"],
         passive=cls["passive"],
         reaction_id=cls["reaction"],
+        reaction=content.reactions[cls["reaction"]],
         upgrade_family=class_id,
     )

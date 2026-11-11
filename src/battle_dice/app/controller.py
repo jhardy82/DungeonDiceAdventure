@@ -13,18 +13,21 @@ import os
 import sys
 import time
 import traceback
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 from battle_dice.content.loader import Content, load_content
 from battle_dice.core import commands as cmd
 from battle_dice.core import planning
+from battle_dice.core.build import BuildSource
 from battle_dice.core.engine import Engine
 from battle_dice.core.events import EventType, summarize, write_jsonl
 from battle_dice.core.models import ROW_BACK, ROW_FRONT, CombatPhase, RunPhase
 from battle_dice.core.progression import face_from_plain
 from battle_dice.core.replay import export_run
 from battle_dice.core.view import action_forecast, combat_log, die_view, face_view, hero_turn_view, snapshot
+from battle_dice.features import CLASS_EVOLUTION
 
 
 class Screen:
@@ -74,8 +77,18 @@ class AppController:
         seed_source: Any = None,
         log_dir: str | Path | None = None,
         fixed_seed: int | None = None,
+        features: Iterable[str] = (),
     ):
         self.content = content if content is not None else load_content()
+        #: Feature gates that are on for this launch (``battle_dice.features``). None by default.
+        self.features: frozenset[str] = frozenset(features)
+        self.vocations: BuildSource | None = None
+        if CLASS_EVOLUTION in self.features:
+            from battle_dice.content.vocations import (
+                load_vocation_catalog,  # never imported while the gate is off
+            )
+
+            self.vocations = load_vocation_catalog(self.content)
         self.screen = Screen.MAIN_MENU
         self.engine: Engine | None = None
         self.party: list[dict[str, str]] = []
@@ -274,7 +287,7 @@ class AppController:
             self.warn(problem)
             return
         seed = self.fixed_seed if self.fixed_seed is not None else int(self._seed_source())
-        engine = Engine(self.content)
+        engine = Engine(self.content, self.vocations)
         self.runs_started += 1
         result = engine.do(cmd.START_RUN, seed=seed, party=[dict(m) for m in self.party],
                            run_id=f"run-{seed}-{self.runs_started}")
