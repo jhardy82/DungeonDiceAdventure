@@ -963,7 +963,7 @@ def test_swapping_out_the_larger_die_needs_a_second_press(tmp_path, monkeypatch)
     engine = play.ctrl.engine
     upgraded = engine.state.upgrades[0]["die_id"]
     if upgraded == "iron_d6":  # the upgraded die is locked; nothing larger can be given up in this run
-        assert engine.combat.combatants["h01"].equipped_dice_ids.count("bulwark_d4") == 1
+        assert engine.combat.combatants["h01"].equipped_dice_ids.count("vanguard_d4") == 1
         return
     play.click("up:swap:h01:iron_d6")
     assert "iron_d6" in engine.combat.combatants["h01"].equipped_dice_ids, "the first press only warns"
@@ -972,7 +972,7 @@ def test_swapping_out_the_larger_die_needs_a_second_press(tmp_path, monkeypatch)
     play.app.frame(0)
     assert "Confirm: give up Iron d6" in drawn and "Confirm: give up Iron d6" not in shortened
     play.click("up:swap:h01:iron_d6")
-    assert "bulwark_d4" in engine.combat.combatants["h01"].equipped_dice_ids
+    assert "vanguard_d4" in engine.combat.combatants["h01"].equipped_dice_ids
     assert "iron_d6" not in engine.combat.combatants["h01"].equipped_dice_ids
 
 

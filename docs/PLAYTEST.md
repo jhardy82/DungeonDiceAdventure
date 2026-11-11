@@ -252,8 +252,12 @@ What this changes in the findings:
 
 - **Finding 3, upgrade choice: resolved by the retune.** Taking the worst upgrade now costs 7.5
   points (was 1.2, inside the noise).
-- **Finding 3, bench die: still open.** Swapping the bench d4 in still changes nothing (+0.8).
-  The owner asked for options to be measured (Stream C).
+- **Finding 3, bench die: partly resolved for the Squire in content 1.3.1.** On 1.3.0 swapping the
+  bench d4 in still changed nothing (+0.8). The owner chose the Squire's Vanguard d4 (Strike 3,
+  Jab 2, Jab 2, Blank). Measured on 80 runs per party: parties with three or more Squires gain
+  7.0 points, the party of two Squires loses 12.5, and for every other party the swap changes
+  nothing measurable. No Apprentice or Scout design was a trade-off, so those bench dice are
+  unchanged and for those two classes the finding stays open. Decision log D-22, section 7.9.
 - **Finding 6, risk-free rerolls: resolved by the retune.** Rerolling without thought now costs
   22.5 points (was 4.0).
 - **Finding 2, newcomer: unchanged at about 9%.** The hints added in section 8 are not something

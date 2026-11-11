@@ -10,7 +10,7 @@ import pytest
 from battle_dice.content.loader import ContentError, build_content, load_documents
 from battle_dice.core import progression
 from battle_dice.core.view import describe_face, die_view
-from tests.conftest import content_with
+from tests.conftest import content_with, mechanics_content
 
 # (category, power, mana cost, action speed, can_revive) for each physical face, in PRD order.
 EXPECTED_DICE: Mapping[str, Sequence[tuple[object, ...]]] = {
@@ -23,7 +23,7 @@ EXPECTED_DICE: Mapping[str, Sequence[tuple[object, ...]]] = {
     "striker_d8": [("attack", 2, 0, 1, False)] * 3 + [("status", 1, 0, 2, False)] * 3
     + [("resource", 1, 0, 3, False), ("blank", 0, 0, None, False)],
     "tools_d4": [("attack", 1, 0, 1, False)] * 2 + [("defense", 2, 0, 2, False), ("blank", 0, 0, None, False)],
-    "bulwark_d4": [("defense", 2, 0, 2, False)] * 2 + [("healing", 1, 0, 1, False), ("blank", 0, 0, None, False)],
+    "vanguard_d4": [("attack", 3, 0, 1, False), ("attack", 2, 0, 1, False), ("attack", 2, 0, 1, False), ("blank", 0, 0, None, False)],
     "spark_d4": [("resource", 1, 0, 3, False)] * 2 + [("attack", 1, 0, 1, False), ("blank", 0, 0, None, False)],
     "venom_d4": [("status", 1, 0, 2, False), ("attack", 1, 0, 1, False), ("attack", 1, 0, 1, False), ("blank", 0, 0, None, False)],
 }
@@ -86,7 +86,9 @@ def test_specific_face_rules_text(content):
     assert describe_face(arcane.faces[3]) == "Weaken 1 for 2 activations"
     assert describe_face(arcane.faces[4]) == "-2 corruption (self)"
     assert describe_face(content.die("striker_d8").faces[3]) == "Poison 1 for 2 activations"
-    assert describe_face(content.die("bulwark_d4").faces[2]) == "heal 1 (cannot revive)"
+    assert describe_face(content.die("vanguard_d4").faces[1]) == "2 melee damage"
+    # Ordinary healing is no longer on a shipped die (content 1.3.1); the frozen fixture dice keep Tend.
+    assert describe_face(mechanics_content().die("bulwark_d4").faces[2]) == "heal 1 (cannot revive)"
     assert describe_face(content.die("spark_d4").faces[2]) == "1 ranged damage; +1 corruption (self)"
 
 
@@ -231,8 +233,8 @@ def test_missing_document_is_reported():
 def test_versions_and_owner_rule_changes_of_1_1_0(content):
     from battle_dice import RULES_VERSION
 
-    assert RULES_VERSION == "1.1.1" and content.content_version == "1.3.0"
-    assert {doc["content_version"] for doc in content.documents.values()} == {"1.3.0"}
+    assert RULES_VERSION == "1.1.1" and content.content_version == "1.3.1"
+    assert {doc["content_version"] for doc in content.documents.values()} == {"1.3.1"}
     assert content.classes["squire"]["passive"]["type"] == "defense_die_bonus"
     assert content.balance["upgrades"]["max_swaps_per_hero"] == 1
     assert "max_swaps_per_run" not in content.balance["upgrades"]

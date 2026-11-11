@@ -16,6 +16,7 @@ from tests.conftest import (
     events_of,
     force_slash,
     last_event,
+    mechanics_content,
     ok,
     rejected,
     resolve_hero,
@@ -62,7 +63,7 @@ def test_ally_and_area_targeting_ignore_rows(content):
     squire = unit(engine, "h01")
     guard = content.die("iron_d6").faces[2]
     rally = content.die("iron_d6").faces[4]
-    tend = content.die("bulwark_d4").faces[2]
+    tend = mechanics_content().die("bulwark_d4").faces[2]  # ordinary healing: a fixture die since content 1.3.1
     assert eligible_targets(combat, squire, guard) == ["h01", "h02", "h03"]
     down(engine, "h03")
     assert eligible_targets(combat, squire, guard) == ["h01", "h02"]

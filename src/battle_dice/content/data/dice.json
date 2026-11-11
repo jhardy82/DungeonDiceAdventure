@@ -1,5 +1,5 @@
 {
-  "content_version": "1.3.0",
+  "content_version": "1.3.1",
   "face_library": {
     "blank": {"name": "Blank", "category": "blank", "power": 0, "target_scope": "none", "range_type": "none", "action_speed": null, "mana_cost": 0, "effects": [], "can_revive": false, "tags": []},
 
@@ -9,7 +9,6 @@
     "sq_guard_2": {"name": "Brace", "category": "defense", "power": 2, "target_scope": "single_ally", "range_type": "ally", "action_speed": 2, "mana_cost": 0, "effects": [{"type": "shield", "target": "target"}], "can_revive": false, "tags": []},
     "sq_rally": {"name": "Rally", "category": "healing", "power": 2, "target_scope": "single_ally", "range_type": "ally", "action_speed": 1, "mana_cost": 1, "effects": [{"type": "heal", "target": "target"}], "can_revive": true, "tags": ["revival"]},
     "sq_resolve": {"name": "Resolve", "category": "resource", "power": 1, "target_scope": "self", "range_type": "self", "action_speed": 3, "mana_cost": 0, "effects": [{"type": "gain_mana", "target": "self"}], "can_revive": false, "tags": []},
-    "sq_tend_1": {"name": "Tend", "category": "healing", "power": 1, "target_scope": "single_ally", "range_type": "ally", "action_speed": 1, "mana_cost": 0, "effects": [{"type": "heal", "target": "target"}], "can_revive": false, "tags": []},
 
     "ap_bolt_3": {"name": "Arcane Bolt", "category": "attack", "power": 3, "target_scope": "single_enemy", "range_type": "ranged", "action_speed": 1, "mana_cost": 1, "effects": [{"type": "damage", "target": "target"}, {"type": "gain_corruption", "target": "self", "amount": 1}], "can_revive": false, "tags": ["spell", "ranged"]},
     "ap_mend": {"name": "Mend", "category": "healing", "power": 3, "target_scope": "single_ally", "range_type": "ally", "action_speed": 1, "mana_cost": 2, "effects": [{"type": "heal", "target": "target"}], "can_revive": true, "tags": ["spell", "revival"]},
@@ -32,8 +31,8 @@
       "faces": ["sq_strike_3", "sq_strike_3", "sq_guard_3", "sq_guard_3", "sq_rally", "blank"]},
     "oath_d4": {"name": "Oath d4", "affinity_class": "squire", "size": 4, "role": "starting", "definition_version": 1,
       "faces": ["sq_jab_2", "sq_guard_2", "sq_guard_2", "sq_resolve"]},
-    "bulwark_d4": {"name": "Bulwark d4", "affinity_class": "squire", "size": 4, "role": "sidegrade", "definition_version": 1,
-      "faces": ["sq_guard_2", "sq_guard_2", "sq_tend_1", "blank"]},
+    "vanguard_d4": {"name": "Vanguard d4", "affinity_class": "squire", "size": 4, "role": "sidegrade", "definition_version": 1,
+      "faces": ["sq_strike_3", "sq_jab_2", "sq_jab_2", "blank"]},
 
     "arcane_d6": {"name": "Arcane d6", "affinity_class": "apprentice", "size": 6, "role": "starting", "definition_version": 1,
       "faces": ["ap_bolt_3", "ap_bolt_3", "ap_mend", "ap_enfeeble", "ap_cleanse_2", "blank"]},
