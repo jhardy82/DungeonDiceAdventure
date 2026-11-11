@@ -713,6 +713,45 @@ says so. None changes an approved rule; the owner can overrule any of them.
 and the rules engine calling these rules (Phase 4). Discovery signals are applied when given;
 nothing raises them automatically yet.
 
+### 7.13 Class Evolution Phase 3: saving the career state (2026-11-11)
+
+**What was built** (`src/battle_dice/career/store.py`): a SQLite save store over the approved
+24-table schema, which moved into the package (`career/schema/progression.sql`). The rules of
+Phase 2 are unchanged: they decide in memory, and the store writes what they decided. After an
+accepted change the difference between the state before and after is written in one
+`BEGIN IMMEDIATE` transaction. If that fails, nothing is in the file and the memory state is put
+back. A rejected command, a replay and a preview write nothing. The game does not open a save
+file yet.
+
+**Gate: rollback, repeated-command and migration fixtures pass.**
+
+| Check | Result |
+|-------|--------|
+| The 28 rule fixtures, run again through the save file (`tests/spec/test_class_evolution_store.py`) | 28 of 28: same result as in memory, and the file holds exactly the result after it is closed and reopened |
+| CE-38, with a real failure inside the SQLite transaction, at both fault points | The file and the memory are as they were; the same command id then succeeds once |
+| CE-33, repeated command and repeated award after a reopen | Answered from the file; nothing written |
+| CE-34, a save of another catalog version | Refused with `CONTENT_MIGRATION_REQUIRED`; no row of the save changes |
+| CE-25, run upgrades after the run ends | Rows kept, no longer applied (owner decision) |
+| Event log | The hash chain verifies on every load; a changed event is detected |
+| Schema version | An older save is backed up through SQLite's own backup call, then migrated in one transaction; a failed migration leaves the old version; a newer save and a file that is not a save are refused |
+| Twenty deliberate breaks of the store, one at a time | Each makes at least one test fail |
+| Line coverage of `battle_dice.career` | 99% |
+| Replay pin and content files | Unchanged; the game loads no career module and creates no save file |
+
+**This build's own readings for saving.** Each has a test. The owner can overrule any of them.
+
+| # | Situation | What this build does |
+|--:|-----------|----------------------|
+| 1 | "Each distinct clue counts once" must survive a restart, and the schema has no column for the clues seen | A new clue that shows nothing new is logged as a `DiscoveryClueCounted` event; on load the event log says which clues were counted. No schema change |
+| 2 | A hero is saved for the first time | Each vocation it has is claimed by a logged event, as the schema requires, and every item held is recorded as a grant |
+| 3 | A save written with another catalog version is opened | The new catalog is installed beside the old one, the old one is marked retired, and the profile is refused until a migration exists |
+| 4 | The schema's run row needs a seed and a build hash | Phase 3 writes stand-in values; the real ones arrive when the game starts runs from saved heroes (Phase 4) |
+| 5 | A hero's health, mana and corruption inside a run | Not saved; the run owns them |
+| 6 | A mastery award names a run that is not in the save | Refused; nothing is written |
+
+**Not in Phase 3:** the game opening a save (the gate decides that in Phase 4), screens, item
+grants and quest completion as events, build snapshots at run start (CE-35).
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

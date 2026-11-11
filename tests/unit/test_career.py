@@ -155,7 +155,8 @@ def test_discovery_only_moves_forward_and_each_distinct_clue_counts_once(catalog
     weaker_again = service.apply_discovery_signal({"signal": "quest_hint:crooked_mirror"})  # a repeat of a weaker clue
     assert weaker_again.accepted and weaker_again.events == [] and (row.state, row.clue_count) == ("discovered", 2)
     third = service.apply_discovery_signal({"signal": "quest_complete:crooked_mirror"})  # new clue, same state
-    assert third.events == [] and service.state.profile.discovery["trickster"].clue_count == 3
+    assert [(e["type"], e["signal"]) for e in third.events] == [("DiscoveryClueCounted", "quest_complete:crooked_mirror")]
+    assert service.state.profile.discovery["trickster"].clue_count == 3
     nothing = service.apply_discovery_signal({"signal": "item_found:rubber_duck"})
     assert nothing.accepted and nothing.events == [] and list(service.state.profile.discovery) == ["trickster"]
 
@@ -174,7 +175,7 @@ def test_a_weaker_clue_after_a_stronger_one_does_not_hide_what_was_shown(catalog
     service.apply_discovery_signal({"signal": "item_found:drake_scale"})
     later = service.apply_discovery_signal({"signal": "mastery_rank:spellblade:4"})
     row = service.state.profile.discovery["dragon_knight"]
-    assert later.events == [] and (row.state, row.clue_count) == ("discovered", 2)
+    assert [e["type"] for e in later.events] == ["DiscoveryClueCounted"] and (row.state, row.clue_count) == ("discovered", 2)
     names = {signal_name(entry) for v in catalog.raw["vocations"] for entry in v.get("discovery", {}).get("signals", [])}
     assert {"mastery_rank:spellblade:4", "item_found:drake_scale", "quest_hint:crooked_mirror"} <= names
 
@@ -480,13 +481,16 @@ def test_the_game_does_not_load_the_career_package_yet():
         "import sys, tempfile\n"
         "import battle_dice.__main__, battle_dice.ui.app, battle_dice.sim.runner, battle_dice.replay_cli\n"
         "from battle_dice.app.controller import AppController\n"
-        "c = AppController(fixed_seed=1, log_dir=tempfile.mkdtemp(), features=['class_evolution_v1'])\n"
+        "import pathlib\n"
+        "base = pathlib.Path(tempfile.mkdtemp())\n"
+        "c = AppController(fixed_seed=1, log_dir=base / 'logs', features=['class_evolution_v1'])\n"
         "c.new_run(); c.add_hero('scout'); c.begin_run()\n"
-        "print(sorted(name for name in sys.modules if name.startswith('battle_dice.career')))\n"
+        "saves = [p.name for p in base.rglob('*.sqlite*')]\n"
+        "print(sorted(name for name in sys.modules if name.startswith('battle_dice.career')), saves)\n"
     )
     env = {**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"}
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=120, check=True)
-    assert done.stdout.strip().splitlines()[-1] == "[]"
+    assert done.stdout.strip().splitlines()[-1] == "[] []", "no career module is loaded and no save file is created"
 
 
 # --------------------------------------------------------------------------------------------
