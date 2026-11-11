@@ -35,7 +35,7 @@ jobs:
       - name: Test, with a coverage floor for the rules engine, content loader and random numbers
         # PRD target: at least 80% line coverage. Measured 97%; the floor is set at 90% so a real drop fails.
         # Warnings are errors: a deprecation or a resource leak fails the build instead of scrolling past.
-        run: python -m pytest -W error --cov=battle_dice.core --cov=battle_dice.content --cov=battle_dice.rng --cov-report=term-missing:skip-covered --cov-fail-under=90
+        run: python -m pytest -W error --cov=battle_dice.core --cov=battle_dice.content --cov=battle_dice.rng --cov=battle_dice.career --cov-report=term-missing:skip-covered --cov-fail-under=90
       - name: Build the wheel and run the game from the installed copy
         # Proves the packaged files (content, schema, sprites, entry points) are complete, not just the source tree.
         shell: bash

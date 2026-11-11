@@ -363,13 +363,22 @@ def _schedule_problems(catalog: Json, schema: Json) -> list[str]:
 
 
 def _attack_faces(catalog: Json, shipped: Content, vocation: Json) -> dict[str, Json]:
-    """Every Attack face ``vocation`` can roll: on its dice, and on its upgrade family's reforge and imbue tables."""
+    """Every Attack face ``vocation`` can roll.
+
+    On its own dice, on the dice of the starting class it grew from (owner decision of 2026-11-11:
+    a vocation may equip its own dice and its family's), and on that family's reforge and imbue tables.
+    """
     faces: dict[str, Json] = {}
     for die_id in vocation["starting_dice"] + vocation["bench_dice"]:
         for face_id in catalog["dice"].get(die_id, {}).get("faces", []):
             face = _resolve_face(catalog, shipped, face_id)
             if face is not None:
                 faces[face_id] = face
+    family = shipped.classes.get(vocation["upgrade_family"], {})
+    shipped_faces = _shipped_faces(shipped)
+    for die_id in [*family.get("starting_dice", []), *family.get("bench_dice", [])]:
+        for face_id in shipped.documents["dice"]["dice"][die_id]["faces"]:
+            faces[face_id] = shipped_faces[face_id]
     upgrades = shipped.documents["upgrades"]
     for table in ("reforge_faces", "imbue_faces"):
         for face_id in upgrades[table].get(vocation["upgrade_family"], []):

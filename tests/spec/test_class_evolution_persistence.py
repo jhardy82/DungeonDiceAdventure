@@ -68,9 +68,9 @@ V01_TABLES = [
 ]
 ADDED_TABLES = ["hero_die_instance", "item_grant", "schema_migration"]
 
-#: Decided by the owner on 2026-11-11 and no longer in this set: CE-01 (where the gate lives), then
-#: CE-10, CE-19, CE-24, CE-28 and CE-39 (the decisions the progression rules need).
-NEEDS_DESIGN_DECISION = {9, 18, 25, 29, 30, 31, 32, 35, 36, 40}
+#: Decided by the owner on 2026-11-11 and no longer in this set: CE-01 (where the gate lives); CE-10,
+#: CE-19, CE-24, CE-28 and CE-39 (progression rules); CE-18, CE-25, CE-35 and CE-40 (dice, saving, run start).
+NEEDS_DESIGN_DECISION = {9, 29, 30, 31, 32, 36}
 BASELINE_DEFINITION = (
     "With the feature gate off, the replay pin tests/golden/replay_pin.json reproduces byte for byte."
 )
@@ -1175,10 +1175,10 @@ def test_the_fixtures_are_ce_01_to_ce_40_exactly_once():
     assert [case["id"] for case in FIXTURES["cases"]] == [f"CE-{number:02d}" for number in range(1, 41)]
 
 
-def test_ten_cases_still_need_a_design_decision():
+def test_six_cases_still_need_a_design_decision():
     needing = {int(case["id"][3:]) for case in FIXTURES["cases"] if "needs_design_decision" in case}
     assert needing == NEEDS_DESIGN_DECISION
-    assert len(needing) == 10 and len(FIXTURES["cases"]) - len(needing) == 30
+    assert len(needing) == 6 and len(FIXTURES["cases"]) - len(needing) == 34
 
 
 def test_ce_01_and_ce_40_share_the_replay_pin_baseline():

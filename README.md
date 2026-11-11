@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 700 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 778 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -163,7 +163,7 @@ Linux and Windows, and fails if line coverage of the rules engine, content loade
 numbers drops below 90% (measured: 97%; PRD target: at least 80%):
 
 ```bash
-python -m pytest -W error --cov=battle_dice.core --cov=battle_dice.content --cov=battle_dice.rng --cov-fail-under=90
+python -m pytest -W error --cov=battle_dice.core --cov=battle_dice.content --cov=battle_dice.rng --cov=battle_dice.career --cov-fail-under=90
 ```
 
 | Folder | Contents |
@@ -218,6 +218,8 @@ src/battle_dice/
     class_evolution/    the vocation catalog and its schema (read only when the gate is on)
     vocations.py        catalog validator; hero builds from the catalog
   features.py         feature gates: launch settings, all off by default
+  career/             Class Evolution progression rules in memory: claims, vocation changes, mastery,
+                      skills, discovery (not called by the game yet)
   core/               pure rules engine (no pygame)
     engine.py           single mutation path: transactional, idempotent command handling
     timeline.py         speed-driven action-gauge scheduler
@@ -262,7 +264,9 @@ python tools/class_evolution/check_persistence.py     # the save database script
 
 Both print `OK`. The first also lists, as warnings, every rank and vocation that cannot be reached
 on shipped content yet. The build follows the phases in section 9 of the document. Phase 1
-(foundations) is done: the rules can run an evolved hero, but no screen offers one yet.
+(foundations) and Phase 2 (progression rules, in memory) are done: the rules can run an evolved
+hero and decide claims, vocation changes, mastery and skills, but nothing is saved and no screen
+offers any of it yet.
 
 The gate is a launch setting. Switching it on changes nothing you can see today; it only hands the
 vocation catalog to the rules engine, and the main menu's status bar says so:

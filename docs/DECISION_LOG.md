@@ -39,6 +39,7 @@ tests, and add an entry here.
 | D-21 | 8.1-8.3 class fixtures, 12.2 encounter scaling | **Owner decision, 2026-11-10 (content 1.3.0):** class balance change. Squire Strike 2 to 3 and Jab 1 to 2; Apprentice health 9 to 12; Scout speed 13 to 10 and health 10 to 9; Disrupt mana cost 1 to 2; enemy health raised per party size. The owner's gate was: every party size inside 70-85% on a block of seeds not used for tuning. See section 7.8. | Under simulated player version 2 the 1.2.1 table was outside the band (95.6% at party size 2), all-Squire parties won 0-1% at sizes 3 to 5 and parties with two or more Scouts about 100% (sections 7.2 and 7.6). |
 | D-22 | 8.1 Squire fixtures (bench die) | **Owner decision, 2026-11-11 (content 1.3.1):** the Squire's bench die is now **Vanguard d4** (Strike 3, Jab 2, Jab 2, Blank), replacing Bulwark d4 (Guard 2, Guard 2, Tend 1, Blank). The Apprentice and Scout bench dice are unchanged. See section 7.9, including a correction to the numbers the choice was made on. | Playtest finding 3: swapping the bench die in changed nothing (+0.8 points). The owner asked for a true sidegrade to be designed and measured first, then chose this one. |
 | D-23 | Class Evolution (beyond the MVP PRD) | **Owner decision, 2026-11-11:** FDD v0.2 (`docs/class_evolution/`) is approved and built in phases behind the feature gate `class_evolution_v1`, a launch setting that is off by default. With the gate off the game stays byte for byte identical. See section 7.11. | The owner asked for the design to be evaluated, chose a reconciled specification as the first step, then approved it. |
+| D-25 | Class Evolution fixtures CE-18, CE-25, CE-35, CE-40 | **Owner decisions, 2026-11-11:** a vocation may equip its own dice plus its family's; run upgrades are kept as history after a run; with the gate on a run takes saved heroes with a build snapshot in its log; gate on with starting classes stays byte for byte identical to gate off. See section 7.12. | Asked before Phases 3 and 4. The dice answer differs from the fixture's first assumption (own dice only), so that fixture's notes and one rule changed. |
 
 ## 2. Content authored under delegation
 
@@ -650,8 +651,67 @@ standalone Windows build passed its smoke test with the gate on.
 | CE-28 | A skill with no die face it can act on | Refused with `NO_LEGAL_FACE`; the skill stays learned |
 | CE-10 | Can discovery move backwards? | No: hidden, hinted, discovered, only forward; each distinct clue counts once |
 
-Ten fixtures still need a decision (CE-09, 18, 25, 29, 30, 31, 32, 35, 36, 40); each is settled in
-the phase that first needs it. The three codes v0.2 proposed are marked approved in the registry.
+Ten fixtures still needed a decision at that point; four more were decided later the same day
+(D-25), leaving six (CE-09, 29, 30, 31, 32, 36). The three codes v0.2 proposed are marked approved
+in the registry.
+
+### 7.12 Class Evolution Phase 2: progression rules in memory (2026-11-11)
+
+**What was built** (`src/battle_dice/career/`): the rules that decide claims, vocation changes,
+previews, mastery awards, inherited skills and discovery. The state is held in memory; nothing is
+saved and nothing in the game calls it yet. It follows the rules engine's contract: a rejected
+command returns one code and changes nothing, a repeated command id returns the stored result, and
+every change runs on a copy that replaces the state only on success.
+
+**Gate: the fully specified rule fixtures pass as executable tests.**
+
+| Check | Result |
+|-------|--------|
+| Acceptance fixtures run against the rules (`tests/spec/test_class_evolution_rules.py`) | 27 of 27 pass (28 since the dice decision below) |
+| The other 13 fixtures | Each is named with where it is checked or which phase will run it; a test fails if a fixture is neither run nor accounted for |
+| Twenty deliberate rule breaks, one at a time (threat floor ignored, wrong route, no rollback, and so on) | Each makes at least one fixture fail |
+| Line coverage of the new package | 100%; it now counts toward the CI coverage floor |
+| Replay pin and content files | Unchanged; the game does not import the package |
+
+**This build's own readings, where the fixtures and v0.1 are silent.** Each has a test whose name
+says so. None changes an approved rule; the owner can overrule any of them.
+
+| # | Situation | What this build does |
+|--:|-----------|----------------------|
+| 1 | Claiming a vocation the hero already has; changing to the active vocation; unequipping an empty slot | Accepted, and nothing changes: no event, no new revision |
+| 2 | Equipping a skill the hero has not learned, or a native-only skill | Rejected with `PREREQUISITE_UNMET` |
+| 3 | A skill tied to melee or ranged faces on dice without such a face | Rejected with `NO_LEGAL_FACE`, like the Healing case the owner decided |
+| 4 | Skills that no longer fit after a change of vocation (capacity or face) | Unequipped in slot order; the change event lists them |
+| 5 | A mastery award for a mastered vocation, for a hero that was not deployed, or for an encounter that never awards mastery | Nothing is recorded |
+| 6 | Claiming during a run | Allowed in every phase except battle (a claim does not alter the build in play) |
+| 7 | A skill's rank is reached by an award | The skill is learned at once and a `SkillLearned` event follows the award event |
+| 8 | A prerequisite that counts mastered vocations and is not met | Reported as `MASTERED_COUNT_AT_LEAST` with the current count |
+
+**Owner decisions for Phases 3 and 4 (D-25, 2026-11-11), and what was built for the dice one.**
+
+| Fixture | Answer | Built now |
+|---------|--------|-----------|
+| CE-18 | A vocation may equip its own dice, plus its family's | Yes: see below; the fixture now runs (28 of 40) |
+| CE-25 | Run upgrades are kept as history, no longer applied | With Phase 3 |
+| CE-35 | Saved heroes enter a run with a build snapshot in the log | With Phase 4 |
+| CE-40 | Gate on with starting classes: byte for byte identical | Already tested on the three pinned parties |
+
+- **The dice rule as built** (`CareerCatalog.may_equip`, `EquipDie`): "family" is the starting
+  class a vocation grew from. On a change of vocation the new vocation's own starting dice take
+  the slots and the dice that were equipped go to the bench. A family die may then be put back;
+  a die of any other vocation, an unknown die or a slot that does not exist is refused with
+  `INCOMPATIBLE_DIE`. A starting class may equip only its own dice. A die swap that takes away
+  the only face a skill needs unequips that skill.
+- **This is my reading of the answer.** The other possible default, "family dice stay equipped
+  when the vocation changes", would change fixture CE-18 and one rule.
+- **Catalog validator:** a vocation's face rules now cover its family's dice too (for example
+  "every Attack face a Ranger can roll is ranged"). No shipped family die breaks a rule.
+- **Risk:** each evolved vocation has more possible loadouts, so the balance surface grows.
+  Loadouts are sampled, not enumerated, when a wave is tuned.
+
+**Not in Phase 2:** saving (Phase 3); item grants and quest completion as events, the screens,
+and the rules engine calling these rules (Phase 4). Discovery signals are applied when given;
+nothing raises them automatically yet.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 
