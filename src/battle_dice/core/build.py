@@ -12,9 +12,11 @@ are derived data, like the content itself, and are not part of the hashed run st
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from battle_dice.core.models import DieDefinition
+from battle_dice.core.schedule import Schedule
 
 if TYPE_CHECKING:  # pragma: no cover
     from battle_dice.content.loader import Content
@@ -45,6 +47,11 @@ class HeroBuild:
     upgrade_family: str
     #: Dice this build brings with it. Empty for a shipped class, whose dice are in the content.
     dice: dict[str, DieDefinition] = field(default_factory=dict)
+
+    @cached_property
+    def schedule(self) -> Schedule:
+        """``scheduling`` in the slot model the rules use. ``scheduling`` stays the one source and the display block."""
+        return Schedule.from_scheduling(self.scheduling)
 
 
 def build_from_class(content: Content, class_id: str) -> HeroBuild:

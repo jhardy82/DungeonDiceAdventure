@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from battle_dice.core.models import ActionIntent, Combatant, FaceDefinition, HeroTurn
+from battle_dice.core.schedule import Schedule, ScheduleError
 from battle_dice.core.targeting import eligible_targets, protected_targets
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -24,40 +25,21 @@ def describe_policy(scheduling: dict[str, Any]) -> str:
     return f"{scheduling['label']}: {scheduling['summary']}"
 
 
-def order_actions(entries: list[tuple[FaceDefinition, int]], scheduling: dict[str, Any]) -> list[int]:
+def order_actions(entries: list[tuple[FaceDefinition, int]], scheduling: dict[str, Any] | Schedule) -> list[int]:
     """Return resolution order as indices into ``entries`` (``(face, player_order)`` pairs).
 
     A class-defined dependency (Resource then cast, Status then Attack) always comes first.
     Otherwise higher ``action_speed`` resolves earlier and the player's order breaks ties.
+    The rule itself lives in :class:`~battle_dice.core.schedule.Schedule`.
     """
-    indices = list(range(len(entries)))
-    if scheduling["policy"] == "sequence" and len(entries) == 2:
-        first = scheduling["first_category"]
-        return sorted(indices, key=lambda i: (0 if entries[i][0].category == first else 1, entries[i][1]))
-    return sorted(indices, key=lambda i: (-(entries[i][0].action_speed or 0), entries[i][1]))
-
-
-def _check_policy(faces: list[FaceDefinition], scheduling: dict[str, Any]) -> None:
-    count = len(faces)
-    if count > scheduling["max_actions"]:
-        raise PlanError(f"{scheduling['label']} allows at most {scheduling['max_actions']} action(s) per activation.")
-    if scheduling["policy"] == "sequence" and count == 2:
-        first = scheduling["first_category"]
-        seconds = scheduling["second_categories"]
-        categories = [f.category for f in faces]
-        firsts = [c for c in categories if c == first]
-        others = [c for c in categories if c != first]
-        if len(firsts) != 1 or len(others) != 1 or others[0] not in seconds:
-            allowed = " or ".join(s.capitalize() for s in seconds)
-            raise PlanError(
-                f"{scheduling['label']}: two actions are only allowed as {first.capitalize()} first, then {allowed}."
-            )
+    schedule = scheduling if isinstance(scheduling, Schedule) else Schedule.from_scheduling(scheduling)
+    return schedule.resolution_order(entries)
 
 
 def build_plan(ctx: Engine, hero: Combatant, turn: HeroTurn, actions: list[dict[str, Any]]) -> list[ActionIntent]:
     """Validate ``actions`` (``[{die_id, target_ids}]`` in the player's order) and return ordered intents."""
     combat = ctx.combat
-    scheduling = ctx.build(hero.id).scheduling
+    schedule = ctx.build(hero.id).schedule
     seen: set[str] = set()
     chosen: list[tuple[FaceDefinition, str, int, list[str]]] = []
 
@@ -90,9 +72,10 @@ def build_plan(ctx: Engine, hero: Combatant, turn: HeroTurn, actions: list[dict[
             targets = requested
         chosen.append((face, die_id, order, targets))
 
-    faces = [c[0] for c in chosen]
-    _check_policy(faces, scheduling)
-    resolution_order = order_actions([(c[0], c[2]) for c in chosen], scheduling)
+    try:
+        resolution_order = schedule.resolution_order([(c[0], c[2]) for c in chosen], strict=True)
+    except ScheduleError as error:
+        raise PlanError(str(error)) from error
 
     # Mana projection in resolution order: costs are charged on resolution, gains arrive first.
     mana = hero.mana
@@ -190,7 +173,7 @@ def enumerate_plans(
     With ``include_targets=False`` only one representative target per action is tried.
     """
     options = [o for o in die_options(ctx, hero, turn) if o["selectable"]]
-    max_actions = ctx.build(hero.id).scheduling["max_actions"]
+    max_actions = ctx.build(hero.id).schedule.max_actions
 
     def target_choices(option: dict[str, Any]) -> list[list[str]]:
         face = option["face"]
