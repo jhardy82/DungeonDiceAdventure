@@ -112,8 +112,8 @@ class HeuristicPolicy:
         """Value of a plan, with its actions applied in resolution order to projected health and shields."""
         combat = engine.combat
         shield_cap = engine.content.balance["shield"]["cap"]
-        passive = engine.content.class_def(hero.archetype_id)["passive"]
-        first_category = engine.content.class_def(hero.archetype_id)["scheduling"].get("first_category")
+        passive = engine.build(hero.id).passive
+        first_category = engine.build(hero.id).scheduling.get("first_category")
         hp: dict[str, int] = {}
         shields: dict[str, int] = {}
         status_credit: dict[str, float] = {}
@@ -322,7 +322,7 @@ class HeuristicPolicy:
         """A face's worth outside any particular battle, for comparing upgrade offers."""
         if face.is_blank:
             return 0.0
-        passive = engine.content.class_def(hero.archetype_id)["passive"]
+        passive = engine.build(hero.id).passive
         spread = 2.0 if face.target_scope in ("all_enemies", "all_allies") else 1.0
         value = -0.6 * face.mana_cost
         for effect in face.effects:

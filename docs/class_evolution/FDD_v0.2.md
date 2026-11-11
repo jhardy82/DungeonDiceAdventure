@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Document | BD-FDD-CE-001, version 0.2 |
-| Status | **Proposed, awaiting owner approval.** Specification only. |
+| Status | **Approved by the owner, 2026-11-11.** Building has started with Phase 1 (section 9). |
 | Replaces | BD-UNIFIED-FDD-001 v0.1 (the 6,270-line design document reviewed on 2026-11-11) |
 | Baseline | Rules `1.1.1`, content `1.3.1`, RNG `BD-PCG32-v1` |
 | Feature gate | `class_evolution_v1`, off |
@@ -17,10 +17,10 @@
 - **What v0.2 changes.** No design intent. It fixes the five gaps that blocked a build: a stale
   baseline, a catalog the engine could not read, a persistence contract that did not load its own
   example, free-text test cases, and a missing decision record.
-- **What v0.2 does not do.** It adds no game code. Nothing in `src/` reads these files. With the
-  gate off the game is byte for byte what it was.
-- **What is asked of the owner.** Approve this document, and answer the open decisions in
-  section 10. No build work starts before that.
+- **What v0.2 does not do.** It adds no game code by itself. With the gate off the game is byte
+  for byte what it was, and that stays true through every later phase.
+- **Owner's decisions (2026-11-11).** The document is approved and Phase 1 has started. The
+  answers to the open decisions are recorded in section 10.
 
 ## 2. What is in the repository
 
@@ -212,7 +212,7 @@ names.
 
 | Case | The question |
 |------|--------------|
-| CE-01 | Where does the feature gate live (content file, settings or build flag), and is the save database opened at all while it is off? |
+| CE-01 | Where does the feature gate live (content file, settings or build flag), and is the save database opened at all while it is off? **Decided 2026-11-11:** a launch setting, off by default; the save database is not opened while it is off. |
 | CE-09 | Does a hidden secret vocation show as an anonymous placeholder in the career tree, or not at all? |
 | CE-10 | Does discovery only move forward, and what does the clue count count? |
 | CE-18 | Which dice fit which vocation? The case assumes a die fits only a vocation named in its tags. |
@@ -244,11 +244,12 @@ names.
 - Every phase leaves the game shippable with the gate off.
 - The first playable evolution arrives before the expensive engine work of waves 3 to 5.
 
-## 10. Open decisions for the owner
+## 10. Decisions put to the owner, and the answers (2026-11-11)
 
 1. **Guardian cannot reach rank 8 on shipped encounters.** Its last rank-up needs a threat-4
    encounter; shipped battles stop at threat 3. Options: author one threat-4 training encounter
    as part of the first slice, or lower the advanced threat floor to 3.
+   - **Answer:** author one threat-4 training encounter as part of the first slice (Phase 4).
 2. **Guardian's passive as written in v0.1 is weaker than the Squire's shipped Steadfast.**
    Guardian: +1 shield on a Defense die that targets another ally. Squire (shipped): +1 on any
    Defense die, self or ally. An evolution that loses power needs a retune before it is built.
@@ -256,10 +257,18 @@ names.
    against Apprentice 12; Ranger speed 14 against Scout 10; two mastery rewards that always
    clamp to zero. Proposal: retune each wave by measurement when it is built, as was done for
    the three novice classes.
+   - **Answer to 2 and 3:** retune each wave by measurement when it is built. Nothing is
+     changed in the catalog now; Guardian's passive is settled with the first slice.
 4. **The 16 fixtures in section 8.**
+   - **Status:** CE-01 is decided (the gate is a launch setting, off by default, read by the
+     app; the rules engine has no global switch and is handed the vocation catalog only when
+     the gate is on; content files and their hash are untouched). The other 15 are settled in
+     the phase that first needs them.
 5. **Pacing.** By the thresholds above, reaching Hero by the lineage route needs 208 mastery
    points for one hero: 52 to 104 winning runs on two-battle content. Options: shrink the
    thresholds, add encounters, or award more per win.
+   - **Answer:** build the first slice with the v0.1 thresholds, measure how many runs mastery
+     takes with the simulator, then bring options with numbers before the roster grows.
 
 ## 11. Risks
 

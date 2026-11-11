@@ -7,6 +7,7 @@ import dataclasses
 from typing import TYPE_CHECKING, Any
 
 from battle_dice.content.loader import Content
+from battle_dice.core.build import HeroBuild, build_from_class
 from battle_dice.core.events import EventType
 from battle_dice.core.models import (
     SIDE_ENEMY,
@@ -36,25 +37,29 @@ def ceil_percent(value: int, percent: int) -> int:
 
 
 def make_hero(content: Content, hero_id: str, class_id: str, row: str) -> Combatant:
-    cls = content.class_def(class_id)
+    """A hero of a shipped class, as it enters Battle 1."""
+    return hero_from_build(content, hero_id, build_from_class(content, class_id), row)
+
+
+def hero_from_build(content: Content, hero_id: str, build: HeroBuild, row: str) -> Combatant:
     return Combatant(
         id=hero_id,
         side=SIDE_HERO,
-        archetype_id=class_id,
-        name=f"{cls['name']} {hero_id[1:].lstrip('0')}",
+        archetype_id=build.vocation_id,
+        name=f"{build.name} {hero_id[1:].lstrip('0')}",
         row=row,
-        hp=cls["start_hp"],
-        max_hp=cls["max_hp"],
+        hp=build.start_hp,
+        max_hp=build.max_hp,
         shields=0,
-        speed=cls["speed"],
-        base_initiative=cls["base_initiative"],
+        speed=build.speed,
+        base_initiative=build.base_initiative,
         gauge=content.balance["timeline"]["start_gauge"],
-        mana=cls["start_mana"],
-        max_mana=cls["max_mana"],
-        corruption=cls["start_corruption"],
-        max_corruption=cls["max_corruption"],
+        mana=build.start_mana,
+        max_mana=build.max_mana,
+        corruption=build.start_corruption,
+        max_corruption=build.max_corruption,
         reaction_charges=content.balance["reactions"]["charges_per_activation"],
-        equipped_dice_ids=list(cls["starting_dice"]),
+        equipped_dice_ids=list(build.starting_dice),
     )
 
 
@@ -109,7 +114,6 @@ def apply_recovery(ctx: Engine) -> None:
     before = ctx.snap([h.id for h in heroes])
     report = []
     for hero in heroes:
-        cls = ctx.content.class_def(hero.archetype_id)
         entry: dict[str, Any] = {"id": hero.id, "hp_before": hero.hp, "was_downed": hero.state == STATE_DOWNED}
         if hero.state == STATE_DOWNED:
             hero.hp = min(hero.max_hp, ceil_percent(hero.max_hp, balance["recovery"]["downed_restore_percent"]))
@@ -117,7 +121,7 @@ def apply_recovery(ctx: Engine) -> None:
         else:
             hero.hp = min(hero.max_hp, hero.hp + ceil_percent(hero.max_hp, balance["recovery"]["standing_heal_percent"]))
         hero.shields = 0
-        hero.mana = cls["max_mana"]
+        hero.mana = ctx.build(hero.id).max_mana
         hero.status_instances = []
         hero.gauge = balance["timeline"]["start_gauge"]
         hero.reaction_charges = balance["reactions"]["charges_per_activation"]
@@ -187,7 +191,8 @@ def offers_for_die(ctx: Engine, hero: Combatant, die: DieDefinition) -> list[dic
         if new_face is not None:
             sharpen_pool.append(_offer("sharpen", index, die.faces[index], new_face))
 
-    reforge_faces = rotate([content.upgrade_faces[f] for f in upgrades["reforge_faces"][hero.archetype_id]])
+    family = ctx.build(hero.id).upgrade_family
+    reforge_faces = rotate([content.upgrade_faces[f] for f in upgrades["reforge_faces"][family]])
     reforge_pool = [
         _offer("reforge", index, die.faces[index], face)
         for index in range(die.size)
@@ -195,7 +200,7 @@ def offers_for_die(ctx: Engine, hero: Combatant, die: DieDefinition) -> list[dic
         for face in reforge_faces
     ]
 
-    imbue_faces = rotate([content.upgrade_faces[f] for f in upgrades["imbue_faces"][hero.archetype_id]])
+    imbue_faces = rotate([content.upgrade_faces[f] for f in upgrades["imbue_faces"][family]])
     imbue_pool = [
         _offer("imbue", index, die.faces[index], face)
         for index in rotate(list(range(die.size)))
@@ -301,8 +306,8 @@ def swap_problem(ctx: Engine, hero_id: str, out_die_id: str, in_die_id: str) -> 
         return "The upgraded die is locked and cannot be swapped out."
     if in_die_id not in state.inventory.get(hero_id, []):
         return f"Die '{in_die_id}' is not on {hero.name}'s bench."
-    incoming = ctx.content.dice.get(in_die_id)
-    if incoming is None or incoming.affinity_class != hero.archetype_id:
+    incoming = ctx.base_die(hero_id, in_die_id)
+    if incoming is None or incoming.affinity_class != ctx.build(hero_id).vocation_id:
         return "A hero can only equip dice of its own class."
     return None
 
@@ -313,7 +318,7 @@ def apply_swap(ctx: Engine, hero_id: str, out_die_id: str, in_die_id: str) -> st
         return problem
     state = ctx.state
     hero = ctx.combat.combatants[hero_id]
-    capacity = ctx.content.class_def(hero.archetype_id)["dice_capacity"]
+    capacity = ctx.build(hero_id).dice_capacity
     hero.equipped_dice_ids[hero.equipped_dice_ids.index(out_die_id)] = in_die_id
     bench = state.inventory[hero_id]
     bench[bench.index(in_die_id)] = out_die_id

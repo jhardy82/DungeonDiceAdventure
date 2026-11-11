@@ -57,7 +57,7 @@ def _check_policy(faces: list[FaceDefinition], scheduling: dict[str, Any]) -> No
 def build_plan(ctx: Engine, hero: Combatant, turn: HeroTurn, actions: list[dict[str, Any]]) -> list[ActionIntent]:
     """Validate ``actions`` (``[{die_id, target_ids}]`` in the player's order) and return ordered intents."""
     combat = ctx.combat
-    scheduling = ctx.content.class_def(hero.archetype_id)["scheduling"]
+    scheduling = ctx.build(hero.id).scheduling
     seen: set[str] = set()
     chosen: list[tuple[FaceDefinition, str, int, list[str]]] = []
 
@@ -190,7 +190,7 @@ def enumerate_plans(
     With ``include_targets=False`` only one representative target per action is tried.
     """
     options = [o for o in die_options(ctx, hero, turn) if o["selectable"]]
-    max_actions = ctx.content.class_def(hero.archetype_id)["scheduling"]["max_actions"]
+    max_actions = ctx.build(hero.id).scheduling["max_actions"]
 
     def target_choices(option: dict[str, Any]) -> list[list[str]]:
         face = option["face"]

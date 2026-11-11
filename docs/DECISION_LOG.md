@@ -38,6 +38,7 @@ tests, and add an entry here.
 | D-19 | 12.2 encounter scaling | **Owner decision, 2026-11-09 (content 1.2.0):** the per-party-size encounter table is retuned so the scripted informed player wins 70-85% of runs at every party size. See section 7.1 for the exact changes and measurements. | The PRD calls the 12.2 tables "initial balance fixtures" to be adjusted after simulation. Informed play won 95-100% before the change. |
 | D-21 | 8.1-8.3 class fixtures, 12.2 encounter scaling | **Owner decision, 2026-11-10 (content 1.3.0):** class balance change. Squire Strike 2 to 3 and Jab 1 to 2; Apprentice health 9 to 12; Scout speed 13 to 10 and health 10 to 9; Disrupt mana cost 1 to 2; enemy health raised per party size. The owner's gate was: every party size inside 70-85% on a block of seeds not used for tuning. See section 7.8. | Under simulated player version 2 the 1.2.1 table was outside the band (95.6% at party size 2), all-Squire parties won 0-1% at sizes 3 to 5 and parties with two or more Scouts about 100% (sections 7.2 and 7.6). |
 | D-22 | 8.1 Squire fixtures (bench die) | **Owner decision, 2026-11-11 (content 1.3.1):** the Squire's bench die is now **Vanguard d4** (Strike 3, Jab 2, Jab 2, Blank), replacing Bulwark d4 (Guard 2, Guard 2, Tend 1, Blank). The Apprentice and Scout bench dice are unchanged. See section 7.9, including a correction to the numbers the choice was made on. | Playtest finding 3: swapping the bench die in changed nothing (+0.8 points). The owner asked for a true sidegrade to be designed and measured first, then chose this one. |
+| D-23 | Class Evolution (beyond the MVP PRD) | **Owner decision, 2026-11-11:** FDD v0.2 (`docs/class_evolution/`) is approved and built in phases behind the feature gate `class_evolution_v1`, a launch setting that is off by default. With the gate off the game stays byte for byte identical. See section 7.11. | The owner asked for the design to be evaluated, chose a reconciled specification as the first step, then approved it. |
 
 ## 2. Content authored under delegation
 
@@ -553,9 +554,29 @@ owner chose to keep Vanguard d4.
 - **How it stays true.** The catalog names the content version it was written against, and the
   validator fails when shipped content moves on. The example save's content hash must equal the
   replay pin's. These run in CI with every other test.
-- **Status:** proposed, awaiting owner approval. The open decisions are in section 10 of the
-  document (Guardian's last rank needs an encounter that is not shipped; Guardian's passive is
-  weaker than the Squire's; pacing; 16 fixtures that need a design decision).
+- **Status:** approved by the owner on 2026-11-11 (decision D-23).
+
+### 7.11 Owner decision D-23: FDD v0.2 approved; Class Evolution Phase 1 (2026-11-11)
+
+| Question put to the owner | Answer |
+|---------------------------|--------|
+| Approve FDD v0.2 as the basis for building? | Approved; start Phase 1 |
+| Guardian cannot reach its last rank on shipped encounters | Author one threat-4 training encounter in the first slice |
+| New vocations are weaker than the classes they evolve from | Retune each wave by measurement when it is built |
+| Pacing (52 to 104 winning runs to Hero) | Measure in the first slice, then bring options |
+| Where the feature gate lives (fixture CE-01) | A launch setting, off by default; content files and their hash untouched |
+
+**Phase 1, part A: one seam for a hero's class data** (`src/battle_dice/core/build.py`).
+
+- **Before:** about 20 places in the rules read `content.class_def(hero.archetype_id)`. An evolved
+  hero is not a shipped class, so each would have needed a special case.
+- **After:** every hero has a `HeroBuild`, resolved once at `StartRun`; the rules read
+  `engine.build(hero_id)` and nothing else. Today a build is always a shipped class.
+- **Builds are not part of the hashed run state.** They are derived from the `StartRun` command
+  and the content, so a replay rebuilds them, and the final state hash cannot move.
+- **Evidence that nothing changed:** `tools/update_replay_pin.py` rewrites the pin file to the
+  same bytes; the content files are untouched; all earlier tests pass unchanged.
+- **Guard:** a test fails if any rule reads the class table directly again.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 
