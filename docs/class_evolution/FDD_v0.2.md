@@ -49,7 +49,7 @@
 |--:|---------------------|--------------------|-------------|
 | 1 | The baseline was stale: the catalog restored numbers the owner had overruled (for example Steadfast on self only). | Novice vocations are **pointers** to shipped classes (`"definition": "shipped"`). They hold no numbers, so they cannot drift. The catalog states the content version it was written against. | Validator refuses a catalog whose baseline differs from shipped content |
 | 2 | The catalog was not executable: 0 of 34 actions had an effects list. | Every face is in the engine's face format. 17 shipped faces are reused by id; 12 new faces are authored. | Faces are built with the game's own content loader |
-| 3 | The engine lacks much of what the new vocations need. | Each missing capability is one entry in `engine_gaps` (15 entries), naming who needs it and the engine file. Section 5 groups them by wave. | Validator: anything marked "new" must name a gap, and the reverse |
+| 3 | The engine lacks much of what the new vocations need. | Each missing capability is one entry in `engine_gaps` (15 entries at first; 14 since the Guardian's passive was built), naming who needs it and the engine file. Section 5 groups them by wave. | Validator: anything marked "new" must name a gap, and the reverse |
 | 4 | There is not enough game to progress through. | Encounters are marked `shipped` or `to_author`. The validator reports every rank that cannot be trained and every vocation that cannot be unlocked on shipped content. | `TRAINING_DEAD_END`, `UNLOCK_DEAD_END` |
 | 5 | The example save did not load into the schema. | Rewritten; it loads, and every hash and derived number in it is checked. | Persistence tests |
 | 6 | No table for owned or benched dice. | New table `hero_die_instance`. | Triggers keep location and slots in step |
@@ -83,7 +83,7 @@ names.
 | Wave | Vocation | Group | Prerequisite | Schedule | Passive | Engine work needed first |
 |-----:|----------|-------|--------------|----------|---------|--------------------------|
 | 0 | Squire, Apprentice, Scout | Novice | None | Shipped | Shipped | Inherited skills (for every wave) |
-| 1 | Guardian | Advanced | Squire mastered | Shipped (single) | New: ally Defense bonus | 1 new passive |
+| 1 | Guardian | Advanced | Squire mastered | Shipped (single) | Ally Defense bonus (**built 2026-11-11**) | None left: playable by the rules |
 | 2 | Spellblade | Advanced | Squire and Apprentice mastered | Shipped (resource then attack) | Shipped type | Corruption as a face cost |
 | 2 | Ranger | Advanced | Scout mastered | Shipped (status then attack) | Shipped type | None beyond wave 1 |
 | 3 | Duelist | Advanced | Squire and Scout mastered | New: two categories in the first slot | New | 1 schedule rule, 1 passive |
@@ -259,7 +259,8 @@ names.
 
 - Every phase leaves the game shippable with the gate off.
 - Progress, with the evidence for each step, is recorded in `docs/DECISION_LOG.md` sections 7.11
-  (Phase 1), 7.12 (Phase 2), 7.13 (Phase 3) and 7.14 (the decisions taken before Phase 4).
+  (Phase 1), 7.12 (Phase 2), 7.13 (Phase 3), 7.14 (the decisions taken before Phase 4) and
+  7.15 (Phase 4: its decisions, its steps, and step A).
 - The first playable evolution arrives before the expensive engine work of waves 3 to 5.
 
 ## 10. Decisions put to the owner, and the answers (2026-11-11)
@@ -290,6 +291,17 @@ names.
    thresholds, add encounters, or award more per win.
    - **Answer:** build the first slice with the v0.1 thresholds, measure how many runs mastery
      takes with the simulator, then bring options with numbers before the roster grows.
+
+6. **Phase 4, the first playable slice** (asked and answered 2026-11-11).
+   - *How does a player get saved heroes?* **Answer:** recruit at party setup; recruiting is
+     free; the roster holds at most 12 heroes.
+   - *Where is the threat-4 fight played?* **Answer:** as an optional third battle after
+     battle 2. The player may stop with a victory or fight on; losing the third battle is a
+     defeat. (The recommended option was a harder run chosen at setup.)
+   - *How hard is it?* **Answer:** an informed player with a Guardian in the party wins
+     70-85%, per party size.
+   - *Does Field Medic work in battle in this slice?* **Answer:** yes, as its last step.
+   - The steps and what each one proves are in `docs/DECISION_LOG.md`, section 7.15.
 
 ## 11. Risks
 

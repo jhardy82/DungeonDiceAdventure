@@ -206,11 +206,19 @@ def attack_bonus(ctx: Engine, actor: Combatant, face: FaceDefinition, intent: Ac
 
 
 def shield_bonus(ctx: Engine, actor: Combatant, face: FaceDefinition, target: Combatant, intent: ActionIntent | None) -> int:
-    """Steadfast: +1 shield on every Defense die action the Squire takes (self or ally), never on reactions."""
+    """The shield a hero's passive adds to a Defense die action. Never on a reaction.
+
+    * ``defense_die_bonus`` (the Squire's Steadfast): on every Defense die action, on itself or an ally.
+    * ``ally_defense_die_bonus`` (the Guardian's Bulwark): only when the target is another ally.
+    """
     if not actor.is_hero or intent is None or intent.source_die_id is None:
         return 0
+    if face.category != CATEGORY_DEFENSE or not target.standing:
+        return 0
     passive = ctx.build(actor.id).passive
-    if passive["type"] == "defense_die_bonus" and face.category == CATEGORY_DEFENSE and target.standing:
+    if passive["type"] == "defense_die_bonus":
+        return int(passive["amount"])
+    if passive["type"] == "ally_defense_die_bonus" and target.id != actor.id:
         return int(passive["amount"])
     return 0
 

@@ -41,6 +41,7 @@ tests, and add an entry here.
 | D-23 | Class Evolution (beyond the MVP PRD) | **Owner decision, 2026-11-11:** FDD v0.2 (`docs/class_evolution/`) is approved and built in phases behind the feature gate `class_evolution_v1`, a launch setting that is off by default. With the gate off the game stays byte for byte identical. See section 7.11. | The owner asked for the design to be evaluated, chose a reconciled specification as the first step, then approved it. |
 | D-25 | Class Evolution fixtures CE-18, CE-25, CE-35, CE-40 | **Owner decisions, 2026-11-11:** a vocation may equip its own dice plus its family's; run upgrades are kept as history after a run; with the gate on a run takes saved heroes with a build snapshot in its log; gate on with starting classes stays byte for byte identical to gate off. See section 7.12. | Asked before Phases 3 and 4. The dice answer differs from the fixture's first assumption (own dice only), so that fixture's notes and one rule changed. |
 | D-26 | Class Evolution fixtures CE-09, CE-29, CE-30, CE-32, CE-36 | **Owner decisions, 2026-11-11:** an undiscovered secret vocation shows in the career tree as an anonymous `???` entry (not the fixture's first assumption, which was not to show it); a refused action plan carries a machine-readable code beside its text; event hashes and the canonical encoding stay as built, with times in no hash; the available encounters are the ones the catalog marks shipped, at its ratings (threat 1 and threat 3). One fixture stays open: CE-31. Rules, content and the replay pin are unchanged. | Section 7.14 |
+| D-27 | Class Evolution Phase 4 (first playable slice) | **Owner decisions, 2026-11-11:** heroes are recruited at party setup, free, with a roster of at most 12; the threat-4 fight is an **optional third battle** after battle 2 (stop with a victory or fight on; losing it is a defeat); it is tuned so an informed player with a Guardian in the party wins 70-85% per party size; Guardian's mastery skill Field Medic works in battle in this slice, as its last step. The plan in five steps (A to E) with two checkpoints was approved the same day. | Section 7.15 |
 
 ## 2. Content authored under delegation
 
@@ -863,6 +864,96 @@ grants and quest completion as events, build snapshots at run start (CE-35).
 | CE-29, CE-30 | The Champion's wave (4); CE-29 also needs inherited skills in battle (Phase 4) |
 | CE-31 | A decision on Duelist's Parry, asked with the Duelist's wave (3) |
 | CE-35 | Phase 4: `StartRun` with saved heroes and build snapshots |
+
+### 7.15 Class Evolution Phase 4: decisions, steps, and step A (2026-11-11)
+
+**Owner decisions (D-27)**
+
+| Question | Answer | The option I recommended? |
+|----------|--------|---------------------------|
+| How does a player get saved heroes? | Recruit at party setup; free; at most 12 heroes | Yes |
+| Where is the threat-4 fight played? | An optional third battle after battle 2 | **No** (a harder run chosen at setup) |
+| How hard is it? | 70-85% for an informed player with a Guardian in the party, per party size | Yes |
+| Field Medic in battle in this slice? | Yes, as the slice's last step | Yes |
+
+**Why the threat-4 fight needs its own numbers per party size.** The v0.1 line-up (two captains
+and a hex adept) was played as battle 2 by today's parties, with each party size's shipped
+numbers for a captain and a hex adept (55 compositions, seeds 300 to 319, heuristic player):
+
+| Party size | 1 | 2 | 3 | 4 | 5 |
+|-----------|--:|--:|--:|--:|--:|
+| Runs won, shipped battle 2 | 73% | 73% | 76% | 75% | 78% |
+| Runs won, v0.1 threat-4 line-up instead | 0% | 0% | 24% | 87% | 100% |
+
+One fixed fight cannot serve five party sizes. The shipped battles have a table per party size
+for the same reason (D-19).
+
+**The approved steps**
+
+| Step | What | Proves |
+|------|------|--------|
+| A | Guardian playable by the rules; measured against the Squire | This section |
+| B | Encounters from the catalog; the optional third battle in the engine | A run of three battles; old runs identical |
+| Checkpoint 1 | Owner decides Guardian's numbers and the threat-4 table, from measurement | Balance evidence for the first evolved vocation |
+| C | Saved heroes in real runs: recruit, build snapshots (CE-35), vocation change between battles (CE-19), awards, a career-aware simulator | 37 of 40 acceptance cases |
+| Checkpoint 2 | Owner decides pacing, from measured runs-to-mastery | FDD open decision 5 |
+| D | Screens | Playable |
+| E | Field Medic in battle; the build panel | The whole loop |
+
+Rules for every step: with the gate off the game is byte for byte unchanged; with the gate on a
+plain `StartRun` is unchanged too (CE-40), because everything new is asked for by new optional
+parameters or new commands; the run's hashed state gains nothing that shows while unused.
+
+**Step A: what was built**
+
+- Passive type `ally_defense_die_bonus` in the one place the Squire's passive is applied
+  (`shield_bonus`, `src/battle_dice/core/effects.py`): +1 shield on a Defense die action that
+  targets another ally. Nothing on the Guardian itself, nothing on a reaction. The action
+  preview and the simulated player's plan scoring call the same function; the simulated
+  player's face valuation counts the bonus only while another ally stands.
+- Catalog 0.3.0: the passive `bulwark` is marked `existing` and its engine gap is removed
+  (14 gaps left). The catalog schema now lets this passive type be either. Nothing else in the
+  catalog changed: every Guardian number is still the v0.1 number.
+- The rules can now run five vocations: the three starting classes, Ranger and Guardian.
+
+**Step A: evidence**
+
+- 19 new tests (`tests/unit/test_guardian.py`): the build; +1 on another ally (Heavy Guard 4
+  gives 5); +0 on itself; a Squire in the same party keeps its own bonus on itself; nothing on
+  the heal face; Guardian Ward gives exactly 3; ten whole runs with every invariant held; a run
+  replays exactly and pins the catalog; without the catalog a Guardian is an unknown class.
+- 878 tests pass (860 before: 19 new, and one old case that said the Guardian is refused is
+  gone). Lint and type checks are clean; coverage is 97%.
+- The replay pin and the six content files are unchanged. With the gate off the simulator on
+  seeds 300 to 339 (2,200 runs) gives the stored reference exactly: 1,703 wins (77.4%).
+- Eleven deliberate breaks of the new code (the bonus on the Guardian itself, on any face, on
+  a reaction, the Squire losing its own, the simulated player counting it when alone, and so
+  on) each fail a fitting test. Run without bytecode files and with a control run.
+
+**Step A: Guardian against Squire, measured (no number changed)**
+
+Every shipped composition with at least one Squire (35 of the 55) was played on the two shipped
+battles twice: as it is, and with one Squire replaced by a Guardian. Heuristic player, seeds 300
+to 339, so 40 runs per composition and 1,400 runs per column.
+
+| Party size | Compositions | With the Squire | With a Guardian instead | Difference |
+|-----------|-------------:|----------------:|------------------------:|-----------:|
+| 1 | 1 | 97.5% (39/40) | 100.0% (40/40) | +2.5 |
+| 2 | 3 | 84.2% (101/120) | 84.2% (101/120) | 0.0 |
+| 3 | 6 | 86.2% (207/240) | 80.8% (194/240) | -5.4 |
+| 4 | 10 | 81.8% (327/400) | 84.0% (336/400) | +2.2 |
+| 5 | 15 | 77.7% (466/600) | 75.3% (452/600) | -2.3 |
+| All | 35 | 81.4% (1,140/1,400) | 80.2% (1,123/1,400) | -1.2 |
+
+- **Reading:** on today's battles the v0.1 Guardian is about as strong as the Squire it replaces.
+  No party size differs by more than about one and a half standard errors. It is a sidegrade
+  in win rate, not an upgrade and not the clear downgrade I expected from its passive alone
+  (its 17 health against 14, its heavier guards and its 3-shield reaction make up for it).
+- **Limits of this measurement:** one simulated player, which may not use a Guardian as well
+  as a person would; shipped battles only (the threat-4 fight does not exist yet); the
+  Guardian's row was always the front.
+- Whether an evolved vocation should be stronger than its starting class is a design choice.
+  It is put to the owner at Checkpoint 1, with the threat-4 table.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 
