@@ -331,7 +331,14 @@ class HeuristicPolicy:
             if kind == "damage":
                 value += amount * spread
             elif kind == "shield":
-                bonus = passive["amount"] if passive["type"] == "defense_die_bonus" and face.category == "defense" else 0
+                bonus = 0
+                if face.category == "defense":
+                    if passive["type"] == "defense_die_bonus":
+                        bonus = passive["amount"]
+                    elif passive["type"] == "ally_defense_die_bonus" and face.target_scope != "self":
+                        # Worth its bonus only while there is another ally to shield.
+                        others = [h for h in engine.combat.side("hero") if h.id != hero.id and h.standing]
+                        bonus = passive["amount"] if others else 0
                 value += (amount + bonus) * 0.5 * spread
             elif kind == "heal":
                 value += amount * 0.8 * spread + (1.0 if face.can_revive else 0.0)

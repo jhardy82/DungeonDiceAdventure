@@ -33,7 +33,6 @@ from tests.conftest import packaged_content, rejected
 NOVICES = ("squire", "apprentice", "scout")
 #: The vocations the rules cannot run yet, each with one engine gap its refusal must name.
 NOT_YET = {
-    "guardian": "passive_ally_defense_die_bonus",
     "spellblade": "face_corruption_cost",
     "duelist": "schedule_first_slot_categories",
     "arcanist": "schedule_slot_tag_filter",
@@ -64,10 +63,10 @@ def test_the_catalog_ships_inside_the_package():
 
 
 def test_every_vocation_is_either_playable_or_refused_with_a_reason(catalog):
-    assert sorted(catalog.builds) == ["apprentice", "ranger", "scout", "squire"]
+    assert sorted(catalog.builds) == ["apprentice", "guardian", "ranger", "scout", "squire"]
     assert set(catalog.unsupported) == set(NOT_YET)
     assert len(catalog.builds) + len(catalog.unsupported) == 14
-    assert catalog.version == "0.2.0" and len(catalog.sha256) == 64
+    assert catalog.version == "0.3.0" and len(catalog.sha256) == 64
     assert all(catalog.known(v) for v in [*catalog.builds, *catalog.unsupported]) and not catalog.known("paladin")
 
 
@@ -173,8 +172,8 @@ def test_with_the_catalog_a_playable_vocation_starts_a_run_and_the_run_names_the
 
 def test_with_the_catalog_an_unplayable_or_unknown_vocation_is_rejected_and_nothing_starts(catalog):
     engine = Engine(packaged_content(), catalog)
-    reason = rejected(engine.do(cmd.START_RUN, seed=1, party=party(("squire", "front"), ("guardian", "front"))), "cannot be played yet")
-    assert "passive_ally_defense_die_bonus" in reason
+    reason = rejected(engine.do(cmd.START_RUN, seed=1, party=party(("squire", "front"), ("duelist", "front"))), "cannot be played yet")
+    assert "passive_attack_after_category_bonus" in reason
     rejected(engine.do(cmd.START_RUN, seed=1, party=party(("paladin", "front"))), "Unknown class 'paladin'")
     assert not engine.started and engine._builds == {} and engine.events == []
     assert engine.do(cmd.START_RUN, seed=1, party=party(("ranger", "back"))).accepted

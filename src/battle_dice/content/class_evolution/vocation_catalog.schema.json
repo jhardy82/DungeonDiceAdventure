@@ -337,7 +337,8 @@
       "enum": [
         "defense_die_bonus",
         "spell_damage_at_corruption",
-        "combo_attack_bonus"
+        "combo_attack_bonus",
+        "ally_defense_die_bonus"
       ]
     },
     "passive_type": {
@@ -814,7 +815,7 @@
                 "minLength": 1
               },
               "engine_support": {
-                "const": "new"
+                "$ref": "#/$defs/engine_support"
               }
             }
           }

@@ -111,7 +111,7 @@
           "type": "object", "required": ["id", "name", "type", "amount", "summary"], "additionalProperties": false,
           "properties": {
             "id": {"$ref": "#/$defs/id"}, "name": {"type": "string"}, "summary": {"type": "string"},
-            "type": {"enum": ["defense_die_bonus", "spell_damage_at_corruption", "combo_attack_bonus"]},
+            "type": {"enum": ["defense_die_bonus", "spell_damage_at_corruption", "combo_attack_bonus", "ally_defense_die_bonus"]},
             "amount": {"$ref": "#/$defs/bounded_int"}, "threshold": {"$ref": "#/$defs/bounded_int"}
           }
         },

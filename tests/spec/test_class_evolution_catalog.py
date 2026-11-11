@@ -102,14 +102,14 @@ def test_rewards_that_always_clamp_to_zero_are_warnings(pristine: Json, shipped:
 
 
 def test_catalog_shape_and_counts(pristine: Json) -> None:
-    assert pristine["catalog_version"] == "0.2.0"
+    assert pristine["catalog_version"] == "0.3.0"  # 0.3.0: the Guardian is playable (its passive is in the engine)
     assert pristine["baseline"] == {"rules_version": "1.1.1", "content_version": "1.3.1"}
     assert {wave: [v["id"] for v in pristine["vocations"] if v["wave"] == wave] for wave in WAVES} == WAVES
     assert len(pristine["face_library"]) == 12 and len(pristine["dice"]) == 23
     assert Counter(s["engine_support"] for s in pristine["schedules"]) == {"existing": 5, "new": 5}
-    assert Counter(p["engine_support"] for p in pristine["passives"]) == {"existing": 2, "new": 9}
+    assert Counter(p["engine_support"] for p in pristine["passives"]) == {"existing": 3, "new": 8}
     assert Counter(r["engine_support"] for r in pristine["reactions"]) == {"existing": 7, "new": 1}
-    assert len(pristine["skills"]) == 14 and len(pristine["challenges"]) == 14 and len(pristine["engine_gaps"]) == 15
+    assert len(pristine["skills"]) == 14 and len(pristine["challenges"]) == 14 and len(pristine["engine_gaps"]) == 14
 
 
 # -- novices are read from the shipped content, never restated ------------------------------------
@@ -182,9 +182,10 @@ def test_schedule_engine_support_matches_the_shipped_policies(pristine: Json, sh
 
 
 def test_new_faces_reactions_and_loadable_vocations_pass_the_shipped_loader(pristine: Json, shipped: Content) -> None:
-    assert [v["id"] for v in vc.loadable_vocations(pristine, shipped)] == ["spellblade", "ranger"]
+    assert [v["id"] for v in vc.loadable_vocations(pristine, shipped)] == ["guardian", "spellblade", "ranger"]
     content = build_content(vc.loader_documents(pristine, shipped))
-    assert {"spellblade", "ranger"} <= set(content.classes)
+    assert {"guardian", "spellblade", "ranger"} <= set(content.classes)
+    assert content.classes["guardian"]["passive"]["type"] == "ally_defense_die_bonus"
     assert set(pristine["face_library"]) <= set(content.documents["dice"]["face_library"])
     assert {r["id"] for r in pristine["reactions"]} <= set(content.reactions)
     assert [face.name for face in content.die("ranger_d8").faces][:2] == ["Aimed Shot", "Shot"]
@@ -335,11 +336,11 @@ def schedule_falsely_existing(c: Json) -> None:
 
 
 def new_passive_without_a_gap(c: Json) -> None:
-    c["engine_gaps"] = [gap for gap in c["engine_gaps"] if gap["id"] != "passive_ally_defense_die_bonus"]
+    c["engine_gaps"] = [gap for gap in c["engine_gaps"] if gap["id"] != "passive_attack_after_category_bonus"]
 
 
 def new_passive_type_marked_existing(c: Json) -> None:
-    by_id(c["passives"], "bulwark")["engine_support"] = "existing"
+    by_id(c["passives"], "riposte")["engine_support"] = "existing"
 
 
 def melee_face_on_a_ranged_only_vocation(c: Json) -> None:
@@ -394,7 +395,7 @@ SEEDED: list[tuple[Callable[[Json], None], str]] = [
     (shipped_face_redefined, "'sq_strike_3' redefines a shipped face"),
     (shipped_face_copied_under_a_new_id, "'ce_aimed_shot_3' only renames the shipped face 'sc_shot_2'"),
     (schedule_falsely_existing, "is marked existing but no shipped policy"),
-    (new_passive_without_a_gap, "'bulwark' is marked new but no engine_gaps entry"),
+    (new_passive_without_a_gap, "'riposte' is marked new but no engine_gaps entry"),
     (new_passive_type_marked_existing, "'new' was expected"),
     (melee_face_on_a_ranged_only_vocation, "needs every Attack face of 'ranger' tagged 'ranged', but 'sq_jab_2' is not"),
     (revive_on_an_attack_face, "face 'ce_aimed_shot_3' is can_revive but is not a Healing face"),
