@@ -1,6 +1,6 @@
 # Battle Dice MVP: Decision Log
 
-Contract: **BD-PRD-MVP-001 v1.0.0** (2026-11-09). Rules version `1.1.1`, content version `1.3.0`,
+Contract: **BD-PRD-MVP-001 v1.0.0** (2026-11-09). Rules version `1.1.1`, content version `1.3.1`,
 RNG `BD-PCG32-v1`.
 
 This log records (1) how gaps and contradictions between *delegated default* (DD) statements in
@@ -37,6 +37,7 @@ tests, and add an entry here.
 | D-18 | 13 runtime | **Python 3.15 or newer is required** (`requires-python = ">=3.15"`), replacing the PRD's delegated default of "Python 3.12+". CI, the lint target and the type-check target are pinned to the 3.15 line, so new 3.15.x patches are picked up but 3.16 is not adopted automatically. | Owner direction (2026-11-09): use the newest stable Python. 3.15.2 was the newest stable build in GitHub's `actions/python-versions` manifest on that date; 3.16 was alpha only. |
 | D-19 | 12.2 encounter scaling | **Owner decision, 2026-11-09 (content 1.2.0):** the per-party-size encounter table is retuned so the scripted informed player wins 70-85% of runs at every party size. See section 7.1 for the exact changes and measurements. | The PRD calls the 12.2 tables "initial balance fixtures" to be adjusted after simulation. Informed play won 95-100% before the change. |
 | D-21 | 8.1-8.3 class fixtures, 12.2 encounter scaling | **Owner decision, 2026-11-10 (content 1.3.0):** class balance change. Squire Strike 2 to 3 and Jab 1 to 2; Apprentice health 9 to 12; Scout speed 13 to 10 and health 10 to 9; Disrupt mana cost 1 to 2; enemy health raised per party size. The owner's gate was: every party size inside 70-85% on a block of seeds not used for tuning. See section 7.8. | Under simulated player version 2 the 1.2.1 table was outside the band (95.6% at party size 2), all-Squire parties won 0-1% at sizes 3 to 5 and parties with two or more Scouts about 100% (sections 7.2 and 7.6). |
+| D-22 | 8.1 Squire fixtures (bench die) | **Owner decision, 2026-11-11 (content 1.3.1):** the Squire's bench die is now **Vanguard d4** (Strike 3, Jab 2, Jab 2, Blank), replacing Bulwark d4 (Guard 2, Guard 2, Tend 1, Blank). The Apprentice and Scout bench dice are unchanged. See section 7.9, including a correction to the numbers the choice was made on. | Playtest finding 3: swapping the bench die in changed nothing (+0.8 points). The owner asked for a true sidegrade to be designed and measured first, then chose this one. |
 
 ## 2. Content authored under delegation
 
@@ -452,6 +453,88 @@ bench die still changes nothing (+0.8). A newcomer still wins about 9%.
 fixtures are unaffected by this change: they use class, dice and encounter numbers frozen in
 `tests/golden/`.
 
+### 7.9 Owner decision D-22: Vanguard d4 as the Squire's bench die (content 1.3.1, 2026-11-11)
+
+**What changed.** One die. Nothing else in the rules or the numbers moved.
+
+| Squire bench die | Faces | Role |
+|------------------|-------|------|
+| 1.3.0: Bulwark d4 | Guard 2, Guard 2, Tend 1, Blank | More defense, which the Squire's starting dice already have |
+| 1.3.1: Vanguard d4 | Strike 3, Jab 2, Jab 2, Blank | All attack: trades the Oath d4's shields and mana for damage |
+
+The face `Tend 1` (heal 1, cannot revive) is no longer on any shipped die. Rule fixtures that
+need ordinary healing (T07, T09, T13) keep using Bulwark d4 from the frozen dice in
+`tests/golden/`, so the rule is still tested.
+
+**Result on the packaged content (the firm numbers).** The simulated player (version 2) swaps
+each Squire's Vanguard d4 in for the Oath d4 before Battle 2. It is compared with the same player
+who never swaps, on the 35 party compositions that contain a Squire, seeds 0-79 (80 runs per
+party and side).
+
+| Parties with | Parties | Runs per side | Never swaps | Swaps to Vanguard | Change | Firm? |
+|--------------|--------:|--------------:|------------:|------------------:|-------:|-------|
+| One Squire | 15 | 1,200 | 91.6% | 91.6% | 0.0 | No effect |
+| Two Squires | 10 | 800 | 86.6% | 84.4% | -2.2 | Inside the margin |
+| Three or more Squires | 10 | 800 | 66.9% | 73.9% | **+7.0** | Yes (three standard errors) |
+| All 35 | 35 | 2,800 | 83.1% | 84.5% | +1.4 | Inside the margin |
+
+| Single party (80 runs per side) | Never swaps | Swaps | Change |
+|---------------------------------|------------:|------:|-------:|
+| Scout and four Squires | 63.7% | 80.0% | +16.3 |
+| Three Squires | 60.0% | 75.0% | +15.0 |
+| Five Squires | 16.2% | 30.0% | +13.8 |
+| Apprentice and three Squires | 66.2% | 77.5% | +11.2 |
+| Four Squires | 51.2% | 58.8% | +7.5 |
+| Two Squires (no one else) | 90.0% | 77.5% | -12.5 |
+
+- **Reading:** Vanguard is a real choice, but a narrow one. Parties with three or more Squires
+  lack damage and win more with it. The party of exactly two Squires needs the Oath d4's shields
+  and mana and loses with it. For every other party the swap makes no measurable difference.
+- One party's change has a margin of about 11 points at 80 runs per side, so only the group rows and the
+  largest single-party rows are firm. The two-Squire loss points the same way in all three
+  samples taken (-35.0, -17.5, -7.5).
+
+**How the die was chosen, and a correction.** The owner's instruction was "design a true
+sidegrade first". Nine designs were measured, three per class, with the same method on seeds
+0-39 only (40 runs per party, 1,400 per cell).
+
+| Class | Design (faces) | Never swaps | Swaps | Change | Parties up 10+ | Parties down 10+ |
+|-------|----------------|------------:|------:|-------:|---------------:|-----------------:|
+| Squire | Support: Brace 2, Brace 2, Tend 2, Tend 2 | 84.1% | 82.8% | -1.4 | 4 | 5 |
+| Squire | **Vanguard: Strike 3, Jab 2, Jab 2, Blank** | 84.1% | 85.4% | +1.2 | 4 | 4 |
+| Squire | Wall: Guard 3, Guard 3, Blank, Blank | 84.1% | 85.4% | +1.2 | 4 | 2 |
+| Apprentice | Spark 2, Spark 2, Trickle 1, Blank | 80.7% | 82.3% | +1.6 | 3 | 1 |
+| Apprentice | Ward 2, Ward 2, Cleanse 2, Channel 2 | 80.7% | 81.9% | +1.2 | 4 | 1 |
+| Apprentice | Arcane Bolt 3, Trickle 1, Blank, Blank | 80.7% | 84.5% | +3.8 | 7 | 1 |
+| Scout | Poison 1, Poison 1, Hamstring 1, Blank | 85.3% | 93.5% | +8.2 | 16 | 0 |
+| Scout | Cover 2, Cover 2, Focus 1, Quick Shot 1 | 85.3% | 77.5% | -7.8 | 0 | 12 |
+| Scout | Shot 2, Shot 2, Blank, Blank | 85.3% | 93.0% | +7.7 | 15 | 0 |
+
+- **What this table can support:** the Scout designs are pure upgrades or a pure downgrade
+  (about 8 points, every party the same way), so the Scout bench die is unchanged. The Apprentice
+  designs are small upgrades at most, so that die is unchanged too.
+- **Correction (2026-11-11).** The Vanguard row was presented to the owner as "4 parties up, 4
+  down", with two Squires 95% to 60% and two Squires with three Scouts 78% to 58%. That reading
+  was too strong. At 40 runs a party moves by 10 points or more by chance about one time in four
+  (27% at an 85% win rate), so 4 up and 4 down out of 35 is what no effect at all would also
+  show. The 80-run measurement above replaces it: the gain for Squire-heavy parties held, the
+  two-Squire loss held at a smaller size, and the other losses did not reproduce.
+- The same caution applies to the "parties up" and "parties down" columns of the other Squire
+  and Apprentice rows: they are not evidence of a trade-off on their own.
+
+**Why the confirmation run did not reproduce the first sample exactly.** The first sample kept
+the die id `bulwark_d4` with new faces. Dice are rolled in id order, and `vanguard_d4` sorts
+after `iron_d6` where `bulwark_d4` sorted before it, so the same seed now gives different rolls.
+The two are separate samples of the same design, not a regression: on seeds 0-39 the first
+sample gave +1.2 overall and the shipped die gives +0.9.
+
+**The balance gate is unaffected.** The official runner on the packaged content, seeds 300-339,
+gives the same result for all 55 parties as content 1.3.0 (per size: 79.2 / 73.8 / 79.0 / 76.5 /
+78.1%). The standard simulated player never swaps.
+
+**Limits.** All figures are for the scripted player. Whether human players find the choice
+interesting is `<UNKNOWN>`; that needs the human playtest.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one
@@ -473,7 +556,7 @@ checked here. Each needs an owner decision or a real Windows display.
 | A back-row Squire can never Interpose | By data (`requires_row: front`); the panel says so when it applies. |
 | A kept die can be un-kept before a later reroll | "Keep" is a per-reroll mark, as the Keep tooltip states. |
 | Key meanings change when the outcome screen appears | `M` toggles animation in battle and is Modify Party on the outcome screen; there is no input pause between them. |
-| Class balance | Changed in content 1.3.0 (D-21, section 7.8): every party size is at 74-83% and one composition is at or below 40%. Still weak: five Squires (16%), and all-Apprentice parties at sizes 3 and 4 (52-56%). Still strong: Scout-heavy parties at sizes 4 and 5 (98-100%). All figures are for the scripted player. |
+| Class balance | Changed in content 1.3.0 (D-21, section 7.8): every party size is at 74-83% and one composition is at or below 40%. Still weak: five Squires (16%; about 30% when they swap to the Vanguard bench die, section 7.9), and all-Apprentice parties at sizes 3 and 4 (52-56%). Still strong: Scout-heavy parties at sizes 4 and 5 (98-100%). All figures are for the scripted player. |
 | Windows display | Never launched on a physical Windows display. Window resize while dragging, font rendering and behaviour at 125% or 150% scaling are unverified. |
 | Python install manager | Whether its `py` command downloads a missing Python on request is `<UNKNOWN>` here; the launcher itself never downloads or installs Python. |
 | Type checking | Closed on 2026-11-10: `mypy` now covers the whole package (including `ui/`), `tools/` and `tests/` with no findings, and CI runs it that way. The one relaxation is for tests only: `union-attr` is off there, because a test that reads optional engine state fails with an AttributeError when it is None, which is the signal wanted. |
