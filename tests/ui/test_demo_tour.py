@@ -25,13 +25,16 @@ def start_a_profile(play: Configured, preset_label: str) -> None:
     assert play.ctrl.screen == Screen.MAIN_MENU
     play.key(pygame.K_s)
     assert play.ctrl.screen == Screen.SETTINGS
+    play.key(pygame.K_3)  # the group Class Evolution
     if not play.ctrl.settings.class_evolution:
         play.click("settings:class_evolution")
+    play.key(pygame.K_4)  # the group Demo and testing
     for _ in range(4):
         if next(row for row in play.ctrl.settings_view() if row["key"] == "demo_preset")["value"] == preset_label:
             break
         play.click("settings:demo_preset")
     assert next(row for row in play.ctrl.settings_view() if row["key"] == "demo_preset")["value"] == preset_label
+    play.key(pygame.K_3)
     play.click("settings:reset")
     play.click("settings:reset")
     play.key(pygame.K_ESCAPE)
@@ -61,7 +64,8 @@ def win_the_battle_as(play: Configured, hero: str, **faces: int) -> None:
 def test_the_tour_is_in_the_readme():
     text = README.read_text(encoding="utf-8")
     for phrase in ("### A tour of the slice in two runs", "A Guardian with Field Medic", "A Guardian at rank 1",
-                   "Reset the saved profile", "Field Medic: revive at 5 HP", "Fight On (F)", "Career (C)", "Make active", "Begin Encounter (B)"):
+                   "Reset the saved profile", "Field Medic: revive at 5 HP", "Fight On (F)", "Career (C)", "Make active", "Begin Encounter (B)",
+                   "Demo and testing", "group **3. Class Evolution**"):
         assert phrase in text, phrase
 
 

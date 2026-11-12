@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1131 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1136 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -314,9 +314,10 @@ yet. Of the 40 acceptance cases 37 run as tests (`docs/DECISION_LOG.md`, section
 
 ### A tour of the slice in two runs
 
-Both runs start in **Main menu, Settings (S)**. Switch **Class Evolution** on, choose what a
-**new profile starts as**, then press **Reset the saved profile** twice so the profile is made
-with that start. Esc returns to the main menu; **New Run (N)** opens the party setup.
+Both runs start in **Main menu, Settings (S)**. In the group **3. Class Evolution** switch
+Class Evolution on. In the group **4. Demo and testing** choose what a **new profile starts
+as**. Back in group 3 press **Reset the saved profile** twice, so the profile is made with that
+start. Esc returns to the main menu; **New Run (N)** opens the party setup.
 
 **Run 1: Field Medic and the third battle** (start: *A Guardian with Field Medic*)
 
@@ -339,22 +340,30 @@ with that start. Esc returns to the main menu; **New Run (N)** opens the party s
 
 ## Settings
 
-**Main menu, Settings (S)** changes these without touching a file. Each button moves its setting
-to the next value; the change is saved at once and takes effect at once.
+**Main menu, Settings (S)**, or **Settings (S)** in the pause menu of a run. The settings are in
+four groups (keys 1 to 4). Each button moves its setting to the next value; the change is saved
+at once and takes effect at once.
 
-| Setting | Values | What it does |
-|---------|--------|--------------|
-| Class Evolution | Off (default), On | Saved heroes, mastery, vocations and the third battle. Off is the game as shipped, with no save file |
-| Third battle | Offered (default), Not offered | The optional third battle after Battle 2 |
-| Mastery pace | Normal (default), Fast, Very fast | How many points a rank needs. Fast asks for about half; Very fast for one point a rank. Heroes are re-ranked from the points they have |
-| Roster size | 6, 12 (default), 24 | How many heroes a profile may hold (1 to 50 in the file) |
-| New profile starts as | Fresh (default); A Squire one win from mastery; A Guardian at rank 1; A Guardian with Field Medic (mastered, the skill equipped) | What a new or reset profile holds. Lets the evolution be shown in minutes |
-| Dice seed | A new one each run (default), Fixed | A fixed seed gives the same dice every run |
-| Animation | On (default), Off | Reduced motion |
-| Window size | 960x540, 1280x720 (default), 1600x900, 1920x1080 | The window can also be dragged to any size |
+| Group | Setting | Values | What it does |
+|-------|---------|--------|--------------|
+| 1. Display and comfort | Window size | 960x540, 1280x720 (default), 1600x900, 1920x1080 | The window can also be dragged to any size |
+| | Motion and flashes | On (default), Off | Reduced motion |
+| 2. Play aids | Controls | (opens the help) | Mouse and keyboard controls, and how a turn works |
+| 3. Class Evolution | Class Evolution | Off (default), On | Saved heroes, mastery, vocations and the third battle. Off is the game as shipped, with no save file |
+| | Saved profile | Reset the saved profile | Deletes every saved hero and starts again from the chosen start. Asks twice |
+| 4. Demo and testing | Mastery pace | Normal (default), Fast, Very fast | How many points a rank needs. Fast asks for about half; Very fast for one point a rank |
+| | New profile starts as | Fresh (default); A Squire one win from mastery; A Guardian at rank 1; A Guardian with Field Medic (mastered, the skill equipped) | What a new or reset profile holds. Lets the evolution be shown in minutes |
+| | Roster size | 6, 12 (default), 24 | How many heroes a profile may hold (1 to 50 in the file) |
+| | Third battle | Offered (default), Not offered | The optional third battle after Battle 2 |
 
-- **Reset the saved profile** (same screen) deletes every saved hero and starts again from the
-  chosen start. It asks twice.
+- **Demo and testing** holds aids for showing and testing Class Evolution. They need Class
+  Evolution on, and say so while it is off. They do not change the rules of a battle.
+- **Reset all settings to defaults** (bottom right) asks twice. Your saved heroes are kept.
+- **From the pause menu** the run waits. Groups 1 and 2 apply at once; groups 3 and 4 and both
+  resets are locked until the run is over, because they would close the save.
+- **The dice seed is chosen when you start a run**, not here: on the party setup, **Dice seed
+  (D)** is random by default. Press D, type digits and press Enter to fix a seed; press D again
+  for a random one. The same seed, party and choices give the same run.
 - The settings are kept in `settings.json`: in the working folder when run from source, in
   `%LOCALAPPDATA%\BattleDice` for the packaged build. `--settings FILE` or the environment
   variable `BATTLE_DICE_SETTINGS` uses another file. The file is plain JSON and may be edited
