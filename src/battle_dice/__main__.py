@@ -118,11 +118,13 @@ def run_smoke_test(report_path: str | None = None, features: frozenset[str] = fr
                         and Screen.CONTINUE not in seen:
                     raise RuntimeError("battle 2 was won but the stop-or-fight-on screen was never drawn")
                 link.close()
+                evolved = _smoke_evolved_run(Path(folder), features)
             lines.append(
                 f"SMOKE TEST OK: outcome={engine.state.outcome} frames={frames} events={len(engine.events)} "
                 f"screens={sorted(seen)} sprites={sprites} rules={RULES_VERSION} content={controller.content.content_version} "
                 f"python={sys.version.split()[0]} pygame-ce={pygame.version.ver} frozen={bool(getattr(sys, 'frozen', False))}"
                 + (f" {describe(features).replace(': ', '=').replace(', ', ',')}" if features else "")
+                + (f" evolved_run={evolved}" if evolution else "")
             )
             pygame.quit()
         code = 0
@@ -134,6 +136,68 @@ def run_smoke_test(report_path: str | None = None, features: frozenset[str] = fr
     if report_path:
         Path(report_path).write_text(text + "\n", encoding="utf-8")
     return code
+
+
+def _smoke_evolved_run(folder: Path, features: frozenset[str]) -> str:
+    """The second half of the Class Evolution self-check: a whole run with an evolved hero.
+
+    The first half recruits fresh heroes, so it never builds a hero from the vocation catalog. This
+    one starts a profile with a mastered Guardian (Field Medic equipped), a Scout and an Apprentice,
+    and plays a run to its end with every step drawn: the Guardian's dice, its picture, its upgrade
+    cards and the third battle come from the catalog, in the packaged app too. Returns the outcome.
+    """
+    from battle_dice.app.controller import AppController, Screen
+    from battle_dice.settings import Settings
+    from battle_dice.sim.policies import HeuristicPolicy
+    from battle_dice.ui.app import GameApp
+
+    settings = Settings(class_evolution=True, demo_preset="guardian_mastered")
+    controller = AppController(fixed_seed=2, log_dir=folder / "logs-evolved", features=features, save_dir=folder / "saves-evolved",
+                               settings=settings)
+    link = controller.progression
+    if link is None:
+        raise RuntimeError(f"the save for the evolved run could not be opened: {controller.progression_error}")
+    try:
+        app = GameApp(controller, headless=True)
+        controller.new_run()
+        for hero_id in list(link.state.heroes)[:3]:
+            controller.add_saved_hero(hero_id)
+        controller.begin_run()
+        engine = controller.engine
+        if engine is None:
+            raise RuntimeError(f"the evolved run did not start: {controller.message}")
+        if engine.build("h01").vocation_id != "guardian" or "guardian_field_medic" not in engine.build("h01").skills:
+            raise RuntimeError(f"the first hero is not a Guardian with Field Medic: {engine.build('h01')}")
+        if app.ui.assets.combatant_key(controller.sprite_class("guardian")) is None:
+            raise RuntimeError("an evolved hero has no picture")
+        policy = HeuristicPolicy()
+        upgraded = ""
+        for _ in range(20000):
+            if engine.finished():
+                break
+            if engine.state.phase == "upgrade":
+                # The upgrade goes on the Guardian's own die, so the screens show a die that is not in the shipped content.
+                upgraded = engine.combat.combatants["h01"].equipped_dice_ids[0]
+                offer = engine.state.upgrade_offers["h01"][upgraded][0]
+                if not engine.do("ChooseUpgrade", hero_id="h01", die_id=upgraded, offer_id=offer["offer_id"]).accepted:
+                    raise RuntimeError("the Guardian's upgrade was refused")
+            elif engine.needs_input():
+                policy.act(engine)
+            else:
+                engine.do("AdvancePhase")
+            controller.refresh()
+            app.frame(0)
+            if app.render_faults or controller.screen == Screen.ERROR:
+                raise RuntimeError(f"the evolved run failed to draw or an input raised:\n{controller.error_text}")
+        if not engine.finished() or controller.screen != Screen.OUTCOME:
+            raise RuntimeError(f"the evolved run did not reach the outcome screen: {controller.screen}")
+        if engine.state.upgrades and upgraded not in engine.build("h01").dice:
+            raise RuntimeError(f"the upgrade did not go on a die from the vocation catalog: {upgraded}")
+        if link.state.run is None or link.state.run.phase != engine.state.outcome:
+            raise RuntimeError("the evolved run's result did not reach the save")
+        return str(engine.state.outcome)
+    finally:
+        controller.close()
 
 
 def main(argv: list[str] | None = None) -> int:
