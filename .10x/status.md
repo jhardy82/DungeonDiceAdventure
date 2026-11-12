@@ -20,12 +20,12 @@
 - Class Evolution Phase 4, step B: encounters from the catalog and the optional third battle; the threat-4 table tuned to 75-77% per party size
 - Class Evolution Phase 4, step C (part 1): recruiting, build snapshots at run start, challenge evidence, the run-to-save hand-over, a career-aware simulator; pacing measured
 - Class Evolution Phase 4, step D: the screens. The first slice is playable behind the gate (recruit, mastery, career, Guardian, third battle)
+- Demo configuration: a settings file and an in-game Settings screen (Class Evolution on or off, third battle, mastery pace, roster size, start presets, seed, animation, window size, profile reset)
 
 ### In Progress
-- Demo configuration: settings file and Settings screen, Class Evolution tuning file, demo start presets
+- Class Evolution Phase 4: vocation change inside a run (CE-19); step E: Field Medic in battle and the build panel
 
 ### Pending
-- Phase 4: vocation change inside a run (CE-19); step E: Field Medic in battle and the build panel
 
 Role checklist. These are the 10x-Team's own passes; none has been run yet. The work listed
 under Done was carried out before the team state existed.
@@ -47,7 +47,7 @@ under Done was carried out before the team state existed.
 (none)
 
 ## Risks
-- Class Evolution is playable only with a launch flag; a player cannot switch it on from inside the game yet (the Settings screen is next).
+- Two tuning knobs named in the configuration assumption were not built (points per win; the third battle's enemies as a setting); the reasons are in docs/DECISION_LOG.md section 7.19.
 - Balance of the Guardian and of the threat-4 fight is measured only by a simulated player; the numbers await an owner decision (Checkpoint 1 of the Phase 4 plan).
 - Pacing: reaching the last capstone needs 52 to 104 winning runs on today's content (FDD open decision 5).
 - Never launched on a physical Windows display; no human playtest yet.

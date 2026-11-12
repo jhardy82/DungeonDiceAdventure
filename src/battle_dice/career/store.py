@@ -564,6 +564,12 @@ class StoredCareerService:
     def apply_discovery_signal(self, event: Json) -> CareerResult:
         return self._saved(lambda: self.service.apply_discovery_signal(event))
 
+    def grant_mastery(self, hero_id: str, vocation_id: str, points: int, reason: str) -> CareerResult:
+        return self._saved(lambda: self.service.grant_mastery(hero_id, vocation_id, points, reason))
+
+    def rederive_ranks(self, reason: str) -> CareerResult:
+        return self._saved(lambda: self.service.rederive_ranks(reason))
+
     def begin_run(self, run_id: str) -> None:
         """Trusted event ``RunStarted``: a run of this profile has begun and is in its first battle.
 

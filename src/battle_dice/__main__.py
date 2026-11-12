@@ -135,7 +135,10 @@ def run_smoke_test(report_path: str | None = None, features: frozenset[str] = fr
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="battle-dice", description="Battle Dice: a turn-based tactical dice RPG")
     parser.add_argument("--seed", type=int, default=None, help="use this root seed for every run (reproducible dice)")
-    parser.add_argument("--size", default="1280x720", help="window size WIDTHxHEIGHT (minimum 960x540)")
+    parser.add_argument("--size", default=None, help="window size WIDTHxHEIGHT (minimum 960x540; default 1280x720)")
+    parser.add_argument("--settings", default=None, metavar="FILE",
+                        help="settings file to read and write (default: settings.json in the game's data folder; "
+                             "the environment variable BATTLE_DICE_SETTINGS does the same). Launch flags override it.")
     parser.add_argument("--log-dir", default=None, help="folder for JSONL event logs")
     parser.add_argument("--save-dir", default=None,
                         help="folder for the save file (only used with the class_evolution_v1 feature)")
@@ -169,19 +172,27 @@ def main(argv: list[str] | None = None) -> int:
     if args.smoke_test:
         return run_smoke_test(args.smoke_out, enabled)
 
+    from battle_dice import settings as settings_module
+
+    settings_path = Path(args.settings) if args.settings else settings_module.default_path()
+    player_settings, problems = settings_module.load(settings_path)
     try:
-        width, height = (int(part) for part in args.size.lower().split("x"))
+        width, height = (int(part) for part in args.size.lower().split("x")) if args.size else player_settings.size()
     except ValueError:
         parser.error("--size must look like 1280x720")
+    if args.no_animation:
+        player_settings.animation = False
     if args.seed is not None and not 0 <= args.seed < 2**64:
         parser.error("--seed must be an unsigned 64-bit integer")
 
     from battle_dice.app.controller import AppController
     from battle_dice.ui.app import GameApp
 
-    controller = AppController(fixed_seed=args.seed, log_dir=args.log_dir, features=enabled, save_dir=args.save_dir)
+    controller = AppController(fixed_seed=args.seed, log_dir=args.log_dir, features=enabled, save_dir=args.save_dir,
+                               settings=player_settings, settings_path=settings_path)
+    controller.settings_problems = problems
     try:
-        GameApp(controller, size=(width, height), animations=not args.no_animation).run()
+        GameApp(controller, size=(width, height), animations=player_settings.animation).run()
     except Exception:  # noqa: BLE001 - a windowed build has no console: leave the reason in a file
         report = traceback.format_exc()
         print(report, file=sys.stderr)

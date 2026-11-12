@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 989 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1038 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -258,7 +258,8 @@ become a Guardian, and fight an optional third, harder battle. It is behind the 
 `class_evolution_v1`, which is **off by default**. With the gate off the game is byte for byte
 unchanged (the replay pin proves it on every change) and no save file is made.
 
-To play it:
+To play it, either switch it on inside the game (**Main menu, Settings, Class Evolution**), or
+start the game with it on:
 
 ```
 python -m battle_dice --feature class_evolution_v1
@@ -295,6 +296,33 @@ python tools/class_evolution/check_persistence.py     # the save database script
 
 Both print `OK`. The first also lists, as warnings, every rank and vocation that cannot be reached
 yet. Of the 40 acceptance cases 36 run as tests (`docs/DECISION_LOG.md`, sections 7.14 to 7.18).
+
+## Settings
+
+**Main menu, Settings (S)** changes these without touching a file. Each button moves its setting
+to the next value; the change is saved at once and takes effect at once.
+
+| Setting | Values | What it does |
+|---------|--------|--------------|
+| Class Evolution | Off (default), On | Saved heroes, mastery, vocations and the third battle. Off is the game as shipped, with no save file |
+| Third battle | Offered (default), Not offered | The optional third battle after Battle 2 |
+| Mastery pace | Normal (default), Fast, Very fast | How many points a rank needs. Fast asks for about half; Very fast for one point a rank. Heroes are re-ranked from the points they have |
+| Roster size | 6, 12 (default), 24 | How many heroes a profile may hold (1 to 50 in the file) |
+| New profile starts as | Fresh (default); a Squire one win from mastery; a Guardian at rank 1; a mastered Guardian | What a new or reset profile holds. Lets the evolution be shown in minutes |
+| Dice seed | A new one each run (default), Fixed | A fixed seed gives the same dice every run |
+| Animation | On (default), Off | Reduced motion |
+| Window size | 960x540, 1280x720 (default), 1600x900, 1920x1080 | The window can also be dragged to any size |
+
+- **Reset the saved profile** (same screen) deletes every saved hero and starts again from the
+  chosen start. It asks twice.
+- The settings are kept in `settings.json`: in the working folder when run from source, in
+  `%LOCALAPPDATA%\BattleDice` for the packaged build. `--settings FILE` or the environment
+  variable `BATTLE_DICE_SETTINGS` uses another file. The file is plain JSON and may be edited
+  by hand; it also holds `save_dir`, the folder of the save file.
+- A launch flag (`--seed`, `--size`, `--no-animation`, `--feature`, `--save-dir`) wins
+  over the file for that launch. A value the game does not allow is replaced by its default and
+  named on the main menu; the game always starts.
+- Nothing here changes the rules of a battle, the shipped content or the numbers of a class.
 
 ## Scope
 

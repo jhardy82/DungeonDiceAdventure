@@ -16,6 +16,9 @@ htmlcov/
 logs/
 *.jsonl
 sim_results/
+# The player's own files, made in the working folder when the game is run from source
+/settings.json
+/saves/
 
 # OS / editor
 .DS_Store

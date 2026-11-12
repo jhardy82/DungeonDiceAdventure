@@ -40,6 +40,20 @@ Started: 2026-11-11
   to add or drop a part later because each is separate.
 - **Impacts:** App and UI (settings, Settings screen), career rules (tuning), save (presets), docs.
 
+### 2026-11-12 — Engineer: what of the configuration assumption was built, and what was not
+- **Decision:** Built: the settings file, the Settings screen, Class Evolution on or off inside the
+  game, the third battle on or off, mastery pace (normal, fast, very fast), roster size, four
+  start presets, profile reset, seed, animation, window size. Not built: points per win as a
+  setting, the third battle's enemy table as a setting, a separate tuning file.
+- **Why:** The save's award rows allow 0 or 1 point, so more points per win needs a schema
+  change; the pace setting changes how many points a rank needs instead. The enemy table is in
+  the catalog whose hash a run's record pins, so a setting that edits it would break replay.
+- **Alternatives considered:** Migrating the save schema for larger awards; a second encounter
+  source with its own hash for a tuned table.
+- **Trade-offs accepted:** The owner tunes the third battle by editing `vocation_catalog.json`
+  (validated), not from the Settings screen.
+- **Impacts:** Settings, save link, docs (`docs/DECISION_LOG.md`, section 7.19).
+
 ### 2026-11-12 — Engineer: the threat-4 table goes in as a default, not as a settled balance decision
 - **Decision:** The enemy table of the optional third battle (`training_04`) is the one tuned by
   measurement in `docs/DECISION_LOG.md`, section 7.16 (75-77% for parties with a Guardian, per

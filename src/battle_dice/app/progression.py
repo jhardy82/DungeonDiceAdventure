@@ -14,6 +14,8 @@ Nothing here decides a rule. Every change goes through :class:`StoredCareerServi
 
 from __future__ import annotations
 
+import copy
+import math
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -31,19 +33,56 @@ from battle_dice.core.events import EventType
 Json = dict[str, Any]
 PROFILE_ID = "profile_1"
 SAVE_FILE = "profile.sqlite"
+#: Mastery pace -> what every rank's points are divided by (``battle_dice.settings.PACES``).
+PACES = {"normal": 1, "fast": 2, "very_fast": 4}
+#: Start presets -> what the first hero (a Squire) has when the profile is made. Every preset but
+#: ``fresh`` also recruits a Scout and an Apprentice, so a party of three is ready.
+PRESETS = ("fresh", "squire_near_mastery", "guardian_unlocked", "guardian_mastered")
+
+
+def with_pace(raw_catalog: Json, pace: str) -> Json:
+    """The catalog with every rank's points divided by the pace (rounded up, still rising with each rank).
+
+    Points per win stay 1 and 1: the save's award rows allow nothing else. A faster pace asks for
+    fewer points instead. ``normal`` returns the catalog as it is.
+    """
+    divisor = PACES[pace]
+    if divisor == 1:
+        return raw_catalog
+    tuned = copy.deepcopy(raw_catalog)
+    for group, thresholds in tuned["mastery"]["rank_thresholds_by_group"].items():
+        scaled = [0]
+        for needed in thresholds[1:]:
+            scaled.append(max(scaled[-1] + 1, math.ceil(needed / divisor)))
+        tuned["mastery"]["rank_thresholds_by_group"][group] = scaled
+    return tuned
 
 
 class Progression:
     """One open save and the career of its profile."""
 
-    def __init__(self, save_dir: Path | str, content: Content, raw_catalog: Json | None = None, clock: Callable[[], str] = utc_now):
-        self.catalog = CareerCatalog(raw_catalog if raw_catalog is not None else load_catalog(), content)
+    def __init__(self, save_dir: Path | str, content: Content, raw_catalog: Json | None = None, clock: Callable[[], str] = utc_now,
+                 mastery_pace: str = "normal", roster_limit: int | None = None, preset: str = "fresh"):
+        if preset not in PRESETS:  # checked before any file is touched, so a wrong name leaves nothing behind
+            raise ValueError(f"Unknown start preset '{preset}'.")
+        if mastery_pace not in PACES:
+            raise ValueError(f"Unknown mastery pace '{mastery_pace}'.")
+        self.content, self._clock = content, clock
+        self.mastery_pace = mastery_pace
+        self.catalog = CareerCatalog(with_pace(raw_catalog if raw_catalog is not None else load_catalog(), mastery_pace), content)
         self.path = Path(save_dir) / SAVE_FILE
         self.store = SqliteProfileStore(self.path, self.catalog, clock)
         try:
-            if PROFILE_ID not in self.store.profile_ids():
+            new_profile = PROFILE_ID not in self.store.profile_ids()
+            if new_profile:
                 self.store.import_state(CareerState(Profile(PROFILE_ID)))
             self.career = StoredCareerService(self.store, PROFILE_ID)
+            if roster_limit is not None:
+                self.career.service.roster_limit = roster_limit
+            if new_profile:
+                self._apply_preset(preset)
+            else:  # the save may have been made at another pace: its ranks must agree with today's thresholds
+                self.career.rederive_ranks(f"mastery pace {mastery_pace}")
         except BaseException:
             self.store.close()
             raise
@@ -54,6 +93,23 @@ class Progression:
         self._seen_events = 0
         #: What the last battles awarded, newest last; the screens show it.
         self.last_awards: list[Json] = []
+
+    def _apply_preset(self, preset: str) -> None:
+        """What a new profile starts with. Everything is done through the career rules and is in the event log."""
+        if preset == "fresh":
+            return
+        for starting_class in ("squire", "scout", "apprentice"):
+            if not self.recruit(starting_class).accepted:
+                raise RuntimeError(f"The preset could not recruit a {starting_class}.")
+        hero_id = next(iter(self.state.heroes))
+        reason = f"demo preset {preset}"
+        top = self.catalog.thresholds("squire")[-1]
+        self.career.grant_mastery(hero_id, "squire", top - 1 if preset == "squire_near_mastery" else top, reason)
+        if preset in ("guardian_unlocked", "guardian_mastered"):
+            if not (self.claim(hero_id, "guardian").accepted and self.change(hero_id, "guardian").accepted):
+                raise RuntimeError("The preset could not make the first hero a Guardian.")
+        if preset == "guardian_mastered":
+            self.career.grant_mastery(hero_id, "guardian", self.catalog.thresholds("guardian")[-1], reason)
 
     def close(self) -> None:
         self.store.close()

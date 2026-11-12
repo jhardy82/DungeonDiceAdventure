@@ -11,8 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from battle_dice.app.progression import PROFILE_ID, SAVE_FILE, Progression
-from battle_dice.content.vocations import VocationCatalog, load_vocation_catalog
+from battle_dice import settings
+from battle_dice.app.progression import PACES, PRESETS, PROFILE_ID, SAVE_FILE, Progression, with_pace
+from battle_dice.content.vocations import VocationCatalog, load_catalog, load_vocation_catalog
 from battle_dice.core import commands as cmd
 from battle_dice.core.engine import Engine
 from battle_dice.core.models import RunPhase
@@ -181,3 +182,99 @@ def test_a_squire_is_mastered_becomes_a_guardian_and_plays_on(progression: Progr
     assert progression.store.verify_event_chain(PROFILE_ID) > 12
     tree = progression.tree("hero_001")["career_tree"]["entries"]
     assert next(e for e in tree if e.get("vocation_id") == "guardian")["active"] is True
+
+
+# --------------------------------------------------------------------------------------------
+# The demo's tuning: mastery pace, roster size, and what a new profile starts with
+# --------------------------------------------------------------------------------------------
+
+
+def test_a_faster_pace_asks_for_fewer_points_and_never_for_fewer_ranks():
+    raw = load_catalog()
+    normal, fast, very_fast = (with_pace(raw, pace)["mastery"]["rank_thresholds_by_group"] for pace in ("normal", "fast", "very_fast"))
+    assert with_pace(raw, "normal") is raw, "the normal pace is the catalog itself"
+    assert normal["novice"] == [0, 1, 2, 3, 5, 7, 10, 14] and fast["novice"] == [0, 1, 2, 3, 4, 5, 6, 7]
+    assert normal["advanced"] == [0, 2, 4, 7, 10, 14, 18, 24] and fast["advanced"] == [0, 1, 2, 4, 5, 7, 9, 12]
+    assert very_fast["advanced"] == very_fast["novice"] == [0, 1, 2, 3, 4, 5, 6, 7]  # a rank per point is the fastest there is
+    for table in (fast, very_fast):
+        for group, thresholds in table.items():
+            assert len(thresholds) == 8 and thresholds[0] == 0 and all(a < b for a, b in zip(thresholds, thresholds[1:], strict=False)), group
+            assert all(mine <= theirs for mine, theirs in zip(thresholds, normal[group], strict=True))
+    assert raw["mastery"]["rank_thresholds_by_group"]["novice"] == [0, 1, 2, 3, 5, 7, 10, 14], "the catalog itself is not altered"
+    assert PACES == settings.PACES and PRESETS == settings.PRESETS, "the settings offer exactly what the save link knows"
+
+
+@pytest.mark.parametrize(("preset", "heroes", "first"), [
+    ("fresh", 0, None),
+    ("squire_near_mastery", 3, ("squire", 7, 13, ["squire", "apprentice", "scout"])),
+    ("guardian_unlocked", 3, ("guardian", 1, 0, ["squire", "apprentice", "scout", "guardian"])),
+    ("guardian_mastered", 3, ("guardian", 8, 24, ["squire", "apprentice", "scout", "guardian"])),
+])
+def test_a_new_profile_starts_as_its_preset_says(tmp_path: Path, preset, heroes, first):
+    link = Progression(tmp_path, packaged_content(), preset=preset, clock=lambda: "2026-11-12T10:00:00Z")
+    assert len(link.state.heroes) == heroes
+    if first is not None:
+        hero = link.state.heroes["hero_001"]
+        active, rank, points, unlocked = first
+        assert (hero.active_vocation_id, hero.mastery[active].rank, hero.mastery[active].points, hero.unlocked_vocations) == (active, rank, points, unlocked)
+        assert [h.active_vocation_id for h in link.state.heroes.values()][1:] == ["scout", "apprentice"]
+        assert ("guardian_field_medic" in hero.learned_skills) == (preset == "guardian_mastered")
+        # Handed-out mastery is in the event log under its own name, with its reason.
+        granted = link.store.conn.execute("SELECT event_json FROM progression_event_log WHERE event_type = 'MasteryGranted'").fetchall()
+        assert granted and all(f"demo preset {preset}" in row[0] for row in granted)
+    link.store.verify_event_chain(PROFILE_ID)
+    link.close()
+    # The preset is for a new profile only: opening the save again with another preset changes nothing.
+    again = Progression(tmp_path, packaged_content(), preset="guardian_mastered")
+    assert len(again.state.heroes) == heroes and (first is None or again.state.heroes["hero_001"].mastery[first[0]].points == first[2])
+    again.close()
+
+
+def test_an_unknown_preset_is_refused_and_leaves_no_half_made_profile_open(tmp_path: Path):
+    with pytest.raises(ValueError, match="Unknown start preset 'everything'"):
+        Progression(tmp_path, packaged_content(), preset="everything")
+    with pytest.raises(ValueError, match="Unknown mastery pace 'instant'"):
+        Progression(tmp_path, packaged_content(), mastery_pace="instant")
+    assert not (tmp_path / SAVE_FILE).exists(), "a wrong name is refused before any file is made"
+
+
+def test_changing_the_pace_re_ranks_the_heroes_from_their_points_and_says_so_in_the_log(tmp_path: Path, vocations):
+    link = Progression(tmp_path, packaged_content(), preset="squire_near_mastery")
+    assert link.state.heroes["hero_001"].mastery["squire"].rank == 7  # 13 of 14 points
+    link.close()
+    fast = Progression(tmp_path, packaged_content(), mastery_pace="fast")
+    hero = fast.state.heroes["hero_001"]
+    assert (hero.mastery["squire"].rank, hero.mastery["squire"].points) == (8, 13)  # 13 points are more than the 7 a fast pace asks
+    events = fast.store.conn.execute("SELECT event_json FROM progression_event_log WHERE event_type = 'RanksRederived'").fetchall()
+    assert len(events) == 1 and "mastery pace fast" in events[0][0] and '"from":7' in events[0][0] and '"to":8' in events[0][0]
+    assert fast.claim("hero_001", "guardian").accepted, "a Squire mastered at the faster pace can become a Guardian"
+    fast.close()
+    # Opened again at the same pace nothing is re-derived, so no second event is written.
+    same = Progression(tmp_path, packaged_content(), mastery_pace="fast")
+    assert same.store.conn.execute("SELECT COUNT(*) FROM progression_event_log WHERE event_type = 'RanksRederived'").fetchone()[0] == 1
+    same.close()
+    # Back at the normal pace the rank follows the points again; what was claimed stays claimed.
+    normal = Progression(tmp_path, packaged_content())
+    hero = normal.state.heroes["hero_001"]
+    assert hero.mastery["squire"].rank == 7 and "guardian" in hero.unlocked_vocations
+    normal.store.verify_event_chain(PROFILE_ID)
+    normal.close()
+
+
+def test_a_faster_pace_masters_a_squire_in_fewer_runs(tmp_path: Path, vocations):
+    content = packaged_content()
+    runs = {}
+    for pace in ("normal", "very_fast"):
+        link = Progression(tmp_path / pace, content, mastery_pace=pace)
+        assert link.recruit("squire").accepted and link.recruit("scout").accepted
+        runs[pace] = runs_to_master(link, content, vocations, PARTY, "hero_001", first_seed=1001)["runs"]
+        link.close()
+    assert runs["very_fast"] < runs["normal"] and runs["very_fast"] <= 4, runs
+
+
+def test_the_roster_size_is_a_setting(tmp_path: Path):
+    link = Progression(tmp_path, packaged_content(), roster_limit=2)
+    assert link.recruit("squire").accepted and link.recruit("scout").accepted
+    full = link.recruit("scout")
+    assert (full.error_code, full.error_details) == ("ROSTER_FULL", {"roster_limit": 2, "heroes": 2})
+    link.close()
