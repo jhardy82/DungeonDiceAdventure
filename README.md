@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 959 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 989 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -250,12 +250,43 @@ docs/class_evolution/ Class Evolution FDD v0.2: approved design; being built beh
 Changing balance means editing `src/battle_dice/content/data/*.json` (bump `content_version`,
 run `python tools/update_replay_pin.py`, rerun the tests, add a decision-log entry). No numeric balance value is hard-coded in the engine.
 
-## Class Evolution (in development, not in the game)
+## Class Evolution (playable behind a switch, off by default)
 
 `docs/class_evolution/FDD_v0.2.md` is the approved design for class evolution: 14 vocations,
-mastery, unlocks and a save database. **It is not playable yet.** The feature gate
-`class_evolution_v1` is off by default, and with it off the game is byte for byte unchanged (the
-replay pin proves it on every change). The specification is executable and checked in CI:
+mastery, unlocks and a save file. Its **first slice is playable**: a Squire can master its class,
+become a Guardian, and fight an optional third, harder battle. It is behind the feature gate
+`class_evolution_v1`, which is **off by default**. With the gate off the game is byte for byte
+unchanged (the replay pin proves it on every change) and no save file is made.
+
+To play it:
+
+```
+python -m battle_dice --feature class_evolution_v1
+```
+
+The environment variable `BATTLE_DICE_FEATURES=class_evolution_v1` does the same. The main
+menu's status bar shows that the gate is on.
+
+What changes with the gate on:
+
+- **Party setup** shows your saved heroes. Recruit a Squire, an Apprentice or a Scout (keys 1,
+  2, 3); recruiting is free and a roster holds 12 heroes.
+- **Every won battle earns mastery** for each hero in the party. The upgrade screen, the
+  outcome screen and the status line say what was earned, or why nothing was.
+- **Career** (the button on a party slot or a roster row) lists what a hero has mastered and
+  what it can become. Vocations that are not discovered show as `???`. A vocation the rules
+  cannot run yet is marked "Coming later".
+- **After Battle 2** you may end the run with a victory or fight a third battle. Losing it
+  loses the run; mastery already earned is kept.
+- **The save file** is `saves/profile.sqlite` beside the `logs` folder (the per-user application
+  data folder for the packaged build). `--save-dir FOLDER` or `BATTLE_DICE_SAVE_DIR` puts it
+  elsewhere. Delete the file to start over.
+
+What is playable today: the three starting classes, Guardian and Ranger. The other nine
+vocations are listed and cannot be claimed yet. The numbers of the Guardian and of the third
+battle are defaults tuned with a simulated player; no person has played them yet.
+
+The specification is executable and checked in CI:
 
 ```
 python tools/class_evolution/validate_catalog.py      # the vocation catalog against shipped content
@@ -263,20 +294,7 @@ python tools/class_evolution/check_persistence.py     # the save database script
 ```
 
 Both print `OK`. The first also lists, as warnings, every rank and vocation that cannot be reached
-on shipped content yet. The build follows the phases in section 9 of the document. Phases 1 to 3
-are done: the rules can run an evolved hero, decide claims, vocation changes, mastery, skills and
-dice, and save all of it to a file. No screen offers any of it yet, and the game itself does not
-open a save file yet. Of the 40 acceptance cases 35 run as tests; the other five wait for Phase 4
-or a later wave (`docs/DECISION_LOG.md`, section 7.14).
-
-The gate is a launch setting. Switching it on changes nothing you can see today; it only hands the
-vocation catalog to the rules engine, and the main menu's status bar says so:
-
-```
-python -m battle_dice --feature class_evolution_v1
-```
-
-The environment variable `BATTLE_DICE_FEATURES=class_evolution_v1` does the same.
+yet. Of the 40 acceptance cases 36 run as tests (`docs/DECISION_LOG.md`, sections 7.14 to 7.18).
 
 ## Scope
 

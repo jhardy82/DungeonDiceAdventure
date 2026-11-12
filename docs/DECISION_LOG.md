@@ -1132,6 +1132,83 @@ mastered, then (as a Guardian) until the Guardian is mastered.
 **Still to do in step C:** the vocation change inside a run, after recovery and before the
 upgrade (CE-19).
 
+### 7.18 Class Evolution Phase 4, step D: the screens; the first slice is playable (2026-11-12)
+
+**What a player can do now** (with `--feature class_evolution_v1`; the gate stays off by default)
+
+1. Recruit heroes at party setup and take up to five of them into a run.
+2. Win battles; every saved hero earns mastery, and the screens say what was earned or why not.
+3. After Battle 2, end the run with a victory or fight the third, threat-4 battle.
+4. Open a hero's career: what it has mastered, what it can claim, what is hidden (`???`).
+5. Master the Squire, claim the Guardian, make it the active vocation, and fight as one.
+
+**What was built**
+
+- **The app opens the save** behind the gate, in `saves/profile.sqlite`. A save that cannot be
+  opened leaves a working game without saved heroes and says so. The file is closed when the
+  game ends.
+- **Party setup with saved heroes** (`draw_roster_setup`): party slots, the roster, recruit
+  buttons (keys 1, 2, 3 as before), a Career button per hero.
+- **The career screen** (`draw_career`): the tree built earlier, with for each vocation where
+  the hero stands, what it still needs, and Claim or Make active. A vocation the rules cannot
+  run yet is "Coming later": it can be read about and not taken, so no hero can be put into a
+  state the game cannot play.
+- **Stop or fight on** (`draw_continue`): the party after recovery, what Battle 2 earned, and
+  the two choices.
+- **Awards on the existing screens:** a status line when a battle ends, and a panel on the
+  outcome screen.
+- **The self-check** (`--smoke-test --feature class_evolution_v1`) now walks this flow: it
+  recruits by key, opens and leaves the career screen, plays three battles and checks that the
+  results reached the save. Its logs and its save stay inside its own temporary folder.
+- New launch flag `--save-dir`.
+
+**Defects the new tests found in this step, all fixed before the commit**
+
+| Found by | Defect |
+|----------|--------|
+| The warning-as-error test run | The save's database connection was never closed |
+| A test that recruits six heroes | Recruiting was blocked once the party was full, although the recruit should wait in the roster |
+| The text-fit test, and a test that selects every vocation | Selecting a vocation the rules cannot run yet (Champion, Hero) crashed the career screen |
+| The text-fit test under the widest font | Two labels were cut off: a button's second line, and the one-line mastery summary with five heroes |
+| Two older tests | With the logs redirected to a temporary folder the save was written **beside** that folder, into the system's temporary directory. The rule is now: a log folder the caller chose keeps its save inside itself. The stray file was removed |
+
+**A reading of decision CE-40, stated because this step touches it**
+
+- CE-40 says: with the gate on and starting classes only, the replay pin must match byte for
+  byte. That holds and is tested: the rules engine gives the same bytes for the same commands
+  whether or not it is handed the catalog.
+- A run started **from the app** with the gate on is a different run by design. Its start
+  command names saved heroes with their builds (decision CE-35) and offers the third battle
+  (D-27), and its run id comes from the save. An older test that compared the app's events
+  with and without the gate now checks exactly that difference and that the battle itself is
+  the same.
+
+**Evidence**
+
+- 989 tests pass (959 before). Lint and type checks are clean; coverage of the rules, content
+  and career code is 97% (the app and screens are outside that figure; their tests are below).
+- 29 new screen tests (`tests/ui/test_evolution_ui.py`): the gate (no save and no save code
+  loaded while it is off, in a fresh interpreter); recruiting, the roster, the party; the
+  career screen including a mastered Squire becoming a Guardian and fighting as one; awards;
+  both choices after Battle 2; **no text cut off at 1280x720 and 960x540 under three fonts**;
+  a drawing fault on each new screen reaches the error screen.
+- The replay pin and the six content files are unchanged. The rules engine, the simulated
+  player and the content were not touched in this step.
+- **Deliberate breaks:** 26 breaks of the new screen and controller code. 23 were caught at
+  first. Two misses were test gaps (adding the same hero twice by a direct call; the Career
+  button of the second slot), now closed. The third no longer changes anything, because of
+  the safer save location above. Run without bytecode files and with a control run.
+
+**Not verified**
+
+- No person has played it. The screens were checked by tests and by reading screenshots made
+  in this session, not on a physical display.
+- Windows: the standalone build with the gate on is checked by its workflow (it now opens a
+  save inside the packaged app for the first time).
+
+**Still to do for the slice:** the vocation change inside a run (CE-19), Field Medic in battle,
+the build panel (skills and family dice), and the demo's settings.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one
@@ -1156,5 +1233,5 @@ checked here. Each needs an owner decision or a real Windows display.
 | Class balance | Changed in content 1.3.0 (D-21, section 7.8): every party size is at 74-83% and one composition is at or below 40%. Still weak: five Squires (16%; about 30% when they swap to the Vanguard bench die, section 7.9), and all-Apprentice parties at sizes 3 and 4 (52-56%). Still strong: Scout-heavy parties at sizes 4 and 5 (98-100%). All figures are for the scripted player. |
 | Windows display | Never launched on a physical Windows display. Window resize while dragging, font rendering and behaviour at 125% or 150% scaling are unverified. |
 | Python install manager | Whether its `py` command downloads a missing Python on request is `<UNKNOWN>` here; the launcher itself never downloads or installs Python. |
-| Class Evolution | Not playable. The rules and the save file are built and tested behind a gate that is off by default (sections 7.11 to 7.14); no screen offers any of it, and the game does not hand a run's results to the career rules yet (Phase 4). 35 of the 40 acceptance cases run as tests; one question is open (CE-31). Whether the design is balanced or enjoyable is `<UNKNOWN>` until a playable slice exists. On shipped encounters the six advanced vocations (Guardian first) cannot reach their last rank, and Champion, Archmage, Hero and Dragon Knight cannot be trained at all; the validator lists each case. |
+| Class Evolution | The first slice (Squire to Guardian, the third battle) is playable behind a gate that is off by default (sections 7.11 to 7.18). Nine of the 14 vocations cannot be played yet. The Guardian's numbers and the third battle's table are defaults measured with a simulated player and await an owner decision. 36 of the 40 acceptance cases run as tests; one question is open (CE-31). No person has played it. Whether the design is balanced or enjoyable is `<UNKNOWN>` until a playable slice exists. On shipped encounters the six advanced vocations (Guardian first) cannot reach their last rank, and Champion, Archmage, Hero and Dragon Knight cannot be trained at all; the validator lists each case. |
 | Type checking | Closed on 2026-11-10: `mypy` now covers the whole package (including `ui/`), `tools/` and `tests/` with no findings, and CI runs it that way. The one relaxation is for tests only: `union-attr` is off there, because a test that reads optional engine state fails with an AttributeError when it is None, which is the signal wanted. |

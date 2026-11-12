@@ -141,6 +141,9 @@ def draw_controls(ui: UI, ctrl: AppController, back: Callable[[], Any] | None = 
 
 
 def draw_party_setup(ui: UI, ctrl: AppController) -> None:
+    if ctrl.progression is not None:  # Class Evolution: the party is made of saved heroes
+        draw_roster_setup(ui, ctrl)
+        return
     minimum, maximum = ctrl.party_limits()
     ui.text(24, 14, "Party Setup", 30, Theme.ACCENT, bold=True)
     ui.text(250, 26, f"{len(ctrl.party)} / {maximum} heroes.  Any mix of classes, duplicates allowed.  Starting dice are fixed by class.", 16, Theme.DIM)
@@ -868,6 +871,12 @@ def draw_outcome(ui: UI, ctrl: AppController) -> None:
         ui.text(360, y, label, 16, Theme.DIM)
         ui.text(920, y, str(outcome["stats"][key]), 16, Theme.TEXT, bold=True, align="right")
         y += 26
+    awards = ctrl.awards_view()
+    if awards:  # Class Evolution: what each saved hero earned in the last battle of the run
+        ui.panel(952, 180, 312, 330, "Mastery from the last battle")
+        award_y = 208.0
+        for award in awards[:5]:
+            award_y = ui.paragraph(966, award_y, award, 286, 14, Theme.TEXT, line_height=17, max_lines=3) + 8
     log_text = f"Event log: {outcome['log_path']}" if outcome["log_path"] else f"Event log not written: {outcome['log_error'] or 'unknown reason'}"
     ui.text(640, 522, log_text, 13, Theme.FAINT, align="center", max_width=1200)
     ui.text(640, 542, f"Seed {outcome['seed']} (use --seed to replay the same dice).", 13, Theme.FAINT, align="center")
@@ -879,6 +888,182 @@ def draw_outcome(ui: UI, ctrl: AppController) -> None:
     for line, tip in enumerate(outcome["tips"][:2]):
         ui.text(640, 650 + line * 18, tip, 14, Theme.ACCENT, align="center", max_width=1200)
     ui.escape_action = ctrl.to_main_menu
+    status_bar(ui, ctrl)
+
+
+# --------------------------------------------------------------------------------------------
+# Class Evolution: party setup with saved heroes, the career screen, stop or fight on
+# --------------------------------------------------------------------------------------------
+
+GROUP_LABELS = {"novice": "Starting class", "advanced": "Advanced", "capstone": "Capstone",
+                "secret_sidegrade": "Secret", "secret_prestige": "Secret"}
+
+
+def draw_roster_setup(ui: UI, ctrl: AppController) -> None:
+    """Party setup while Class Evolution is on: pick saved heroes, recruit new ones, open a hero's career."""
+    _, maximum = ctrl.party_limits()
+    roster = ctrl.roster_view()
+    by_id = {row["hero_id"]: row for row in roster}
+    ui.text(24, 14, "Party Setup", 30, Theme.ACCENT, bold=True)
+    ui.text(250, 26, f"{len(ctrl.party)} / {maximum} heroes in the party.  Your heroes are saved and keep what they master.", 16, Theme.DIM, max_width=1010)
+
+    ui.panel(16, 60, 560, 470, "Party")
+    for index in range(maximum):
+        y: float = 90 + index * 86
+        if index >= len(ctrl.party):
+            ui.panel(26, y, 540, 78, fill=(24, 27, 35))
+            ui.text(296, y + 30, "empty slot", 15, Theme.FAINT, align="center")
+            continue
+        member = ctrl.party[index]
+        hero = by_id[member["hero_id"]]
+        selected = index == ctrl.selected_slot
+        ui.panel(26, y, 540, 78, fill=Theme.PANEL_ALT, border=Theme.ACCENT if selected else Theme.BORDER, width=2 if selected else 1)
+        ui.sprite(ui.assets.combatant_key(ctrl.sprite_class(member["class_id"])), 30, y + 11, 56, 56)
+        ui.button(f"slot:{index}:select", 90, y + 8, 170, 62, f"{index + 1}. {ui.fit_name(hero['name'], 16, False, 150)}",
+                  partial(setattr, ctrl, "selected_slot", index), selected=selected,
+                  sublabel=f"{hero['vocation_name']}, rank {hero['rank']}",
+                  tooltip=f"{hero['name']}: {hero['vocation_name']}, mastery rank {hero['rank']} of 8.")
+        ui.button(f"slot:{index}:row", 266, y + 8, 100, 62, member["row"].capitalize(),
+                  partial(ctrl.toggle_party_row, index), sublabel="row: toggle",
+                  tooltip="Front-row heroes shield the back row from melee. Click to switch rows.")
+        ui.button(f"slot:{index}:career", 372, y + 8, 92, 62, "Career", partial(ctrl.open_career, member["hero_id"]),
+                  sublabel="press C" if selected else "vocations", hotkeys=(pygame.K_c,) if selected else (),
+                  tooltip="What this hero has mastered and what it can become.")
+        ui.button(f"slot:{index}:remove", 470, y + 8, 88, 62, "Remove", partial(ctrl.remove_hero, index),
+                  tooltip="Take this hero out of the party. It stays in the roster.")
+
+    problem = ctrl.begin_problem()
+    ui.button("party:begin", 16, 606, 284, 60, "Begin Encounter  (B)", ctrl.begin_run, enabled=problem is None,
+              reason=problem, hotkeys=(pygame.K_b,), default=True, size=20,
+              tooltip="Start Battle 1 with this party.")
+    ui.button("party:back", 308, 606, 138, 60, "Back  (Esc)", ctrl.to_main_menu, tooltip="Return to the main menu.")
+    ui.escape_action = ctrl.to_main_menu
+    third = "After Battle 2 you may stop with a victory or fight a third, harder battle." if ctrl.third_battle else "The third battle is switched off."
+    ui.text(16, 548, third, 14, Theme.DIM, max_width=560)
+    ui.text(16, 570, "Mastery is earned by winning battles. A mastered class opens new vocations.", 14, Theme.DIM, max_width=560)
+
+    limit = ctrl.progression.career.service.roster_limit
+    ui.panel(588, 60, 676, 606, f"Roster ({len(roster)} of {limit} heroes)")
+    full = len(ctrl.party) >= maximum
+    y = 88.0
+    if not roster:
+        ui.text(604, y, "No heroes yet. Recruit one below: a Squire, an Apprentice or a Scout.", 15, Theme.DIM, max_width=640)
+    for row in roster:
+        reason = "Already in the party." if row["in_party"] else f"The party already has {maximum} heroes." if full else None
+        progress = "mastered" if row["mastered"] else f"{row['points']}/{row['points_for_next_rank']} to rank {row['rank'] + 1}"
+        ui.button(f"roster:{row['hero_id']}:add", 600, y, 520, 34,
+                  f"{ui.fit_name(row['name'], 15, False, 170)}   {row['vocation_name']}, rank {row['rank']}   ({progress})",
+                  partial(ctrl.add_saved_hero, row["hero_id"]), enabled=reason is None, reason=reason, size=15,
+                  tooltip="Add this hero to the party.")
+        ui.button(f"roster:{row['hero_id']}:career", 1126, y, 126, 34, "Career", partial(ctrl.open_career, row["hero_id"]), size=15,
+                  tooltip="What this hero has mastered and what it can become.")
+        y += 38
+    roster_full = len(roster) >= limit
+    for position, class_id in enumerate(ctrl.progression.catalog.starting_classes()):
+        name = ctrl.class_view(class_id)["name"]
+        ui.button(f"add:{class_id}", 600 + position * 220, 606, 212, 50, f"Recruit {name} ({position + 1})",
+                  partial(ctrl.add_hero, class_id), enabled=not roster_full,
+                  reason=f"The roster is full ({limit} heroes).", hotkeys=(NUMBER_KEYS[position],),
+                  tooltip=f"Recruit a new {name}. It joins the party if there is room. Recruiting is free.")
+    status_bar(ui, ctrl)
+
+
+def draw_career(ui: UI, ctrl: AppController) -> None:
+    """One hero's career: every vocation it knows of, what it may claim or become, and what is still hidden."""
+    view = ctrl.career_view()
+    ui.text(24, 14, f"Career: {ui.fit_name(view['name'], 30, True, 520)}", 30, Theme.ACCENT, bold=True)
+    note = "During a run a hero cannot change. Come back between runs." if view["in_run"] else \
+        "Master a vocation (rank 8) to open the ones that build on it. A hero fights as its active vocation."
+    ui.text(24, 52, note, 15, Theme.DIM, max_width=1230)
+
+    ui.panel(16, 78, 760, 540, "Vocations")
+    y = 104.0
+    for index, row in enumerate(view["rows"]):
+        if row["kind"] != "vocation":
+            ui.panel(26, y, 740, 32, fill=(24, 27, 35))
+            ui.text(36, y + 7, row["label"], 16, Theme.FAINT, bold=True)
+            ui.text(110, y + 8, row["status"], 14, Theme.FAINT, max_width=640)
+            y += 36
+            continue
+        vocation_id = row["vocation_id"]
+        selected = vocation_id == view["selected"]
+        ui.button(f"career:{vocation_id}:select", 26, y, 176, 32, row["name"], partial(ctrl.select_career_vocation, vocation_id),
+                  selected=selected, size=15, tooltip=f"Show what a {row['name']} is.")
+        ui.text(210, y + 8, GROUP_LABELS.get(row["group"], row["group"]), 13, Theme.FAINT, max_width=96)
+        # The row says where the hero stands; what a locked vocation still needs is spelled out on the right.
+        ui.text(310, y + 8, row["status"], 14, Theme.TEXT if row["unlocked"] else Theme.DIM, max_width=320)
+        if row["unlocked"]:
+            ui.button(f"career:{vocation_id}:activate", 640, y, 126, 32, "Active" if row["active"] else "Make active",
+                      partial(ctrl.change_vocation, vocation_id), enabled=row["can_activate"], size=14,
+                      reason="This is the active vocation." if row["active"] else "A hero cannot change during a run.",
+                      tooltip="The hero fights as this vocation from the next run on.")
+        else:
+            ui.button(f"career:{vocation_id}:claim", 640, y, 126, 32, "Claim", partial(ctrl.claim_vocation, vocation_id),
+                      enabled=row["can_claim"], size=14,
+                      reason=row["needs"] or "A hero cannot claim a vocation during a run.",
+                      tooltip="Unlock this vocation for the hero. It costs nothing.")
+        y += 36 if index < len(view["rows"]) - 1 else 0
+
+    info = ctrl.class_view(view["selected"])
+    ui.panel(788, 78, 476, 540, info["name"])
+    ui.sprite(ui.assets.combatant_key(ctrl.sprite_class(view["selected"])), 1206, 82, 50, 50)
+    x, y = 802.0, 106.0
+    ui.text(x, y, f"HP {info['max_hp']}   Speed {info['speed']}   Mana {info['start_mana']}/{info['max_mana']}   Rerolls {info['rerolls']}", 15,
+            Theme.TEXT, max_width=390)
+    y += 24
+    if view["selected_needs"]:
+        ui.text(x, y, "To claim", 14, Theme.WARN, bold=True)
+        y = ui.paragraph(x + 76, y, view["selected_needs"], 372, 14, Theme.TEXT, line_height=17, max_lines=5) + 5
+    if not info.get("playable", True):
+        ui.paragraph(x, y + 6, "This vocation is part of the design but cannot be played in this version: the rules it needs are "
+                               "not built yet. Its dice and abilities will be shown here when they are.", 448, 14, Theme.DIM, line_height=18)
+        ui.button("career:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_career, hotkeys=(pygame.K_b,), default=True)
+        ui.escape_action = ctrl.close_career
+        status_bar(ui, ctrl)
+        return
+    for label, body in (
+        ("Schedule", f"{info['scheduling']['label']}: {info['scheduling']['summary']}"),
+        ("Passive", f"{info['passive']['name']}: {info['passive']['summary']}"),
+        ("Reaction", f"{info['reaction_def']['name']} ({info['reaction_def']['mana_cost']} mana): {info['reaction_def']['summary']}"),
+    ):
+        ui.text(x, y, label, 14, Theme.ACCENT, bold=True)
+        y = ui.paragraph(x + 76, y, body, 372, 14, Theme.DIM, line_height=17, max_lines=4) + 5
+    for die in info["dice"]:
+        y = draw_die_faces(ui, x, y + 2, 448, die, max_rows=6) + 4
+    ui.button("career:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_career, hotkeys=(pygame.K_b,), default=True)
+    ui.escape_action = ctrl.close_career
+    status_bar(ui, ctrl)
+
+
+def draw_continue(ui: UI, ctrl: AppController) -> None:
+    """After Battle 2 of a run that offers a third battle: stop with the victory, or fight on."""
+    view = ctrl.continue_view()
+    ui.text(640, 36, f"BATTLE {view['battle']} WON", 52, Theme.GOOD, bold=True, align="center")
+    ui.text(640, 104, "Your party has recovered. Stop here with a victory, or fight a third, harder battle.", 18, Theme.TEXT, align="center",
+            max_width=1200)
+    threat = f" (threat {view['threat_rating']} of 5)" if view["threat_rating"] is not None else ""
+    ui.text(640, 132, f"The third battle is harder than the first two{threat}. Losing it loses the run; mastery already earned is kept.", 15,
+            Theme.DIM, align="center", max_width=1200)
+
+    ui.panel(240, 170, 380, 300, "Party after recovery")
+    for position, hero in enumerate(view["heroes"][:5]):
+        line_y = 200 + position * 52
+        ui.text(256, line_y, ui.fit_name(hero["name"], 16, True, 170), 16, Theme.TEXT, bold=True)
+        ui.text(604, line_y, f"HP {hero['hp']}/{hero['max_hp']}   MP {hero['mana']}/{hero['max_mana']}   {hero['row']}", 14, Theme.DIM, align="right")
+    ui.panel(640, 170, 400, 300, f"Mastery from Battle {view['battle']}")
+    y = 200.0
+    if not view["awards"]:
+        ui.text(656, y, "No saved hero fought this battle.", 14, Theme.DIM, max_width=370)
+    for line in view["awards"][:5]:
+        y = ui.paragraph(656, y, line, 370, 14, Theme.TEXT, line_height=17, max_lines=3) + 8
+
+    ui.button("continue:fight", 300, 500, 320, 64, "Fight On  (F)", ctrl.fight_on, hotkeys=(pygame.K_f,), size=20,
+              tooltip="Start the third battle. Winning it wins the run; losing it loses the run.")
+    ui.button("continue:stop", 660, 500, 320, 64, "End Run: Victory  (V)", ctrl.end_run_with_victory, hotkeys=(pygame.K_v,), default=True, size=20,
+              tooltip="End the run now as a victory, with two battles won.")
+    ui.text(640, 584, "Mastery is awarded for every won battle, so the points from Battles 1 and 2 are yours either way.", 14, Theme.FAINT,
+            align="center", max_width=1200)
+    ui.escape_action = None
     status_bar(ui, ctrl)
 
 

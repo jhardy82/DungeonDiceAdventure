@@ -471,26 +471,36 @@ def test_the_state_view_is_plain_data_in_the_fixture_vocabulary(catalog):
     assert copy.deepcopy(view) == view
 
 
-def test_the_game_does_not_load_the_career_package_yet():
-    """Phase 2 is rules only: nothing a player runs may depend on them until they are wired in behind the gate."""
+@pytest.mark.parametrize("gate", ["off", "on"])
+def test_the_game_loads_the_career_package_and_makes_a_save_only_behind_the_gate(gate):
+    """With the gate off nothing a player runs touches the career rules or a save. With it on the game opens one save.
+
+    (Until Phase 4, step D this test said "not even with the gate on": the game opened no save yet.)
+    """
     import os
     import subprocess
     import sys
 
+    features = "['class_evolution_v1']" if gate == "on" else "[]"
     code = (
         "import sys, tempfile\n"
         "import battle_dice.__main__, battle_dice.ui.app, battle_dice.sim.runner, battle_dice.replay_cli\n"
         "from battle_dice.app.controller import AppController\n"
         "import pathlib\n"
         "base = pathlib.Path(tempfile.mkdtemp())\n"
-        "c = AppController(fixed_seed=1, log_dir=base / 'logs', features=['class_evolution_v1'])\n"
+        f"c = AppController(fixed_seed=1, log_dir=base / 'logs', features={features})\n"
         "c.new_run(); c.add_hero('scout'); c.begin_run()\n"
-        "saves = [p.name for p in base.rglob('*.sqlite*')]\n"
-        "print(sorted(name for name in sys.modules if name.startswith('battle_dice.career')), saves)\n"
+        "assert c.engine is not None\n"
+        "saves = sorted(str(p.relative_to(base)).replace(chr(92), '/') for p in base.rglob('*.sqlite'))\n"
+        "print(any(name.startswith('battle_dice.career') for name in sys.modules), 'sqlite3' in sys.modules, saves)\n"
+        "c.close()\n"
     )
     env = {**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"}
+    env.pop("BATTLE_DICE_FEATURES", None)
+    env.pop("BATTLE_DICE_SAVE_DIR", None)
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=120, check=True)
-    assert done.stdout.strip().splitlines()[-1] == "[] []", "no career module is loaded and no save file is created"
+    expected = "True True ['logs/saves/profile.sqlite']" if gate == "on" else "False False []"
+    assert done.stdout.strip().splitlines()[-1] == expected
 
 
 # --------------------------------------------------------------------------------------------

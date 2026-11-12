@@ -247,11 +247,19 @@ def test_the_controller_hands_the_catalog_to_the_engine_only_when_the_gate_is_on
     on = AppController(fixed_seed=1, log_dir=tmp_path / "on", features=["class_evolution_v1"])
     assert on.vocations is not None and on.vocations.sha256 == catalog.sha256
     on.new_run()
-    on.add_hero("squire")
+    on.add_hero("squire")  # with the gate on this recruits a saved Squire
     on.begin_run()
     assert on.engine is not None and on.engine.vocations is on.vocations
-    # The same party gives the same run: the gate changes nothing for shipped classes.
-    assert [dataclasses.asdict(e) for e in on.engine.events] == [dataclasses.asdict(e) for e in off.engine.events]
+    # With the gate on the app starts a different run by design: its start command names the saved hero with
+    # its build (decision CE-35) and offers the third battle (D-27). The battle itself is the same battle.
+    first_on, first_off = dataclasses.asdict(on.engine.events[0]), dataclasses.asdict(off.engine.events[0])
+    assert set(first_on["delta"]) - set(first_off["delta"]) == {"encounters", "heroes", "vocation_catalog"}
+    assert first_on["delta"]["party"] == [{**first_off["delta"]["party"][0], "hero_id": "hero_001"}]
+    assert first_on["delta"]["run_id"] == "run-0001-1" and first_off["delta"]["run_id"] == "run-1-1"
+    assert [dataclasses.asdict(e) for e in on.engine.events[1:]] == [dataclasses.asdict(e) for e in off.engine.events[1:]]
+    # The rules engine itself still gives the same bytes for the same commands with the catalog handed to it (CE-40):
+    # tests/integration/test_class_evolution_runs.py proves that on the three pinned parties.
+    on.close()
 
 
 def test_the_command_line_reports_and_validates_the_gate(capsys):
