@@ -1261,7 +1261,7 @@ class AppController:
         needs = None if evolution else "Switch Class Evolution on first."
         paces = {"normal": "Normal", "fast": "Fast (about half the points)", "very_fast": "Very fast (a rank per win at most)"}
         presets = {"fresh": "Fresh: no heroes", "squire_near_mastery": "A Squire one win from mastery",
-                   "guardian_unlocked": "A Guardian at rank 1", "guardian_mastered": "A mastered Guardian"}
+                   "guardian_unlocked": "A Guardian at rank 1", "guardian_mastered": "A Guardian with Field Medic"}
         rows = [
             {"key": "class_evolution", "label": "Class Evolution", "value": ("On (launch flag)" if forced else "On") if evolution else "Off",
              "help": "Saved heroes, mastery, vocations and the third battle. Off: the game as shipped, and no save file.",
