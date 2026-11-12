@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1128 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1131 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -279,10 +279,10 @@ What changes with the gate on:
   cannot run yet is marked "Coming later".
 - **Skills** (key K on the Career screen) lists the skills a hero has learned and lets you equip
   them between runs. A mastered vocation teaches one. The first that works in battle is the
-  Guardian's **Field Medic**: once per battle its Heal may bring a downed ally back at 1 HP, for
-  1 more mana. The die says so when it can ("Field Medic: revive for 2 mana"), and the downed
-  ally becomes a target. A skill the rules of battle do not know yet is listed and cannot be
-  equipped.
+  Guardian's **Field Medic**: once per battle its Heal may bring a downed ally back at 5 HP, for
+  the Heal's own 1 mana. The die says so when it can ("Field Medic: revive at 5 HP"),
+  and the downed ally becomes a target. A skill the rules of battle do not know yet is listed
+  and cannot be equipped.
 - **Changing vocation inside a run.** There are two moments, both between battles:
   - After Battle 1, before you choose the upgrade: the upgrade screen's **Career (C)** button
     lets the selected hero claim a vocation or change to one it has unlocked. The upgrade cards
@@ -324,8 +324,8 @@ with that start. Esc returns to the main menu; **New Run (N)** opens the party s
    Guardian), the Scout and the Apprentice.
 2. Click **Career** on the Guardian's slot, then press **K**: Field Medic is equipped. Esc.
 3. **Begin Encounter (B)**. When an ally is down and the Guardian rolls its Heal, the die says
-   "Field Medic: revive for 2 mana". Use the die and pick the downed ally. It needs 2 mana, so
-   do not spend the Guardian's mana on its reaction first.
+   "Field Medic: revive at 5 HP". Use the die and pick the downed ally. It needs
+   1 mana, so the Guardian must not have spent its last mana on its reaction.
 4. Win Battle 1, choose an upgrade, win Battle 2. Then choose **Fight On (F)** for the third battle.
 
 **Run 2: becoming a Guardian inside a run** (start: *A Guardian at rank 1*)

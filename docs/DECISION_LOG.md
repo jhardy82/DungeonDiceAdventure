@@ -1663,6 +1663,50 @@ Each is built as its own change.
 Guidance also recommends audio controls, subtitles, key remapping and controller support. The
 game has no audio and no controller support; remapping is not small. None is proposed.
 
+### 7.27 Field Medic: no extra mana, back at 5 HP (owner decision D-30, built 2026-11-12)
+
+**Decision.** After the measurement of section 7.25 the owner chose: the revival costs what
+the Heal costs, and the ally comes back at 5 HP. Still once per encounter.
+
+**What changed**
+
+| Before | Now |
+|--------|-----|
+| The revival cost the Heal's mana + 1 (2 for the Guardian) | It costs the Heal's own mana (1 for the Guardian) |
+| The ally came back at 1 HP | The ally comes back at 5 HP, never more than its maximum |
+| The die said "Field Medic: revive for 2 mana" | It says "Field Medic: revive at 5 HP"; the cost is the die's own and is in the plan |
+
+- The two numbers are in one place, `src/battle_dice/core/skills.py`. A test names them as the
+  owner's decision.
+- **Vocation catalog 0.5.0:** the skill's description says what it now does. The catalog's
+  hash changes, so a record of an evolved run made with catalog 0.4.0 no longer verifies.
+- Everything else about the skill is as in section 7.20: which face, when the use is spent,
+  the refusal codes, the hashed state.
+- Gate off: unchanged. Replay pin and the six content files unchanged.
+
+**Confirmed with the game's own numbers** (nothing patched; the same 480 seeds as section 7.25):
+316 wins of 480 with the skill against 297 without it; 28 runs won that were lost without it, 9
+lost that were won; used 92 times. Run by run the same as the measured option "1 mana, 5 HP".
+
+| Party size | Wins without | Wins with |
+|------------|--------------|-----------|
+| 2 | 89 of 120 | 91 of 120 |
+| 3 | 90 of 120 | 93 of 120 |
+| 4 | 63 of 120 | 68 of 120 |
+| 5 | 55 of 120 | 64 of 120 |
+
+**Evidence**
+
+- 1131 tests pass (1128 before). Lint and type checks are clean.
+- Tests changed to the decided numbers, and new ones: the two numbers as the owner's decision;
+  a revival never gives more health than the ally can hold; the catalog's description carries
+  the decided numbers; 1 mana pays for the revival and 0 does not.
+- A longer die note ("... 5 HP, 1 mana") was cut off under the widest font; the fit test caught
+  it, so the note is the shorter one.
+
+**Not verified:** no person has played it. The gain is measured with one simulated player on
+four fixed compositions.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

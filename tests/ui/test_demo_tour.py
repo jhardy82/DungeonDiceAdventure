@@ -61,7 +61,7 @@ def win_the_battle_as(play: Configured, hero: str, **faces: int) -> None:
 def test_the_tour_is_in_the_readme():
     text = README.read_text(encoding="utf-8")
     for phrase in ("### A tour of the slice in two runs", "A Guardian with Field Medic", "A Guardian at rank 1",
-                   "Reset the saved profile", "Field Medic: revive for 2 mana", "Fight On (F)", "Career (C)", "Make active", "Begin Encounter (B)"):
+                   "Reset the saved profile", "Field Medic: revive at 5 HP", "Fight On (F)", "Career (C)", "Make active", "Begin Encounter (B)"):
         assert phrase in text, phrase
 
 
@@ -85,12 +85,12 @@ def test_run_one_field_medic_and_the_third_battle(tmp_path):
     play.ctrl.refresh()
     play.app.frame(0)
     die = next(d for d in play.ctrl._turn_view()["dice"] if d["die_id"] == "guardian_d6")  # type: ignore[index]
-    assert die["skill_note"] == "Field Medic: revive for 2 mana"
+    assert die["skill_note"] == "Field Medic: revive at 5 HP"
     play.click("die:guardian_d6:use")
     play.click("unit:h02")
     play.ctrl.confirm_plan()
     finish_activation(engine)
-    assert (unit(engine, "h02").state, unit(engine, "h02").hp) == ("standing", 1)
+    assert (unit(engine, "h02").state, unit(engine, "h02").hp) == ("standing", 5)
     win_the_battle_as(play, "h01", guardian_d6=4, guardian_d4=3)  # step 4
     assert play.ctrl.screen == Screen.UPGRADE
     play.click("up:offer:0")

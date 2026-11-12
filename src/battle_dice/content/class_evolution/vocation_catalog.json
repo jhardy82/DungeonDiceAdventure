@@ -1,5 +1,5 @@
 {
-  "catalog_version": "0.4.0",
+  "catalog_version": "0.5.0",
   "baseline": {"rules_version": "1.1.1", "content_version": "1.3.1"},
   "feature_gate": "class_evolution_v1",
   "mastery": {
@@ -819,7 +819,7 @@
       "kind": "face_modifier",
       "transfer": "compatible_healing",
       "capacity_cost": 3,
-      "summary": "One equipped Healing face may revive to 1 HP once per encounter if it costs +1 mana; ordinary healing otherwise cannot revive. Does not create a new action.",
+      "summary": "Once per encounter a Healing face that cannot revive may be used on a downed ally: the ally comes back at 5 HP, for the face's own mana cost. Does not create a new action.",
       "engine_support": "existing"
     },
     {
