@@ -30,9 +30,10 @@
 - The demo's configuration (D-31), part 1: Settings in four groups with a demo group, reset to defaults, Settings from the pause menu, the dice seed typed on the New Run screen
 - Field Medic at the owner's numbers (D-30): no extra mana, the ally back at 5 HP; catalog 0.5.0. Measured: 316 wins of 480 against 297 without the skill
 - The demo's configuration (D-31), part 2a: four new settings: high contrast, battle speed at start, confirm a pass that leaves a die unused, help text delay
+- The demo's configuration (D-31), part 2b: text size (Normal, Large). Each frame is measured and a text grows only where it has room; a layout check walks 39 states under three fonts and two window sizes
 
 ### In Progress
-- The demo's configuration (D-31), part 2b: text size (Normal, Large) with a layout check on every screen
+- Nothing is being built. Every setting the owner chose in D-31 is in
 
 ### Pending
 

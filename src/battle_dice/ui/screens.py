@@ -78,12 +78,16 @@ def draw_die_faces(ui: UI, x: float, y: float, w: float, die: dict[str, Any], hi
         room = w - 54 - ui.text_width(odds, 14) - 10
         line = f"{face['name']}: {face['text']}"
         ui.text(x, y, f"{marker}{face['glyph']}", 14, color, bold=True)
-        ui.text(x + w, y, odds, 14, text_color, align="right")
-        if ui.text_width(line, 14, rolled) <= room:
+        # The rules text is drawn before the odds: at a larger text size the first of two neighbours grows first.
+        one_line = ui.text_width(line, 14, rolled) <= room
+        if one_line:
             ui.text(x + 54, y, line, 14, text_color, bold=rolled)
+        else:
+            ui.text(x + 54, y, face["name"], 14, text_color, bold=rolled, max_width=room)
+        ui.text(x + w, y, odds, 14, text_color, align="right")
+        if one_line:
             y += 17
         else:  # narrow panel: name beside the odds, the rules text in full underneath
-            ui.text(x + 54, y, face["name"], 14, text_color, bold=rolled, max_width=room)
             y = ui.paragraph(x + 54, y + 16, face["text"], w - 54, 13, text_color, line_height=15, max_lines=2) + 2
     return y
 
@@ -330,7 +334,7 @@ def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float
     elif intended:
         tag = "TARGETED"
     name_room = w - 12 - (ui.text_width(tag, 14, True) + 8 if tag else 0)
-    ui.text(x + 6, y + 3, ui.fit_name(c["name"], 15, True, name_room), 15, Theme.TEXT if standing else Theme.FAINT, bold=True)
+    ui.text(x + 6, y + 3, ui.fit_name(c["name"], 15, True, name_room), 15, Theme.TEXT if standing else Theme.FAINT, bold=True, grow="up")
     if tag:
         ui.text(x + w - 6, y + 3, tag, 14, Theme.ACCENT if tag.startswith(("TARGET", "ACTING")) else Theme.BAD, bold=True, align="right")
 
@@ -487,14 +491,15 @@ def draw_header(ui: UI, ctrl: AppController, view: dict[str, Any], fast: bool) -
     ui.text(1166, 12, f"Seed {view['seed']}   {'FAST' if fast else 'normal'} (F)", 14, Theme.FAINT, align="right")
     ui.text(12, 52, "Next:", 15, Theme.DIM, bold=True)
     x = 62.0
-    for position, cid in enumerate(view["forecast"][:8]):
-        name = names.get(cid, cid)
-        hero = cid.startswith("h")
-        ui.panel(x, 46, 146, 28, fill=Theme.PANEL, border=Theme.ACCENT if position == 0 else Theme.HERO if hero else Theme.ENEMY,
-                 width=2 if position == 0 else 1)
-        ui.sprite(ui.assets.combatant_key(ctrl.sprite_class(archetypes.get(cid, ""))), x + 3, 49, 22, 22)
-        ui.text(x + 28, 53, ui.fit_name(name, 13, False, 114), 13, Theme.TEXT)
-        x += 151
+    with ui.group():  # the names of the row have one size
+        for position, cid in enumerate(view["forecast"][:8]):
+            name = names.get(cid, cid)
+            hero = cid.startswith("h")
+            ui.panel(x, 46, 146, 28, fill=Theme.PANEL, border=Theme.ACCENT if position == 0 else Theme.HERO if hero else Theme.ENEMY,
+                     width=2 if position == 0 else 1)
+            ui.sprite(ui.assets.combatant_key(ctrl.sprite_class(archetypes.get(cid, ""))), x + 3, 49, 22, 22)
+            ui.text(x + 28, 53, ui.fit_name(name, 13, False, 114), 13, Theme.TEXT)
+            x += 151
 
 
 def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str, Any] | None:
@@ -558,14 +563,14 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
                     detail += f"   speed {face['action_speed']}   target: {face['target_label']}"
                 ui.text(x + 8, 598, detail, 13, Theme.FAINT, max_width=232)
             if die["reason"]:
-                ui.text(x + 8, 612, die["reason"], 13, Theme.WARN, bold=True, max_width=232)
+                ui.text(x + 8, 612, die["reason"], 13, Theme.WARN, bold=True, max_width=232, grow="down")
             elif in_plan:
-                ui.text(x + 8, 612, "IN PLAN", 13, Theme.ACCENT, bold=True)
+                ui.text(x + 8, 612, "IN PLAN", 13, Theme.ACCENT, bold=True, grow="down")
             elif awaiting:
-                ui.text(x + 8, 612, "CHOOSE A TARGET", 13, Theme.ACCENT, bold=True)
+                ui.text(x + 8, 612, "CHOOSE A TARGET", 13, Theme.ACCENT, bold=True, grow="down")
             elif die.get("skill_note"):
                 # An equipped skill widens what this face may do right now (Field Medic: a downed ally is a target).
-                ui.text(x + 8, 612, die["skill_note"], 13, Theme.GOOD, bold=True, max_width=232)
+                ui.text(x + 8, 612, die["skill_note"], 13, Theme.GOOD, bold=True, max_width=232, grow="down")
         keep_key = (pygame.K_z, pygame.K_x)[index]
         ui.button(f"die:{die['die_id']}:keep", x + 8, 628, 112, 48, "Unkeep" if die["kept"] else "Keep",
                   partial(ctrl.toggle_keep, die["die_id"]), selected=die["kept"], hotkeys=(keep_key,),
@@ -1073,13 +1078,14 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
         ui.escape_action = ctrl.close_career
         status_bar(ui, ctrl)
         return
-    for label, body in (
-        ("Schedule", f"{info['scheduling']['label']}: {info['scheduling']['summary']}"),
-        ("Passive", f"{info['passive']['name']}: {info['passive']['summary']}"),
-        ("Reaction", f"{info['reaction_def']['name']} ({info['reaction_def']['mana_cost']} mana): {info['reaction_def']['summary']}"),
-    ):
-        ui.text(x, y, label, 14, Theme.ACCENT, bold=True)
-        y = ui.paragraph(x + 76, y, body, 372, 14, Theme.DIM, line_height=17, max_lines=4) + 5
+    with ui.group():  # the three labels have one size; each body is a paragraph and decides for itself
+        for label, body in (
+            ("Schedule", f"{info['scheduling']['label']}: {info['scheduling']['summary']}"),
+            ("Passive", f"{info['passive']['name']}: {info['passive']['summary']}"),
+            ("Reaction", f"{info['reaction_def']['name']} ({info['reaction_def']['mana_cost']} mana): {info['reaction_def']['summary']}"),
+        ):
+            ui.text(x, y, label, 14, Theme.ACCENT, bold=True)
+            y = ui.paragraph(x + 76, y, body, 372, 14, Theme.DIM, line_height=17, max_lines=4) + 5
     for die in info["dice"]:
         y = draw_die_faces(ui, x, y + 2, 448, die, max_rows=6) + 4
     ui.button("career:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_career, hotkeys=(pygame.K_b,), default=True)

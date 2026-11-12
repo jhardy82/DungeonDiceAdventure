@@ -1811,6 +1811,91 @@ size follows on its own, because it needs a layout check on every screen.
 **Not verified:** no person has used them. High contrast was checked by measurement and by
 screenshots made in this session, not by a person who needs it.
 
+### 7.30 The configuration as decided (D-31), part 2b: text size (2026-11-12)
+
+**Owner decision (D-31):** "Text size (Normal, Large), with a layout check on every screen."
+
+| Setting | Group | Values | What it does |
+|---------|-------|--------|--------------|
+| Text size | Display and comfort | Normal (default), Large | Large draws text 15% larger (a 14 unit text becomes 16) wherever the whole text still fits |
+
+**The problem.** Every screen is drawn for a fixed 1280x720 layout. A larger text cannot push its
+neighbours away, so "make every font larger" breaks the screens: a first measurement with every
+font at 115% found about 80 places where texts ran into each other or out of their panels.
+
+**The rule that was built.** At Large, every frame is drawn in two passes.
+
+1. The frame is measured: where the ink of every text is at the normal size, and where it would
+   be at the larger size. Panels, buttons, pictures and bars are recorded too.
+2. Each text, in the order it is drawn, gets the larger size only if at that size it
+   - is still whole (a text with a width limit takes the largest size at which it fits, down to
+     the normal one, so Large never costs a letter);
+   - stays inside the panel or button it sits in;
+   - stays clear of every picture and bar it was clear of;
+   - keeps 5 units to every other text beside it (two texts that were already closer may grow
+     until they would overlap).
+3. The frame is drawn with those sizes.
+
+- **Paragraphs** have one size: the largest that needs no more lines than the normal size.
+  What follows a paragraph is therefore never pushed down.
+- **Groups.** Labels of one row or column grow together or not at all (the turn order, the
+  labels of a vocation's abilities), so a row never mixes two sizes.
+- **Order decides between neighbours:** the first one drawn grows first. A die face's rules
+  text is therefore drawn before its odds.
+- A text grows around the middle of its line; the two lines of a button grow away from each
+  other.
+- **Normal is untouched:** at the normal size nothing is measured and every text is drawn as
+  before.
+
+**Why not 200%.** Xbox Accessibility Guideline 101 asks for text that scales to 200%. That needs
+screens that reflow, which this fixed layout cannot do. Large is a modest step, stated as such
+in the setting's help text.
+
+**The layout check (the owner's condition).** `tests/ui/test_text_size.py` does not trust the
+rule above. It walks two tours through the game (39 states: menus, the four Settings groups,
+party setup, the seed entry, four career pages, the skills, a battle with rolled dice, a target
+choice, a plan with Field Medic, the inspect panel for an enemy and a hero, pause, Settings in a
+run, the upgrade with a card chosen, the boss battle, the decision after Battle 2, victory with
+awards, defeat). Every state is drawn at the normal and at the large size, and the two finished
+frames are compared text by text against the four conditions. It runs under three fonts (the
+system font, DejaVu Sans as the widest common one, and pygame's own) and two window sizes
+(1280x720 and 960x540).
+
+| Measured | Result |
+|----------|--------|
+| Layout problems at Large, all 12 combinations of font, window size and tour | 0 |
+| Share of texts drawn larger, system font | 92% to 94% |
+| Share of texts drawn larger, DejaVu Sans (widest) | 79% to 84% |
+| Share of texts drawn larger, pygame's own font | 94% to 97% |
+| Cost of a frame, battle with five heroes, this machine | 4.0 ms at Normal, 8.7 ms at Large (a 60 Hz frame has 16.7 ms) |
+
+- The check is tested itself: four small faults (a text beside another, a line below another, a
+  text that fills its panel, a text beside a picture) are drawn on the main menu. With the rule
+  on, the text keeps its size. With the rule switched off, the check reports exactly that fault.
+- A fault while a frame is measured reaches the error screen once, as any drawing fault does.
+
+**Known limits (stated, not hidden)**
+
+- A text with no room keeps its normal size. Neighbours can therefore differ in size: in a
+  vocation's details one ability's text may be larger than the next.
+- Long names in the turn order keep the whole row at the normal size.
+- Floating numbers in battle (damage, healing) are not enlarged.
+- Large costs about twice the drawing time, because every frame is measured first.
+
+**Evidence**
+
+- 1193 tests pass (1155 before); 38 of the new ones are in `tests/ui/test_text_size.py`. Lint and type checks are clean.
+- Replay pin, content and catalog unchanged. Both self-checks pass. The simulator on seeds 300
+  to 339 is identical to the stored reference.
+- **Deliberate breaks:** 34 breaks of the new code, each caught by a fitting test (four only after
+  the tests were tightened: a frame that faults while it is measured, a paragraph line measured
+  with the wrong words, and the two groups on the real screens). A thirty-fifth showed a line of
+  dead code, which was removed. Run without bytecode files and with a control run.
+
+**Not verified:** no person has read the Large size on a real display; the sizes were checked by
+measurement and by screenshots made in this session. The system font on Windows (Segoe UI) is
+first exercised by the Windows job of the pull request.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

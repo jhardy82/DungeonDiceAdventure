@@ -11,7 +11,7 @@ import os
 import pygame
 
 from battle_dice.app.controller import AppController, Screen
-from battle_dice.settings import TOOLTIP_DELAYS
+from battle_dice.settings import TEXT_SIZES, TOOLTIP_DELAYS
 from battle_dice.ui import screens
 from battle_dice.ui.toolkit import LOGICAL_H, LOGICAL_W, MIN_H, MIN_W, UI, apply_theme
 
@@ -101,10 +101,11 @@ class GameApp:
     # -- update and draw ---------------------------------------------------------------------
 
     def _apply_comfort(self) -> None:
-        """The palette and the help-text delay of the settings in use."""
+        """The palette, the text size and the help-text delay of the settings in use."""
         settings = self.controller.settings
         apply_theme("high_contrast" if settings.high_contrast else "normal")
         self.ui.tooltip_delay_ms = TOOLTIP_DELAYS[settings.tooltip_delay]
+        self.ui.text_scale = TEXT_SIZES[settings.text_size]
 
     def _follow_settings(self) -> None:
         """A setting changed in the Settings screen: apply what belongs to the window."""
@@ -153,8 +154,25 @@ class GameApp:
     def draw(self) -> None:
         ui, controller = self.ui, self.controller
         ui.begin(self.surface)
-        screen = controller.screen
+        if ui.text_scale > 1.0:
+            # A larger text size: the frame is measured first, so that a text grows only where it has room.
+            ui.plan_sizes(self._draw_screen)
+            ui.begin(self.surface)
         try:
+            self._draw_screen()
+        except Exception:  # noqa: BLE001 - a rendering fault must leave a usable error screen
+            controller.fail()
+            self.render_faults += 1
+            ui.begin(self.surface)
+            screens.draw_error(ui, controller)
+        ui.end()
+        if not self.headless:
+            pygame.display.flip()
+
+    def _draw_screen(self) -> None:
+        ui, controller = self.ui, self.controller
+        screen = controller.screen
+        if True:
             if screen == Screen.MAIN_MENU:
                 screens.draw_main_menu(ui, controller, self.quit)
             elif screen == Screen.CONTROLS:
@@ -177,14 +195,6 @@ class GameApp:
                 screens.draw_settings(ui, controller)
             else:
                 screens.draw_error(ui, controller)
-        except Exception:  # noqa: BLE001 - a rendering fault must leave a usable error screen
-            controller.fail()
-            self.render_faults += 1
-            ui.begin(self.surface)
-            screens.draw_error(ui, controller)
-        ui.end()
-        if not self.headless:
-            pygame.display.flip()
 
     def frame(self, dt_ms: float = 16.0) -> None:
         """One update + draw. Used by the main loop and by headless tests."""
