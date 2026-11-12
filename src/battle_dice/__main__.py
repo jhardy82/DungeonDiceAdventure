@@ -65,6 +65,10 @@ def run_smoke_test(report_path: str | None = None, features: frozenset[str] = fr
                 press(pygame.K_c)
                 if controller.screen != Screen.CAREER:
                     raise RuntimeError("C did not open the career screen")
+                press(pygame.K_k)  # the hero's skills, and back to the vocations
+                if controller.career_tab != "skills":
+                    raise RuntimeError("K did not show the hero's skills")
+                press(pygame.K_k)
                 press(pygame.K_ESCAPE)
                 if controller.screen != Screen.PARTY_SETUP:
                     raise RuntimeError("Esc did not leave the career screen")

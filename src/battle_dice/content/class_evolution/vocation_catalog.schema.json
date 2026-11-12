@@ -1363,7 +1363,7 @@
           "minLength": 1
         },
         "engine_support": {
-          "const": "new"
+          "$ref": "#/$defs/engine_support"
         }
       }
     },

@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1038 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1071 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -277,6 +277,12 @@ What changes with the gate on:
 - **Career** (the button on a party slot or a roster row) lists what a hero has mastered and
   what it can become. Vocations that are not discovered show as `???`. A vocation the rules
   cannot run yet is marked "Coming later".
+- **Skills** (key K on the Career screen) lists the skills a hero has learned and lets you equip
+  them between runs. A mastered vocation teaches one. The first that works in battle is the
+  Guardian's **Field Medic**: once per battle its Heal may bring a downed ally back at 1 HP, for
+  1 more mana. The die says so when it can ("Field Medic: revive for 2 mana"), and the downed
+  ally becomes a target. A skill the rules of battle do not know yet is listed and cannot be
+  equipped.
 - **After Battle 2** you may end the run with a victory or fight a third battle. Losing it
   loses the run; mastery already earned is kept.
 - **The save file** is `saves/profile.sqlite` beside the `logs` folder (the per-user application
@@ -308,7 +314,7 @@ to the next value; the change is saved at once and takes effect at once.
 | Third battle | Offered (default), Not offered | The optional third battle after Battle 2 |
 | Mastery pace | Normal (default), Fast, Very fast | How many points a rank needs. Fast asks for about half; Very fast for one point a rank. Heroes are re-ranked from the points they have |
 | Roster size | 6, 12 (default), 24 | How many heroes a profile may hold (1 to 50 in the file) |
-| New profile starts as | Fresh (default); a Squire one win from mastery; a Guardian at rank 1; a mastered Guardian | What a new or reset profile holds. Lets the evolution be shown in minutes |
+| New profile starts as | Fresh (default); a Squire one win from mastery; a Guardian at rank 1; a mastered Guardian with Field Medic equipped | What a new or reset profile holds. Lets the evolution be shown in minutes |
 | Dice seed | A new one each run (default), Fixed | A fixed seed gives the same dice every run |
 | Animation | On (default), Off | Reduced motion |
 | Window size | 960x540, 1280x720 (default), 1600x900, 1920x1080 | The window can also be dragged to any size |

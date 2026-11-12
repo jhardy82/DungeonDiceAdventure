@@ -110,7 +110,7 @@ def test_rewards_that_always_clamp_to_zero_are_warnings(pristine: Json, shipped:
 
 
 def test_catalog_shape_and_counts(pristine: Json) -> None:
-    assert pristine["catalog_version"] == "0.3.0"  # 0.3.0: the Guardian is playable (its passive is in the engine)
+    assert pristine["catalog_version"] == "0.4.0"  # 0.3.0: the Guardian is playable; 0.4.0: its skill Field Medic works in battle
     assert pristine["baseline"] == {"rules_version": "1.1.1", "content_version": "1.3.1"}
     assert {wave: [v["id"] for v in pristine["vocations"] if v["wave"] == wave] for wave in WAVES} == WAVES
     assert len(pristine["face_library"]) == 12 and len(pristine["dice"]) == 23

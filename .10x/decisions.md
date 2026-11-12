@@ -65,3 +65,20 @@ Started: 2026-11-11
 - **Trade-offs accepted:** The demo ships numbers the owner has not approved. They are labelled
   as defaults and measured only by a simulated player.
 - **Impacts:** Vocation catalog, balance evidence, the demo's tuning file.
+
+### 2026-11-12 — Engineer: how Field Medic works, and what the skills panel offers
+- **Decision:** Field Medic applies to any Healing face with one ally as its target that the
+  hero rolls and that cannot revive; once per encounter it may be used on a downed ally for 1
+  more mana, bringing the ally back at 1 HP. Skills are equipped on the Career screen between
+  runs. A skill the rules of battle do not know (today: Squire Anchor) is listed and cannot be
+  equipped.
+- **Why:** The owner decided that Field Medic works in battle in the first slice (D-27). The
+  catalog says "one equipped Healing face" without a way to choose one, and fixture CE-29 shows
+  the revival as an option on the face.
+- **Alternatives considered:** Letting the player mark one face for the skill (more screens,
+  no gain while a Guardian has one Healing face); letting Squire Anchor be equipped with a
+  warning.
+- **Trade-offs accepted:** The reading is the builder's. Measured with the simulated player the
+  skill changes nothing (it rarely has the 2 mana); the cost was not tuned.
+- **Impacts:** Rules (`core/skills.py`), vocation catalog 0.4.0, save link, Career screen, docs
+  (`docs/DECISION_LOG.md`, section 7.20).

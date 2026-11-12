@@ -219,6 +219,8 @@ def test_a_new_profile_starts_as_its_preset_says(tmp_path: Path, preset, heroes,
         assert (hero.active_vocation_id, hero.mastery[active].rank, hero.mastery[active].points, hero.unlocked_vocations) == (active, rank, points, unlocked)
         assert [h.active_vocation_id for h in link.state.heroes.values()][1:] == ["scout", "apprentice"]
         assert ("guardian_field_medic" in hero.learned_skills) == (preset == "guardian_mastered")
+        # The mastered Guardian starts with its skill equipped, so the demo shows it working at once.
+        assert hero.equipped_skills == ({0: "guardian_field_medic"} if preset == "guardian_mastered" else {})
         # Handed-out mastery is in the event log under its own name, with its reason.
         granted = link.store.conn.execute("SELECT event_json FROM progression_event_log WHERE event_type = 'MasteryGranted'").fetchall()
         assert granted and all(f"demo preset {preset}" in row[0] for row in granted)
@@ -227,6 +229,8 @@ def test_a_new_profile_starts_as_its_preset_says(tmp_path: Path, preset, heroes,
     # The preset is for a new profile only: opening the save again with another preset changes nothing.
     again = Progression(tmp_path, packaged_content(), preset="guardian_mastered")
     assert len(again.state.heroes) == heroes and (first is None or again.state.heroes["hero_001"].mastery[first[0]].points == first[2])
+    if preset == "guardian_mastered":
+        assert again.state.heroes["hero_001"].equipped_skills == {0: "guardian_field_medic"}, "an equipped skill is saved"
     again.close()
 
 
@@ -278,3 +282,103 @@ def test_the_roster_size_is_a_setting(tmp_path: Path):
     full = link.recruit("scout")
     assert (full.error_code, full.error_details) == ("ROSTER_FULL", {"roster_limit": 2, "heroes": 2})
     link.close()
+
+
+# --------------------------------------------------------------------------------------------
+# Skills (Phase 4, step E)
+# --------------------------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def medic(tmp_path: Path):
+    """A new profile with a mastered Guardian (Field Medic equipped), a Scout and an Apprentice."""
+    link = Progression(tmp_path, packaged_content(), preset="guardian_mastered", clock=lambda: "2026-11-12T10:00:00Z")
+    yield link
+    link.close()
+
+
+def test_the_skills_of_a_hero_say_what_is_equipped_and_why_another_cannot_be(medic: Progression):
+    view = medic.skills("hero_001")
+    assert (view["capacity"], view["used"], view["vocation_name"]) == (4, 0, "Guardian")
+    assert [row["skill_id"] for row in view["rows"]] == ["squire_anchor", "guardian_field_medic"]
+    anchor, field_medic = view["rows"]
+    assert (field_medic["name"], field_medic["taught_by"], field_medic["cost"], field_medic["equipped"], field_medic["slot_index"]) == (
+        "Guardian Field Medic", "Guardian", 0, True, 0)
+    assert field_medic["in_battle"] and field_medic["problem"] is None
+    assert (anchor["taught_by"], anchor["cost"], anchor["equipped"], anchor["slot_index"], anchor["in_battle"]) == ("Squire", 1, False, None, False)
+    assert anchor["problem"] == "Not in this version yet: the rules of battle do not know this skill."
+    assert medic.skills("hero_002") == {"capacity": 2, "used": 0, "vocation_name": "Scout", "rows": []}
+
+
+def test_a_skill_is_taken_off_and_put_back_in_the_first_free_slot(medic: Progression):
+    hero = medic.state.heroes["hero_001"]
+    assert medic.unequip_skill("hero_001", "guardian_field_medic").accepted and hero.equipped_skills == {}
+    assert medic.skills("hero_001")["rows"][1]["problem"] is None, "a learned skill that fits can be equipped"
+    assert medic.unequip_skill("hero_001", "guardian_field_medic").accepted and hero.equipped_skills == {}, "taking off what is not on changes nothing"
+    assert medic.equip_skill("hero_001", "squire_anchor").accepted  # the career rules allow it; only the screen holds it back
+    assert medic.equip_skill("hero_001", "guardian_field_medic").accepted
+    assert hero.equipped_skills == {0: "squire_anchor", 1: "guardian_field_medic"}
+    assert medic.skills("hero_001")["used"] == 1 and medic.snapshot("hero_001")["skills"] == ["squire_anchor", "guardian_field_medic"]
+    assert medic.unequip_skill("hero_001", "squire_anchor").accepted and hero.equipped_skills == {1: "guardian_field_medic"}
+    assert medic.equip_skill("hero_001", "squire_anchor").accepted and hero.equipped_skills == {0: "squire_anchor", 1: "guardian_field_medic"}
+    # The skill that is named is the one taken off, whichever slot it is in.
+    assert medic.unequip_skill("hero_001", "guardian_field_medic").accepted and hero.equipped_skills == {0: "squire_anchor"}
+
+
+def test_away_from_its_vocation_a_skill_costs_capacity_the_hero_may_not_have(medic: Progression):
+    assert medic.change("hero_001", "squire").accepted
+    hero = medic.state.heroes["hero_001"]
+    assert hero.equipped_skills == {}, "Field Medic needs 3 capacity away from the Guardian; a Squire has 2"
+    field_medic = medic.skills("hero_001")["rows"][1]
+    assert (field_medic["cost"], field_medic["problem"]) == (3, "Needs 3 capacity; 2 of 2 is free.")
+    refused = medic.equip_skill("hero_001", "guardian_field_medic")
+    assert not refused.accepted and refused.error_code == "CAPACITY_EXCEEDED"
+
+
+def test_an_equipped_skill_goes_into_the_run_and_works_there(medic: Progression, vocations):
+    from battle_dice.core import skills
+    from tests.conftest import action, begin_hero, commit, down, finish_activation, unit
+
+    engine = start(medic, vocations)
+    assert engine.build("h01").skills == (skills.FIELD_MEDIC,) and engine.build("h02").skills == ()
+    locked = medic.unequip_skill("hero_001", "guardian_field_medic")
+    assert not locked.accepted and locked.error_code == "PHASE_LOCKED", "a build does not change during a run"
+    down(engine, "h02")
+    begin_hero(engine, "h01", guardian_d4=1, guardian_d6=5)
+    unit(engine, "h01").mana = 2
+    commit(engine, action("guardian_d6", "h02"))
+    finish_activation(engine)
+    assert (unit(engine, "h02").state, unit(engine, "h02").hp) == ("standing", 1)
+    medic.sync(engine)  # the save follows the run as before; a revival changes nothing in what it records
+    assert medic.state.run is not None and medic.state.run.phase == "battle"
+
+
+def test_whole_runs_with_field_medic_equipped_end_and_replay(vocations):
+    """Eight whole runs by the informed simulated player. It uses the skill when it can pay for it (seed 503)."""
+    from battle_dice.core import skills
+    from battle_dice.core.events import EventType, events_hash, state_hash
+    from battle_dice.core.replay import export_run, verify
+    from battle_dice.sim.policies import play_run
+
+    shape = [("guardian", "front"), ("scout", "back"), ("apprentice", "back")]
+    used: dict[int, int] = {}
+    for seed in range(500, 508):
+        party = [{"class_id": class_id, "row": row, "hero": {"hero_id": f"hero_{n:03d}", "skills": [skills.FIELD_MEDIC] if class_id == "guardian" else []}}
+                 for n, (class_id, row) in enumerate(shape, start=1)]
+        engine = Engine(packaged_content(), vocations)
+        ok(engine.do(cmd.START_RUN, seed=seed, party=party, encounters=["training_04"]))
+        play_run(engine, HeuristicPolicy())
+        assert engine.finished()
+        battle = 0
+        per_battle: dict[int, int] = {}
+        for event in engine.events:
+            if event.type == EventType.BATTLE_STARTED:
+                battle = event.delta["battle"]
+            elif event.type == EventType.ACTION_RESOLVED and event.delta.get("name") == "Heal (Field Medic)":
+                per_battle[battle] = per_battle.get(battle, 0) + 1
+        assert all(count == 1 for count in per_battle.values()), "once per encounter"
+        used[seed] = sum(per_battle.values())
+        if used[seed]:
+            again = verify(packaged_content(), export_run(engine))
+            assert (events_hash(again.events), state_hash(again.state)) == (events_hash(engine.events), state_hash(engine.state))
+    assert used[503] == 1, used
