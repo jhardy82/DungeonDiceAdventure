@@ -107,6 +107,12 @@ class DrawnText:
     normal_pixels: int   # the font size it has at the normal text size
 
 
+def overlap_depth(first: pygame.Rect, second: pygame.Rect) -> int:
+    """How far two boxes reach into each other, in pixels: 0 when they do not overlap."""
+    shared = first.clip(second)
+    return min(shared.width, shared.height)
+
+
 @dataclass(frozen=True)
 class _Measured:
     """A text of the frame being measured: where its ink is at the normal size, and where it would be if it grew."""
@@ -408,24 +414,22 @@ class UI:
         boxes = [*self._boxes, self.surface.get_rect()]
         near = 2 * self.px(TEXT_CLEARANCE)
         occupied = [item.normal for item in items]  # where each text is, as far as decided: normal until it grows
-        grown = [False] * len(items)
         groups: dict[int, list[int]] = {}
         for index, item in enumerate(items):
             if item.group is not None:
                 groups.setdefault(item.group, []).append(index)
 
         def apart(first: pygame.Rect, second: pygame.Rect, first_normal: pygame.Rect, second_normal: pygame.Rect) -> bool:
-            """Two texts keep their distance; two that were already close do not start to overlap; an overlap may stay."""
+            """Two texts keep their distance; two that were already closer do not start to overlap; and where the
+            layout lets two lines' boxes overlap (a descender above a capital), they do not overlap any deeper."""
             if not first.inflate(near, 0).colliderect(second):
                 return True
             if not first_normal.inflate(near, 0).colliderect(second_normal):
                 return False
-            return first_normal.colliderect(second_normal) or not first.colliderect(second)
+            return overlap_depth(first, second) <= overlap_depth(first_normal, second_normal)
 
         def fits(index: int, members: list[int]) -> bool:
             item = items[index]
-            if item.wanted <= item.normal_pixels:
-                return False
             homes = [box for box in boxes if box.contains(item.normal)]
             if homes and not min(homes, key=lambda box: box.w * box.h).contains(item.large):
                 return False
@@ -436,16 +440,20 @@ class UI:
                     return False
             return all(apart(item.large, items[other].large, item.normal, items[other].normal) for other in members if other > index)
 
+        sizes = [item.normal_pixels for item in items]
         decided: set[int] = set()
         for index, item in enumerate(items):
             if index in decided:
                 continue
             members = groups[item.group] if item.group is not None else [index]
             decided.update(members)
-            if all(fits(member, members) for member in members):
+            # A group has one size: every member grows by as much as the member with the least room for it can.
+            # (Each member was measured at the size it wanted itself, which is no smaller: that errs on the safe side.)
+            step = min(items[member].wanted - items[member].normal_pixels for member in members)
+            if step > 0 and all(fits(member, members) for member in members):
                 for member in members:
-                    grown[member], occupied[member] = True, items[member].large
-        return [(item.text, item.wanted if grown[index] else item.normal_pixels) for index, item in enumerate(items)]
+                    occupied[member], sizes[member] = items[member].large, items[member].normal_pixels + step
+        return [(item.text, sizes[index]) for index, item in enumerate(items)]
 
     def wrap_lines(self, text: str, width: float, size: int = 16, bold: bool = False) -> list[str]:
         """The lines of ``text`` at the normal text size."""
@@ -484,15 +492,15 @@ class UI:
             return lines, all(font.size(line)[0] <= limit for line in lines)
 
         normal = self._pixels(size)
-        lines, whole = laid_out(normal)
+        lines, _ = laid_out(normal)
         pixels = normal
         if self.text_scale > 1.0:
-            # The whole paragraph has one size: the largest that needs no more lines than the normal size and cuts no
-            # line the normal size leaves whole. What follows a paragraph is placed for its normal height.
+            # The whole paragraph has one size: the largest that needs no more lines than the normal size and leaves
+            # every line whole. What follows a paragraph is placed for its normal height.
             larger, wanted = lines, normal
             for candidate in self._sizes(size)[:-1]:
                 tried, tried_whole = laid_out(candidate)
-                if len(tried) == len(lines) and (tried_whole or not whole):
+                if len(tried) == len(lines) and tried_whole:
                     larger, wanted = tried, candidate
                     break
             if self._measuring:
