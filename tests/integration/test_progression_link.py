@@ -348,7 +348,7 @@ def test_an_equipped_skill_goes_into_the_run_and_works_there(medic: Progression,
     unit(engine, "h01").mana = 2
     commit(engine, action("guardian_d6", "h02"))
     finish_activation(engine)
-    assert (unit(engine, "h02").state, unit(engine, "h02").hp) == ("standing", 1)
+    assert (unit(engine, "h02").state, unit(engine, "h02").hp) == ("standing", 5)
     medic.sync(engine)  # the save follows the run as before; a revival changes nothing in what it records
     assert medic.state.run is not None and medic.state.run.phase == "battle"
 

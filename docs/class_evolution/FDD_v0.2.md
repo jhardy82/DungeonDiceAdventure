@@ -314,6 +314,8 @@ names.
    - **Owner decisions of 2026-11-12** (`docs/DECISION_LOG.md`, section 7.24): the Guardian's
      numbers and the third battle's enemy table are accepted as built (D-28); a hero may also
      change vocation at the decision to stop or fight on after Battle 2 (D-29, beyond CE-19).
+     Field Medic, after a measurement: no extra mana, the ally comes back at 5 HP (D-30,
+     section 7.27; catalog 0.5.0). This replaces "revive to 1 HP ... if it costs +1 mana".
 
 ## 11. Risks
 

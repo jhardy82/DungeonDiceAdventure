@@ -66,7 +66,7 @@ def test_every_vocation_is_either_playable_or_refused_with_a_reason(catalog):
     assert sorted(catalog.builds) == ["apprentice", "guardian", "ranger", "scout", "squire"]
     assert set(catalog.unsupported) == set(NOT_YET)
     assert len(catalog.builds) + len(catalog.unsupported) == 14
-    assert catalog.version == "0.4.0" and len(catalog.sha256) == 64
+    assert catalog.version == "0.5.0" and len(catalog.sha256) == 64
     assert all(catalog.known(v) for v in [*catalog.builds, *catalog.unsupported]) and not catalog.known("paladin")
 
 

@@ -1,7 +1,7 @@
 """Field Medic in battle (Class Evolution Phase 4, step E).
 
 Mastering the Guardian teaches Field Medic. Equipped, it lets a Healing face that cannot revive
-bring a downed ally back at 1 HP, once per encounter, for 1 more mana. Owner decision of
+bring a downed ally back at 5 HP, once per encounter, for the face's own mana (D-30). Owner decision of
 2026-11-11 (D-27): it works in battle in the first slice.
 """
 
@@ -73,21 +73,26 @@ def test_the_guardians_heal_cannot_revive_on_its_own(catalog):
     assert "h02" not in option["eligible_target_ids"]
 
 
-def test_with_field_medic_the_heal_revives_a_downed_ally_to_one_hp_for_one_more_mana(catalog):
+def test_the_numbers_are_the_owners_decision():
+    """D-30 (2026-11-12, after the measurement of decision log 7.25): no extra mana, back at 5 HP."""
+    assert (skills.FIELD_MEDIC_EXTRA_MANA, skills.FIELD_MEDIC_REVIVE_HP) == (0, 5)
+
+
+def test_with_field_medic_the_heal_revives_a_downed_ally_to_five_hp_for_its_own_mana(catalog):
     engine = with_a_downed_scout(catalog)
     option = die_option(engine, "guardian_d6")
     assert option["eligible_target_ids"] == ["h01", "h02"], "the downed ally is offered as a target"
     ok(engine.do(cmd.SET_ACTION_PLAN, actions=[action("guardian_d6", "h02")]))
     intent = engine.combat.turn.plan[0]
-    assert intent.costs == {"mana": 2} and skills.FIELD_MEDIC_TAG in intent.tags and intent.name == "Heal (Field Medic)"
+    assert intent.costs == {"mana": 1} and skills.FIELD_MEDIC_TAG in intent.tags and intent.name == "Heal (Field Medic)"
     ok(engine.do(cmd.COMMIT_ACTION_PLAN))
     finish_activation(engine)
     guardian, scout = unit(engine, "h01"), unit(engine, "h02")
-    assert (scout.state, scout.hp) == (STATE_STANDING, 1) and guardian.mana == 0
+    assert (scout.state, scout.hp, scout.max_hp) == (STATE_STANDING, 5, 9) and guardian.mana == 1
     assert guardian.skill_uses == {skills.FIELD_MEDIC: 1}
     resolved = [e for e in events_of(engine, EventType.ACTION_RESOLVED) if e.actor_id == "h01"][-1]
-    assert resolved.delta["name"] == "Heal (Field Medic)" and resolved.delta["mana_spent"] == 2
-    assert [(r["type"], r["target"], r["healed"], r["revived"]) for r in resolved.delta["results"]] == [("heal", "h02", 1, True)]
+    assert resolved.delta["name"] == "Heal (Field Medic)" and resolved.delta["mana_spent"] == 1
+    assert [(r["type"], r["target"], r["healed"], r["revived"]) for r in resolved.delta["results"]] == [("heal", "h02", 5, True)]
     assert [e.delta["id"] for e in events_of(engine, EventType.HERO_REVIVED)] == ["h02"]
 
 
@@ -130,13 +135,17 @@ def win_battle_as_guardian(engine: Engine) -> None:
 
 def test_too_little_mana_for_the_revival_is_refused_for_the_mana(catalog):
     """The situation of fixture CE-29: the target is legal through the skill, so the mana check is the one that fails."""
-    engine = with_a_downed_scout(catalog, mana=1)  # the heal itself costs 1; the revival costs 2
+    engine = with_a_downed_scout(catalog, mana=0)  # the revival costs what the Heal costs: 1
     before = state_hash(engine.state)
     result = engine.do(cmd.SET_ACTION_PLAN, actions=[action("guardian_d6", "h02")])
-    assert not result.accepted and result.code == "INSUFFICIENT_MANA" and "needs 2 mana but only 1" in (result.reason or "")
+    assert not result.accepted and result.code == "INSUFFICIENT_MANA"
+    assert result.reason == "Heal (Field Medic) needs 1 mana but only 0 will be available."
     assert state_hash(engine.state) == before and unit(engine, "h02").state == STATE_DOWNED and unit(engine, "h01").skill_uses == {}
-    ok(engine.do(cmd.SET_ACTION_PLAN, actions=[action("guardian_d6", "h01")]))  # on a standing ally the heal is the plain heal
-    assert engine.combat.turn.plan[0].costs == {"mana": 1} and skills.FIELD_MEDIC_TAG not in engine.combat.turn.plan[0].tags
+    enough = with_a_downed_scout(catalog, mana=1)
+    ok(enough.do(cmd.SET_ACTION_PLAN, actions=[action("guardian_d6", "h01")]))  # on a standing ally the heal is the plain heal
+    assert enough.combat.turn.plan[0].costs == {"mana": 1} and skills.FIELD_MEDIC_TAG not in enough.combat.turn.plan[0].tags
+    ok(enough.do(cmd.SET_ACTION_PLAN, actions=[action("guardian_d6", "h02")]))  # and 1 mana pays for the revival too
+    assert enough.combat.turn.plan[0].costs == {"mana": 1} and skills.FIELD_MEDIC_TAG in enough.combat.turn.plan[0].tags
 
 
 def test_on_a_standing_ally_the_face_is_what_it_always_was_and_the_skill_stays_ready(catalog):
@@ -156,7 +165,7 @@ def test_a_face_that_already_revives_or_is_not_a_heal_is_not_changed(catalog):
     assert skills.field_medic_ready(engine, guardian, plain_heal)
     assert not any(skills.field_medic_ready(engine, guardian, face) for face in (guard, strike, rally))
     changed = skills.as_field_medic(plain_heal)
-    assert (changed.can_revive, changed.mana_cost, changed.effects) == (True, 2, [{**plain_heal.effects[0], "amount": 1}])
+    assert (changed.can_revive, changed.mana_cost, changed.effects) == (True, 1, [{**plain_heal.effects[0], "amount": 5}])
     assert plain_heal.can_revive is False and plain_heal.mana_cost == 1, "the die's own face is not altered"
     assert skills.KNOWN == (skills.FIELD_MEDIC,)
 
@@ -208,7 +217,7 @@ def kept_plan(engine: Engine) -> list[dict]:
 def test_the_simulated_player_revives_with_field_medic_when_it_can_pay(catalog):
     engine = with_a_downed_scout(catalog, mana=2)
     assert {"die_id": "guardian_d6", "target_ids": ["h02"]} in kept_plan(engine)
-    poor = with_a_downed_scout(catalog, mana=1)
+    poor = with_a_downed_scout(catalog, mana=0)
     assert all(a["target_ids"] != ["h02"] for a in kept_plan(poor)), "it never proposes a plan the rules would refuse"
     without = with_a_downed_scout(catalog, mana=2, equipped=False)
     assert all(a["target_ids"] != ["h02"] for a in kept_plan(without))
@@ -235,7 +244,7 @@ def test_one_plan_cannot_hold_two_field_medic_revivals(catalog):
     twice = engine.do(cmd.SET_ACTION_PLAN, actions=[action("guardian_d6", "h02"), action("guardian_d4", "h03")])
     assert not twice.accepted and twice.code == "TARGET_DOWNED" and twice.reason == "Field Medic can revive once per encounter."
     ok(engine.do(cmd.SET_ACTION_PLAN, actions=[action("guardian_d6", "h02"), action("guardian_d4", "h01")]))
-    assert [(i.name, i.costs["mana"]) for i in engine.combat.turn.plan] == [("Heal (Field Medic)", 2), ("Heal", 1)]
+    assert [(i.name, i.costs["mana"]) for i in engine.combat.turn.plan] == [("Heal (Field Medic)", 1), ("Heal", 1)]
 
 
 def test_the_catalog_and_the_rules_agree_on_which_skills_work_in_battle(catalog):
@@ -247,3 +256,19 @@ def test_the_catalog_and_the_rules_agree_on_which_skills_work_in_battle(catalog)
     assert supported == sorted(skills.KNOWN) == ["guardian_field_medic"]
     gap = next(gap for gap in raw["engine_gaps"] if gap["id"] == "inherited_skills")
     assert "skill:guardian_field_medic" not in gap["used_by"] and "skill:squire_anchor" in gap["used_by"]
+
+
+def test_a_revival_never_gives_more_health_than_the_ally_can_hold(catalog):
+    engine = with_a_downed_scout(catalog)
+    unit(engine, "h02").max_hp = 3
+    commit(engine, action("guardian_d6", "h02"))
+    finish_activation(engine)
+    assert (unit(engine, "h02").state, unit(engine, "h02").hp) == (STATE_STANDING, 3)
+
+
+def test_the_catalog_describes_the_skill_with_the_decided_numbers():
+    from battle_dice.content.vocations import load_catalog
+
+    summary = next(skill["summary"] for skill in load_catalog()["skills"] if skill["id"] == skills.FIELD_MEDIC)
+    assert f"comes back at {skills.FIELD_MEDIC_REVIVE_HP} HP" in summary and "own mana cost" in summary and "+1 mana" not in summary
+    assert skills.field_medic_note(packaged_content().die("iron_d6").faces[4]) == "Field Medic: revive at 5 HP"

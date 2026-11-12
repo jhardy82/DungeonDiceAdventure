@@ -770,13 +770,13 @@ def test_field_medic_is_offered_on_the_die_and_revives_the_downed_ally(tmp_path,
     engine = in_a_battle_with_a_downed_scout(play)
     assert engine.build("h01").skills == ("guardian_field_medic",)
     die = heal_die(play)
-    assert (die["skill_note"], die["skill_target_ids"], die["eligible_target_ids"]) == ("Field Medic: revive for 2 mana", ["h02"], ["h01", "h02"])
-    assert "Field Medic: revive for 2 mana" in drawn and "Field Medic: revive for 2 mana" not in shortened
+    assert (die["skill_note"], die["skill_target_ids"], die["eligible_target_ids"]) == ("Field Medic: revive at 5 HP", ["h02"], ["h01", "h02"])
+    assert "Field Medic: revive at 5 HP" in drawn and "Field Medic: revive at 5 HP" not in shortened
     play.click("die:guardian_d6:use")
-    assert play.ctrl.message == "Choose a target for Heal (Esc cancels). Field Medic: revive for 2 mana (once per battle)."
+    assert play.ctrl.message == "Choose a target for Heal (Esc cancels). Field Medic: revive at 5 HP (once per battle)."
     play.click("unit:h02")
     assert play.ctrl.draft == [{"die_id": "guardian_d6", "target_ids": ["h02"]}] and not play.ctrl.message_is_error
-    assert any(text.startswith("1. Heal (Field Medic) -> Scout 2") and "2 mana" in text for text in drawn), "the plan names the dearer action"
+    assert any(text.startswith("1. Heal (Field Medic) -> Scout 2") and "1 mana" in text for text in drawn), "the plan names the revival and its cost"
     play.ctrl.confirm_plan()
     for _ in range(40):
         if unit(engine, "h02").state == "standing":
@@ -787,16 +787,16 @@ def test_field_medic_is_offered_on_the_die_and_revives_the_downed_ally(tmp_path,
             break
         assert engine.do(cmd.ADVANCE_PHASE).accepted
     scout, guardian = unit(engine, "h02"), unit(engine, "h01")
-    assert (scout.state, scout.hp, guardian.mana) == ("standing", 1, 0) and guardian.skill_uses == {"guardian_field_medic": 1}
+    assert (scout.state, scout.hp, guardian.mana) == ("standing", 5, 1) and guardian.skill_uses == {"guardian_field_medic": 1}
     assert play.app.render_faults == 0 and not [text for text in shortened if "Field Medic" in text]
 
 
 def test_too_little_mana_for_the_revival_is_said_in_the_plan(tmp_path):
     play = medic_game(tmp_path)
-    in_a_battle_with_a_downed_scout(play, mana=1)
+    in_a_battle_with_a_downed_scout(play, mana=0)
     play.click("die:guardian_d6:use")
     play.click("unit:h02")
-    assert play.ctrl.message == "Heal (Field Medic) needs 2 mana but only 1 will be available." and play.ctrl.message_is_error
+    assert play.ctrl.message == "Heal (Field Medic) needs 1 mana but only 0 will be available." and play.ctrl.message_is_error
     assert play.ui.widget("plan:confirm").enabled is False
 
 
@@ -849,7 +849,7 @@ def test_no_text_is_cut_off_on_the_skills_panel_or_with_field_medic_in_battle(tm
     play.click("unit:h02")
     # The battle screen shortens some long names under the widest font, as it always did; what Field Medic adds must fit.
     added = [text for text in drawn if "Field Medic" in text]
-    assert "Field Medic: revive for 2 mana" in added and any(text.startswith("1. Heal (Field Medic)") for text in added)
+    assert "Field Medic: revive at 5 HP" in added and any(text.startswith("1. Heal (Field Medic)") for text in added)
     assert not [text for text in shortened if "Field Medic" in text], shortened
     assert play.app.render_faults == 0
 
