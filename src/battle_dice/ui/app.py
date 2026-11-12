@@ -63,6 +63,24 @@ class GameApp:
             self.controller.fail()
 
     def _route(self, event: pygame.event.Event) -> None:
+        if self.controller.seed_entry is not None and self.controller.screen != Screen.PARTY_SETUP:
+            self.controller.seed_entry = None  # the player left the New Run screen: nothing is being typed any more
+        if event.type == pygame.KEYDOWN and self.controller.seed_entry is not None:
+            # A dice seed is being typed on the New Run screen: every key belongs to the entry until it ends.
+            key = event.key
+            if pygame.K_0 <= key <= pygame.K_9:
+                self.controller.seed_key(str(key - pygame.K_0))
+            elif pygame.K_KP1 <= key <= pygame.K_KP9:
+                self.controller.seed_key(str(key - pygame.K_KP1 + 1))
+            elif key == pygame.K_KP0:
+                self.controller.seed_key("0")
+            elif key == pygame.K_BACKSPACE:
+                self.controller.seed_key("backspace")
+            elif key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self.controller.seed_key("enter")
+            elif key == pygame.K_ESCAPE:
+                self.controller.seed_key("escape")
+            return
         if event.type == pygame.KEYDOWN and self.controller.screen == Screen.BATTLE and not self.controller.paused:
             if event.key == pygame.K_f:
                 self.fast = not self.fast

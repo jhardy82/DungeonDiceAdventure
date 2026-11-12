@@ -136,6 +136,14 @@ class AppController:
         self.paused = False
         self.pause_help = False
         self.fixed_seed = fixed_seed if fixed_seed is not None else self.settings.seed
+        #: Settings screen: the group shown, where Back leads, and whether a run waits behind it.
+        self.settings_tab = "comfort"
+        self.settings_return = Screen.MAIN_MENU
+        self.settings_in_run = False
+        self.defaults_confirm = False
+        self.controls_return = Screen.MAIN_MENU
+        #: New Run screen: the digits typed so far while a dice seed is being entered, else ``None``.
+        self.seed_entry: str | None = None
         self._seed_from_flag = fixed_seed is not None
         self._seed_source = seed_source or default_seed
         self.log_dir = Path(log_dir) if log_dir is not None else default_log_dir()
@@ -257,7 +265,79 @@ class AppController:
         self.info("Add 1 to 5 heroes, set their rows, then begin.")
 
     def show_controls(self) -> None:
+        if self.screen != Screen.CONTROLS:
+            self.controls_return = self.screen
         self.screen = Screen.CONTROLS
+
+    def close_controls(self) -> None:
+        """Back from the controls help to where it was opened: the main menu or the Settings."""
+        if self.controls_return == Screen.SETTINGS:
+            self.screen = Screen.SETTINGS
+        else:
+            self.to_main_menu()
+
+    # -- the dice seed of the next run (New Run screen) --------------------------------------------
+
+    SEED_DIGITS = 20  # 2^64 - 1 has 20 digits
+
+    def seed_view(self) -> dict[str, Any]:
+        """The seed control of the New Run screen: what it shows, and why it cannot be changed when it cannot."""
+        if self.seed_entry is not None:
+            label = f"Seed: {self.seed_entry}_"
+            hint = "type digits, Enter to set, Esc to cancel"
+        elif self.fixed_seed is None:
+            label, hint = "Dice seed: random", "press D to type a seed"
+        else:
+            label, hint = f"Dice seed: {self.fixed_seed}", "press D for a random seed"
+        return {"label": label, "hint": hint, "entering": self.seed_entry is not None, "seed": self.fixed_seed,
+                "reason": "Set by a launch flag for this session." if self._seed_from_flag else None}
+
+    def toggle_seed(self) -> None:
+        """Random seed: start typing one. Fixed seed: back to a random one each run."""
+        if self._seed_from_flag:
+            self.warn("The dice seed is set by a launch flag for this session.")
+        elif self.seed_entry is not None:
+            self.confirm_seed()
+        elif self.fixed_seed is None:
+            self.seed_entry = ""
+            self.info("Type a dice seed (digits). Enter sets it, Esc cancels. The same seed, party and choices give the same run.")
+        else:
+            self._set_seed(None)
+            self.info("Dice seed: a new one each run.")
+
+    def seed_key(self, key: str) -> None:
+        """One key while a seed is typed: a digit, 'backspace', 'enter' or 'escape'."""
+        if self.seed_entry is None:
+            return
+        if key == "escape":
+            self.seed_entry = None
+            self.info("Seed entry cancelled.")
+        elif key == "enter":
+            self.confirm_seed()
+        elif key == "backspace":
+            self.seed_entry = self.seed_entry[:-1]
+        elif len(key) == 1 and key.isdigit() and len(self.seed_entry) < self.SEED_DIGITS:
+            self.seed_entry += key
+
+    def confirm_seed(self) -> None:
+        """Take the typed digits as the seed of every run until it is changed. Nothing typed: a random seed."""
+        typed, self.seed_entry = self.seed_entry, None
+        if not typed:
+            self._set_seed(None)
+            self.info("Dice seed: a new one each run.")
+            return
+        seed = int(typed)
+        if seed > settings_module.MAX_SEED:
+            self.warn(f"A seed is a whole number from 0 to {settings_module.MAX_SEED}.")
+            return
+        self._set_seed(seed)
+        self.info(f"Dice seed: {seed}. Every run uses it until you change it.")
+
+    def _set_seed(self, seed: int | None) -> None:
+        self.fixed_seed = self.settings.seed = seed
+        self.settings_serial += 1
+        if self.settings_path is not None:
+            settings_module.save(self.settings, self.settings_path)
 
     def to_main_menu(self) -> None:
         self._leave_run()
@@ -343,6 +423,8 @@ class AppController:
         if problem:
             self.warn(problem)
             return
+        if self.seed_entry is not None:  # a seed still being typed counts as entered
+            self.confirm_seed()
         seed = self.fixed_seed if self.fixed_seed is not None else int(self._seed_source())
         engine = Engine(self.content, self.vocations)
         self.runs_started += 1
@@ -1252,43 +1334,90 @@ class AppController:
         except Exception as error:  # noqa: BLE001
             self.progression_error = f"The save could not be opened, so heroes are not saved this session: {error}"
 
+    #: The groups of the Settings screen, in order: player settings first, demo aids last.
+    SETTINGS_GROUPS = (("comfort", "Display and comfort"), ("aids", "Play aids"), ("evolution", "Class Evolution"), ("demo", "Demo and testing"))
+    RUN_LOCKED = "Not during a run: finish or abandon it first."
+
     def open_settings(self) -> None:
+        """From the main menu, or from the pause menu of a run (the run waits; what would end it is locked)."""
+        if self.screen != Screen.SETTINGS:
+            self.settings_return = self.screen
+            self.settings_in_run = self.run_in_progress()
+        self.paused = self.pause_help = False
         self.screen = Screen.SETTINGS
-        self.reset_confirm = False
+        self.reset_confirm = self.defaults_confirm = False
         self.info("Settings are saved as you change them." if self.settings_path else "Settings last for this session (no settings file is in use).")
 
     def close_settings(self) -> None:
-        self.reset_confirm = False
+        self.reset_confirm = self.defaults_confirm = False
+        if self.settings_in_run and self.engine is not None:
+            self.screen, self.paused = self.settings_return, True  # back to the pause menu the player came from
+            self.settings_in_run = False
+            return
+        self.settings_in_run = False
         self.screen = Screen.MAIN_MENU
+
+    def select_settings_tab(self, group: str) -> None:
+        if group in dict(self.SETTINGS_GROUPS):
+            self.settings_tab = group
+            self.reset_confirm = self.defaults_confirm = False
+
+    def reset_settings(self) -> None:
+        self._guard(self._reset_settings)
+
+    def _reset_settings(self) -> None:
+        """Every setting back to its default. Asked twice; the saved profile and its folder are kept."""
+        if self.settings_in_run:
+            self.warn(self.RUN_LOCKED)
+            return
+        if not self.defaults_confirm:
+            self.defaults_confirm = True
+            self.warn("Press again: every setting returns to its default (Class Evolution off). Your saved heroes are kept.")
+            return
+        self.defaults_confirm = False
+        fresh = settings_module.Settings(save_dir=self.settings.save_dir)
+        changed_save = (fresh.class_evolution, fresh.mastery_pace, fresh.roster_limit) != (
+            self.settings.class_evolution, self.settings.mastery_pace, self.settings.roster_limit)
+        self.settings = fresh
+        if not self._seed_from_flag:
+            self.fixed_seed = fresh.seed
+        self.third_battle = fresh.third_battle
+        self.settings_serial += 1
+        if self.settings_path is not None:
+            settings_module.save(fresh, self.settings_path)
+        if changed_save:
+            self._reopen_progression()
+        self.info("Every setting is back to its default.")
 
     def settings_view(self) -> list[dict[str, Any]]:
         """Every setting as the Settings screen shows it: its value in words, what it does, and whether it can be changed here."""
         current = self.settings
         evolution = CLASS_EVOLUTION in self.features
         forced = CLASS_EVOLUTION in self.forced_features
-        needs = None if evolution else "Switch Class Evolution on first."
+        locked = self.RUN_LOCKED if self.settings_in_run else None
+        needs = locked or (None if evolution else "Switch Class Evolution on first.")
         paces = {"normal": "Normal", "fast": "Fast (about half the points)", "very_fast": "Very fast (a rank per win at most)"}
         presets = {"fresh": "Fresh: no heroes", "squire_near_mastery": "A Squire one win from mastery",
                    "guardian_unlocked": "A Guardian at rank 1", "guardian_mastered": "A Guardian with Field Medic"}
         rows = [
-            {"key": "class_evolution", "label": "Class Evolution", "value": ("On (launch flag)" if forced else "On") if evolution else "Off",
-             "help": "Saved heroes, mastery, vocations and the third battle. Off: the game as shipped, and no save file.",
-             "reason": "Switched on by a launch flag for this session." if forced else None},
-            {"key": "third_battle", "label": "Third battle", "value": "Offered" if current.third_battle else "Not offered",
-             "help": "After Battle 2, offer a third, harder battle. A Guardian needs it for its last rank.", "reason": needs},
-            {"key": "mastery_pace", "label": "Mastery pace", "value": paces[current.mastery_pace],
-             "help": "How many points a rank needs. A faster pace re-ranks your heroes from the points they have.", "reason": needs},
-            {"key": "roster_limit", "label": "Roster size", "value": f"{current.roster_limit} heroes",
-             "help": "How many heroes a profile may hold.", "reason": needs},
-            {"key": "demo_preset", "label": "New profile starts as", "value": presets[current.demo_preset],
-             "help": "Used when a profile is made or reset. Every start but the first comes with a Scout and an Apprentice.", "reason": needs},
-            {"key": "seed", "label": "Dice seed", "value": "A new one each run" if self.fixed_seed is None else f"Fixed: {self.fixed_seed}",
-             "help": "A fixed seed gives the same dice every run with the same party and choices.",
-             "reason": "Set by a launch flag for this session." if self._seed_from_flag else None},
-            {"key": "animation", "label": "Animation", "value": "On" if current.animation else "Off (reduced motion)",
-             "help": "Movement and flashes in battle. M also toggles it during a battle.", "reason": None},
-            {"key": "window_size", "label": "Window size", "value": current.window_size.replace("x", " x "),
+            {"group": "comfort", "key": "window_size", "label": "Window size", "value": current.window_size.replace("x", " x "),
              "help": "The window can also be resized by dragging its edge.", "reason": None},
+            {"group": "comfort", "key": "animation", "label": "Motion and flashes", "value": "On" if current.animation else "Off (reduced motion)",
+             "help": "Movement and flashes in battle. M also toggles it during a battle.", "reason": None},
+            {"group": "aids", "key": "controls", "label": "Controls", "value": "Show the controls",
+             "help": "Mouse and keyboard controls, and how a turn works.", "reason": None},
+            {"group": "evolution", "key": "class_evolution", "label": "Class Evolution",
+             "value": ("On (launch flag)" if forced else "On") if evolution else "Off",
+             "help": "Saved heroes, mastery, vocations and the third battle. Off: the game as shipped, and no save file.",
+             "reason": locked or ("Switched on by a launch flag for this session." if forced else None)},
+            {"group": "demo", "key": "mastery_pace", "label": "Mastery pace", "value": paces[current.mastery_pace],
+             "help": "How many points a rank needs. A faster pace re-ranks your heroes from the points they have.", "reason": needs},
+            {"group": "demo", "key": "demo_preset", "label": "New profile starts as", "value": presets[current.demo_preset],
+             "help": "Used when a profile is made or reset. Every start but the first comes with a Scout and an Apprentice.", "reason": needs},
+            {"group": "demo", "key": "roster_limit", "label": "Roster size", "value": f"{current.roster_limit} heroes",
+             "help": "How many heroes a profile may hold.", "reason": needs},
+            {"group": "demo", "key": "third_battle", "label": "Third battle", "value": "Offered" if current.third_battle else "Not offered",
+             "help": "After Battle 2, offer a third, harder battle. A Guardian needs it for its last rank.", "reason": needs},
         ]
         return rows
 
@@ -1298,7 +1427,14 @@ class AppController:
     def _change_setting(self, key: str) -> None:
         """Move one setting to its next value, save the file, and make the change take effect now."""
         current = self.settings
-        self.reset_confirm = False
+        self.reset_confirm = self.defaults_confirm = False
+        if key == "controls":  # not a value: the row opens the controls help and comes back here
+            self.show_controls()
+            return
+        row = next((r for r in self.settings_view() if r["key"] == key), None)
+        if row is not None and row["reason"]:
+            self.warn(row["reason"])
+            return
 
         def following(options: tuple[Any, ...], value: Any) -> Any:
             return options[(options.index(value) + 1) % len(options)] if value in options else options[0]
@@ -1313,9 +1449,6 @@ class AppController:
             current.demo_preset = following(settings_module.PRESETS, current.demo_preset)
         elif key == "window_size":
             current.window_size = following(settings_module.WINDOW_SIZES, current.window_size)
-        elif key == "seed":
-            current.seed = None if current.seed is not None else int(self._seed_source())
-            self.fixed_seed = current.seed
         else:
             raise ValueError(f"Unknown setting '{key}'.")
         self.settings_serial += 1
@@ -1347,6 +1480,9 @@ class AppController:
 
     def _reset_profile(self) -> None:
         """Delete the save and start a new profile from the chosen start. Asked twice: it cannot be undone."""
+        if self.settings_in_run:
+            self.warn(self.RUN_LOCKED)
+            return
         if CLASS_EVOLUTION not in self.features:
             self.warn("There is no profile to reset while Class Evolution is off.")
             return

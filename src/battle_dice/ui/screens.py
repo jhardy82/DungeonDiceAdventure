@@ -129,8 +129,16 @@ CONTROLS_TEXT = [
 ]
 
 
+def draw_seed_control(ui: UI, ctrl: AppController) -> None:
+    """New Run screen, top right: the dice seed of the next run, random or typed (owner decision D-31)."""
+    view = ctrl.seed_view()
+    ui.button("party:seed", 960, 8, 304, 46, view["label"], ctrl.toggle_seed, enabled=view["reason"] is None, reason=view["reason"],
+              selected=view["entering"], hotkeys=() if view["entering"] else (pygame.K_d,), sublabel=view["hint"], size=15,
+              tooltip="The same seed, party and choices give the same run. A finished run shows its seed.")
+
+
 def draw_controls(ui: UI, ctrl: AppController, back: Callable[[], Any] | None = None) -> None:
-    back = back or ctrl.to_main_menu
+    back = back or ctrl.close_controls
     ui.text(40, 28, "Controls", 34, Theme.ACCENT, bold=True)
     y = 80.0
     for heading, body in CONTROLS_TEXT:
@@ -152,7 +160,9 @@ def draw_party_setup(ui: UI, ctrl: AppController) -> None:
         return
     minimum, maximum = ctrl.party_limits()
     ui.text(24, 14, "Party Setup", 30, Theme.ACCENT, bold=True)
-    ui.text(250, 26, f"{len(ctrl.party)} / {maximum} heroes.  Any mix of classes, duplicates allowed.  Starting dice are fixed by class.", 16, Theme.DIM)
+    ui.text(250, 26, f"{len(ctrl.party)} / {maximum} heroes.  Any mix of classes, duplicates allowed.  Starting dice are fixed by class.", 15, Theme.DIM,
+            max_width=700)
+    draw_seed_control(ui, ctrl)
 
     ui.panel(16, 60, 430, 470, "Party (click a hero to inspect)")
     for index in range(maximum):
@@ -723,13 +733,15 @@ def draw_pause(ui: UI, ctrl: AppController) -> None:
     ui.backdrop(0, 0, 1280, 694, wall_rows=2, dim=190)
     ui.text(640, 130, "PAUSED", 52, Theme.ACCENT, bold=True, align="center")
     ui.text(640, 204, "The run is waiting exactly where you left it. Nothing advances while this menu is open.", 17, Theme.DIM, align="center")
-    ui.button("pause:resume", 470, 260, 340, 56, "Resume  (Esc)", ctrl.resume, default=True, size=20,
+    ui.button("pause:resume", 470, 250, 340, 52, "Resume  (Esc)", ctrl.resume, default=True, size=20,
               tooltip="Return to the run.")
-    ui.button("pause:controls", 470, 330, 340, 56, "Controls", ctrl.toggle_pause_help, size=20,
+    ui.button("pause:controls", 470, 312, 340, 52, "Controls", ctrl.toggle_pause_help, size=20,
               tooltip="Mouse and keyboard controls, and how a turn works.")
-    ui.button("pause:party", 470, 400, 340, 56, "Abandon Run: Change Party", ctrl.abandon_to_party, size=18,
+    ui.button("pause:settings", 470, 374, 340, 52, "Settings  (S)", ctrl.open_settings, hotkeys=(pygame.K_s,), size=20,
+              tooltip="Display, comfort and play aids. The run waits; what would end it cannot be changed from here.")
+    ui.button("pause:party", 470, 436, 340, 52, "Abandon Run: Change Party", ctrl.abandon_to_party, size=18,
               tooltip="Give up this run and return to party setup. The run is not saved and writes no event log.")
-    ui.button("pause:menu", 470, 470, 340, 56, "Abandon Run: Main Menu", ctrl.abandon_to_menu, size=18,
+    ui.button("pause:menu", 470, 498, 340, 52, "Abandon Run: Main Menu", ctrl.abandon_to_menu, size=18,
               tooltip="Give up this run and return to the main menu. The run is not saved and writes no event log.")
     ui.escape_action = ctrl.resume
     status_bar(ui, ctrl)
@@ -923,7 +935,8 @@ def draw_roster_setup(ui: UI, ctrl: AppController) -> None:
     roster = ctrl.roster_view()
     by_id = {row["hero_id"]: row for row in roster}
     ui.text(24, 14, "Party Setup", 30, Theme.ACCENT, bold=True)
-    ui.text(250, 26, f"{len(ctrl.party)} / {maximum} heroes in the party.  Your heroes are saved and keep what they master.", 16, Theme.DIM, max_width=1010)
+    ui.text(250, 26, f"{len(ctrl.party)} / {maximum} heroes in the party.  Your heroes are saved and keep what they master.", 15, Theme.DIM, max_width=700)
+    draw_seed_control(ui, ctrl)
 
     ui.panel(16, 60, 560, 470, "Party")
     for index in range(maximum):
@@ -1139,25 +1152,46 @@ def draw_continue(ui: UI, ctrl: AppController) -> None:
 
 
 def draw_settings(ui: UI, ctrl: AppController) -> None:
-    """The demo's configuration: every setting, what it does, and a button that moves it to its next value."""
+    """The settings in four groups: player settings first, the demo's aids last. A button moves a setting to its next value."""
     ui.text(24, 14, "Settings", 30, Theme.ACCENT, bold=True)
     where = f"Saved in {ctrl.settings_path}" if ctrl.settings_path else "No settings file is in use: changes last for this session."
     ui.text(170, 26, where, 14, Theme.DIM, max_width=1090)
-    y = 70.0
+    for index, (group, title) in enumerate(ctrl.SETTINGS_GROUPS):
+        ui.button(f"settings:tab:{group}", 16 + index * 312, 58, 304, 40, f"{index + 1}. {title}", partial(ctrl.select_settings_tab, group),
+                  selected=group == ctrl.settings_tab, hotkeys=(NUMBER_KEYS[index],), size=15, tooltip=f"Show the group: {title}.")
+    if ctrl.settings_in_run:
+        ui.text(24, 106, "A run is waiting. Display, comfort and play aids apply at once; the other groups are locked until the run is over.", 14,
+                Theme.WARN, max_width=1230)
+    y = 132.0
     for row in ctrl.settings_view():
+        if row["group"] != ctrl.settings_tab:
+            continue
         ui.panel(16, y, 1248, 54, fill=Theme.PANEL_ALT)
         ui.text(30, y + 17, row["label"], 17, Theme.TEXT, bold=True, max_width=210)
         ui.button(f"settings:{row['key']}", 250, y + 6, 330, 42, row["value"], partial(ctrl.change_setting, row["key"]),
                   enabled=row["reason"] is None, reason=row["reason"], size=15, tooltip="Click to change.")
         ui.paragraph(596, y + 9, row["help"], 656, 14, Theme.DIM, line_height=17, max_lines=2)
         y += 60
-    evolution = ctrl.progression is not None
-    label = "Press again to delete every hero" if ctrl.reset_confirm else "Reset the saved profile"
-    ui.button("settings:reset", 250, 566, 330, 46, label, ctrl.reset_profile, enabled=evolution,
-              reason="There is no profile while Class Evolution is off.", size=15,
-              tooltip="Delete the save and start a new profile from the start chosen above. Asked twice.")
-    if evolution:
-        ui.text(596, 580, f"Save file: {ctrl.progression.path}", 13, Theme.FAINT, max_width=656)
+    if ctrl.settings_tab == "evolution":
+        evolution = ctrl.progression is not None
+        ui.panel(16, y, 1248, 54, fill=Theme.PANEL_ALT)
+        ui.text(30, y + 17, "Saved profile", 17, Theme.TEXT, bold=True, max_width=210)
+        label = "Press again to delete every hero" if ctrl.reset_confirm else "Reset the saved profile"
+        reason = ctrl.RUN_LOCKED if ctrl.settings_in_run else "There is no profile while Class Evolution is off."
+        ui.button("settings:reset", 250, y + 6, 330, 42, label, ctrl.reset_profile, enabled=evolution and not ctrl.settings_in_run, reason=reason,
+                  size=15, tooltip="Delete the save and start a new profile from the start chosen under Demo and testing. Asked twice.")
+        if evolution:
+            # One line with its label: a path has no spaces to wrap at, and a long one (Windows) is cut as a whole.
+            ui.text(596, y + 19, f"Save file: {ctrl.progression.path}", 13, Theme.FAINT, max_width=656)
+        else:
+            ui.paragraph(596, y + 9, "Deletes every saved hero and starts a new profile. Asked twice.", 656, 13, Theme.FAINT, line_height=17,
+                         max_lines=2)
+    elif ctrl.settings_tab == "demo":
+        ui.text(24, y + 8, "These four are aids for showing and testing Class Evolution. They do not change the rules of a battle.", 14, Theme.FAINT,
+                max_width=1230)
+    label = "Press again: all settings to defaults" if ctrl.defaults_confirm else "Reset all settings to defaults"
+    ui.button("settings:defaults", 934, 630, 330, 44, label, ctrl.reset_settings, enabled=not ctrl.settings_in_run, reason=ctrl.RUN_LOCKED, size=15,
+              tooltip="Every setting returns to its default. Your saved heroes are kept. Asked twice.")
     ui.button("settings:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_settings, hotkeys=(pygame.K_b,), default=True)
     ui.escape_action = ctrl.close_settings
     status_bar(ui, ctrl)

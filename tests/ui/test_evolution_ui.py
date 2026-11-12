@@ -448,9 +448,19 @@ class Configured(Play):
 def test_the_main_menu_opens_the_settings_and_escape_returns(tmp_path):
     play = Configured(tmp_path)
     play.key(pygame.K_s)
-    assert play.ctrl.screen == Screen.SETTINGS and "settings:class_evolution" in play.ui.keys()
-    assert [row["key"] for row in play.ctrl.settings_view()] == [
-        "class_evolution", "third_battle", "mastery_pace", "roster_limit", "demo_preset", "seed", "animation", "window_size"]
+    assert play.ctrl.screen == Screen.SETTINGS and play.ctrl.settings_tab == "comfort" and "settings:window_size" in play.ui.keys()
+    # Owner decision D-31: four groups, player settings first, the demo's aids last; the seed is not a setting any more.
+    assert [(row["group"], row["key"]) for row in play.ctrl.settings_view()] == [
+        ("comfort", "window_size"), ("comfort", "animation"), ("aids", "controls"), ("evolution", "class_evolution"),
+        ("demo", "mastery_pace"), ("demo", "demo_preset"), ("demo", "roster_limit"), ("demo", "third_battle")]
+    assert [group for group, _title in play.ctrl.SETTINGS_GROUPS] == ["comfort", "aids", "evolution", "demo"]
+    assert "settings:class_evolution" not in play.ui.keys(), "a group shows its own rows only"
+    play.key(pygame.K_3)
+    assert play.ctrl.settings_tab == "evolution" and {"settings:class_evolution", "settings:reset"} <= set(play.ui.keys())
+    play.click("settings:tab:demo")
+    assert play.ctrl.settings_tab == "demo" and "settings:mastery_pace" in play.ui.keys() and "settings:window_size" not in play.ui.keys()
+    play.ctrl.select_settings_tab("no such group")
+    assert play.ctrl.settings_tab == "demo", "a group that does not exist is not shown"
     assert not play.file.exists(), "looking at the settings writes nothing"
     play.key(pygame.K_ESCAPE)
     assert play.ctrl.screen == Screen.MAIN_MENU
@@ -461,11 +471,15 @@ def test_class_evolution_can_be_switched_on_and_off_from_inside_the_game(tmp_pat
     assert play.ctrl.progression is None and play.ctrl.vocations is None
     play.key(pygame.K_s)
     needs = "Switch Class Evolution on first."
-    assert play.ui.widget("settings:third_battle").reason == needs and play.ui.widget("settings:reset").enabled is False
+    play.click("settings:tab:demo")
+    assert play.ui.widget("settings:third_battle").reason == needs and play.ui.widget("settings:mastery_pace").enabled is False
+    play.click("settings:tab:evolution")
+    assert play.ui.widget("settings:reset").enabled is False
     play.click("settings:class_evolution")
     assert play.saved()["class_evolution"] is True and play.ctrl.message == "Class Evolution: On."
     link = play.ctrl.progression
     assert link is not None and link.path == tmp_path / "logs" / "saves" / "profile.sqlite" and link.path.is_file()
+    play.click("settings:tab:demo")
     assert play.ctrl.vocations is not None and play.ui.widget("settings:third_battle").enabled is True
     play.key(pygame.K_ESCAPE)
     play.key(pygame.K_n)
@@ -475,6 +489,7 @@ def test_class_evolution_can_be_switched_on_and_off_from_inside_the_game(tmp_pat
     # Off again: the shipped game, the old party setup, and nothing of the save is held open.
     play.ctrl.to_main_menu()
     play.ctrl.open_settings()
+    play.ctrl.select_settings_tab("evolution")
     play.app.frame(0)
     play.click("settings:class_evolution")
     assert play.saved()["class_evolution"] is False and play.ctrl.progression is None and play.ctrl.vocations is None
@@ -497,6 +512,7 @@ def test_every_setting_moves_to_its_next_value_is_saved_and_takes_effect(tmp_pat
 
     play = Configured(tmp_path, settings=Settings(class_evolution=True))
     play.ctrl.open_settings()
+    play.ctrl.select_settings_tab("demo")
     play.app.frame(0)
     play.click("settings:third_battle")
     assert play.saved()["third_battle"] is False and play.ctrl.third_battle is False
@@ -507,11 +523,8 @@ def test_every_setting_moves_to_its_next_value_is_saved_and_takes_effect(tmp_pat
     assert play.saved()["roster_limit"] == 24 and play.ctrl.progression.career.service.roster_limit == 24
     play.click("settings:demo_preset")
     assert play.saved()["demo_preset"] == "squire_near_mastery" and play.ctrl.roster_view() == [], "a preset is for a new profile"
-    play.click("settings:seed")
-    fixed = play.saved()["seed"]
-    assert isinstance(fixed, int) and play.ctrl.fixed_seed == fixed and f"Fixed: {fixed}" in play.ctrl.message
-    play.click("settings:seed")
-    assert play.saved()["seed"] is None and play.ctrl.fixed_seed is None
+    assert play.ui.widget("settings:seed") is None, "the seed is chosen on the New Run screen"
+    play.click("settings:tab:comfort")
     play.click("settings:animation")
     play.app.frame(0)
     assert play.saved()["animation"] is False and play.app.ui.anim.enabled is False
@@ -561,10 +574,19 @@ def test_a_launch_flag_wins_over_the_settings_file_and_cannot_be_switched_off_in
     assert play.ctrl.progression is not None and play.ctrl.fixed_seed == 9
     rows = {row["key"]: row for row in play.ctrl.settings_view()}
     assert rows["class_evolution"]["value"] == "On (launch flag)" and "launch flag" in rows["class_evolution"]["reason"]
-    assert rows["seed"]["value"] == "Fixed: 9" and "launch flag" in rows["seed"]["reason"]
     play.ctrl.open_settings()
+    play.ctrl.select_settings_tab("evolution")
     play.app.frame(0)
-    assert play.ui.widget("settings:class_evolution").enabled is False and play.ui.widget("settings:seed").enabled is False
+    assert play.ui.widget("settings:class_evolution").enabled is False
+    play.ctrl.change_setting("class_evolution")  # sent anyway: refused with the reason
+    assert play.ctrl.message == "Switched on by a launch flag for this session." and play.ctrl.progression is not None
+    play.ctrl.close_settings()
+    play.ctrl.new_run()
+    play.app.frame(0)
+    seed = play.ui.widget("party:seed")
+    assert seed.enabled is False and seed.reason == "Set by a launch flag for this session." and play.ctrl.seed_view()["label"] == "Dice seed: 9"
+    play.ctrl.toggle_seed()
+    assert play.ctrl.seed_entry is None and play.ctrl.fixed_seed == 9 and play.ctrl.message_is_error
 
 
 def test_resetting_the_profile_asks_twice_and_starts_again_from_the_chosen_start(tmp_path):
@@ -575,11 +597,14 @@ def test_resetting_the_profile_asks_twice_and_starts_again_from_the_chosen_start
     play.ctrl.recruit("scout")
     assert len(play.ctrl.roster_view()) == 2
     play.ctrl.open_settings()
+    play.ctrl.select_settings_tab("evolution")
     play.app.frame(0)
     play.click("settings:reset")
     assert play.ctrl.reset_confirm and len(play.ctrl.roster_view()) == 2 and "Press Reset again" in play.ctrl.message
-    play.click("settings:demo_preset")  # anything else cancels the question
+    play.click("settings:tab:demo")  # anything else cancels the question
+    play.click("settings:demo_preset")
     assert not play.ctrl.reset_confirm and len(play.ctrl.roster_view()) == 2
+    play.click("settings:tab:evolution")
     play.click("settings:reset")
     play.click("settings:reset")
     assert not play.ctrl.reset_confirm and play.ctrl.message == "A new profile was made (3 heroes)."
@@ -618,14 +643,34 @@ def test_no_text_is_cut_off_on_the_settings_screen_and_the_main_menu(tmp_path, m
     play.app.frame(0)
     assert "Settings  (S)" in drawn and shortened == [], shortened
     play.ctrl.open_settings()
-    for key in ("mastery_pace", "mastery_pace", "demo_preset", "demo_preset", "demo_preset", "seed", "animation", "third_battle"):
+    for group, keys in (("demo", ("mastery_pace", "mastery_pace", "demo_preset", "demo_preset", "demo_preset", "third_battle", "roster_limit")),
+                        ("comfort", ("animation", "animation")), ("aids", ()), ("evolution", ())):
+        play.ctrl.select_settings_tab(group)
         play.app.frame(0)
-        play.ctrl.change_setting(key)
+        for key in keys:
+            play.ctrl.change_setting(key)
+            play.app.frame(0)
     play.ctrl.reset_profile()
+    play.app.frame(0)
+    play.ctrl.reset_settings()
     play.app.frame(0)
     # Paths are as long as the machine makes them; everything the game itself words must fit.
     worded = [text for text in shortened if not text.startswith(("Saved in ", "Save file: "))]
-    assert "Press again to delete every hero" in drawn and worded == [], worded
+    assert "Press again to delete every hero" in drawn and "Press again: all settings to defaults" in drawn and worded == [], worded
+    assert all(f"{n}. {title}" in drawn for n, (_group, title) in enumerate(play.ctrl.SETTINGS_GROUPS, start=1))
+    # The New Run screen with its seed control, at rest and while a seed of full length is typed.
+    play.ctrl.close_settings()
+    play.ctrl.new_run()
+    play.app.frame(0)
+    play.ctrl.toggle_seed()
+    for digit in "18446744073709551615":
+        play.ctrl.seed_key(digit)
+    play.app.frame(0)
+    play.ctrl.confirm_seed()
+    play.app.frame(0)
+    worded = [text for text in shortened if not text.startswith(("Saved in ", "Save file: "))]
+    assert "Dice seed: random" in drawn and "Seed: 18446744073709551615_" in drawn and "Dice seed: 18446744073709551615" in drawn
+    assert worded == [], worded
     assert play.app.render_faults == 0
 
 
@@ -1079,3 +1124,170 @@ def test_no_text_is_cut_off_at_the_decision_with_its_career_buttons(tmp_path, mo
     play.app.frame(0)
     assert "Career" in drawn and "Guardian" in drawn and shortened == [], shortened
     assert play.app.render_faults == 0
+
+
+# --------------------------------------------------------------------------------------------
+# The configuration as the owner decided it (D-31): groups, reset to defaults, Settings from the
+# pause menu, and the dice seed on the New Run screen
+# --------------------------------------------------------------------------------------------
+
+
+def test_the_controls_help_opens_from_the_settings_and_comes_back_there(tmp_path):
+    play = Configured(tmp_path)
+    play.key(pygame.K_s)
+    play.key(pygame.K_2)
+    assert play.ctrl.settings_tab == "aids"
+    play.click("settings:controls")
+    assert play.ctrl.screen == Screen.CONTROLS and not play.file.exists(), "opening the help changes no setting"
+    play.key(pygame.K_ESCAPE)
+    assert play.ctrl.screen == Screen.SETTINGS and play.ctrl.settings_tab == "aids"
+    play.key(pygame.K_ESCAPE)
+    assert play.ctrl.screen == Screen.MAIN_MENU
+    play.key(pygame.K_c)  # from the main menu the help still returns to the main menu
+    assert play.ctrl.screen == Screen.CONTROLS
+    play.key(pygame.K_ESCAPE)
+    assert play.ctrl.screen == Screen.MAIN_MENU
+
+
+def test_all_settings_return_to_their_defaults_when_asked_twice(tmp_path):
+    from battle_dice.settings import Settings
+
+    custom = Settings(class_evolution=True, third_battle=False, animation=False, seed=77, window_size="1600x900", roster_limit=24,
+                      mastery_pace="fast", demo_preset="guardian_unlocked", save_dir=str(tmp_path / "my saves"))
+    play = Configured(tmp_path, settings=custom)
+    assert len(play.ctrl.roster_view()) == 3
+    play.ctrl.open_settings()
+    play.app.frame(0)
+    play.click("settings:defaults")
+    assert play.ctrl.defaults_confirm and play.ctrl.message_is_error and play.ctrl.settings.mastery_pace == "fast"
+    assert not play.file.exists(), "the question changes nothing"
+    play.click("settings:tab:demo")  # anything else cancels the question
+    assert not play.ctrl.defaults_confirm
+    play.click("settings:defaults")
+    play.click("settings:defaults")
+    play.app.frame(0)
+    now = play.ctrl.settings
+    assert now == Settings(save_dir=str(tmp_path / "my saves")), "every setting is the default; the save folder is a place, not a preference"
+    assert play.saved()["mastery_pace"] == "normal" and play.saved()["class_evolution"] is False and play.saved()["seed"] is None
+    assert play.ctrl.progression is None and play.ctrl.fixed_seed is None and play.ctrl.third_battle is True
+    assert play.app.surface.get_size() == (1280, 720) and play.app.ui.anim.enabled is True
+    assert play.ctrl.message == "Every setting is back to its default."
+    assert (tmp_path / "my saves" / "profile.sqlite").is_file(), "the saved heroes are kept"
+    play.click("settings:tab:evolution")
+    play.click("settings:class_evolution")
+    assert len(play.ctrl.roster_view()) == 3, "and they are there when Class Evolution is switched on again"
+
+
+def test_the_settings_open_from_the_pause_menu_and_what_would_end_the_run_is_locked(tmp_path):
+    from battle_dice.settings import Settings
+
+    play = Configured(tmp_path, settings=Settings(class_evolution=True, demo_preset="guardian_unlocked"), fixed_seed=11)
+    play.ctrl.new_run()
+    for hero_id in ("hero_001", "hero_002"):
+        play.ctrl.add_saved_hero(hero_id)
+    play.ctrl.begin_run()
+    engine = play.ctrl.engine
+    revision = engine.revision
+    play.app.frame(0)
+    play.key(pygame.K_ESCAPE)
+    assert play.ctrl.paused and play.ui.widget("pause:settings") is not None
+    play.key(pygame.K_s)
+    assert play.ctrl.screen == Screen.SETTINGS and play.ctrl.settings_in_run and not play.ctrl.paused
+    # Display and comfort apply at once, inside the run.
+    play.click("settings:animation")
+    assert play.ctrl.settings.animation is False and play.app.ui.anim.enabled is False and play.ctrl.engine is engine
+    # Everything that would close the save, and with it the run, is locked and says why.
+    for group, keys in (("evolution", ("class_evolution", "reset")), ("demo", ("mastery_pace", "demo_preset", "roster_limit", "third_battle"))):
+        play.click(f"settings:tab:{group}")
+        for key in keys:
+            widget = play.ui.widget(f"settings:{key}")
+            assert widget.enabled is False and widget.reason == play.ctrl.RUN_LOCKED, key
+    assert play.ui.widget("settings:defaults").reason == play.ctrl.RUN_LOCKED and play.ui.widget("settings:defaults").enabled is False
+    for send in (lambda: play.ctrl.change_setting("class_evolution"), lambda: play.ctrl.change_setting("mastery_pace"),
+                 play.ctrl.reset_profile, play.ctrl.reset_settings):
+        send()  # sent anyway: each is refused
+        assert play.ctrl.message == play.ctrl.RUN_LOCKED and play.ctrl.message_is_error
+    assert play.ctrl.engine is engine and play.ctrl.progression is not None and len(play.ctrl.roster_view()) == 3
+    assert play.ctrl.settings.class_evolution is True and play.ctrl.settings.mastery_pace == "normal"
+    play.key(pygame.K_ESCAPE)
+    assert play.ctrl.screen == Screen.BATTLE and play.ctrl.paused and not play.ctrl.settings_in_run, "back in the pause menu"
+    play.key(pygame.K_ESCAPE)
+    assert not play.ctrl.paused and engine.revision == revision, "nothing advanced while the settings were open"
+    assert play.app.render_faults == 0
+
+
+def test_the_dice_seed_is_typed_on_the_new_run_screen(tmp_path):
+    play = Configured(tmp_path)
+    play.key(pygame.K_n)
+    assert play.ctrl.seed_view() == {"label": "Dice seed: random", "hint": "press D to type a seed", "entering": False, "seed": None, "reason": None}
+    play.key(pygame.K_1)  # a Squire joins, as always
+    assert len(play.ctrl.party) == 1
+    play.key(pygame.K_d)
+    assert play.ctrl.seed_entry == "" and play.ctrl.seed_view()["label"] == "Seed: _"
+    for key in (pygame.K_1, pygame.K_2, pygame.K_KP3, pygame.K_KP0, pygame.K_b, pygame.K_n):  # letters are not digits
+        play.key(key)
+    assert play.ctrl.seed_entry == "1230" and len(play.ctrl.party) == 1, "while a seed is typed the number keys add no hero"
+    assert play.ctrl.screen == Screen.PARTY_SETUP and play.ctrl.engine is None, "and B does not begin the run"
+    play.key(pygame.K_BACKSPACE)
+    play.key(pygame.K_RETURN)
+    assert play.ctrl.seed_entry is None and play.ctrl.fixed_seed == 123 and play.saved()["seed"] == 123
+    assert play.ctrl.message == "Dice seed: 123. Every run uses it until you change it." and play.ctrl.seed_view()["label"] == "Dice seed: 123"
+    play.key(pygame.K_2)
+    assert len(play.ctrl.party) == 2, "after the entry the keys are the screen's again"
+    play.key(pygame.K_b)
+    assert play.ctrl.engine is not None and play.ctrl.engine.state.seed == 123
+    # A second game reads the seed from the file; D switches back to a random one.
+    from battle_dice import settings as module
+
+    assert module.load(play.file)[0].seed == 123
+    play.ctrl.to_main_menu()
+    play.app.frame(0)
+    play.key(pygame.K_n)
+    play.key(pygame.K_d)
+    assert play.ctrl.fixed_seed is None and play.saved()["seed"] is None and play.ctrl.message == "Dice seed: a new one each run."
+
+
+def test_a_seed_entry_can_be_cancelled_left_or_finished_by_beginning(tmp_path):
+    play = Configured(tmp_path)
+    play.key(pygame.K_n)
+    play.key(pygame.K_1)
+    play.key(pygame.K_d)
+    play.key(pygame.K_7)
+    play.key(pygame.K_ESCAPE)
+    assert play.ctrl.seed_entry is None and play.ctrl.fixed_seed is None and play.ctrl.screen == Screen.PARTY_SETUP, "Esc ends the entry, not the screen"
+    play.key(pygame.K_d)
+    play.key(pygame.K_RETURN)  # nothing typed: a random seed
+    assert play.ctrl.seed_entry is None and play.ctrl.fixed_seed is None
+    play.key(pygame.K_d)
+    for digit in "99999999999999999999":  # twenty nines: more than a seed can be
+        play.ctrl.seed_key(digit)
+    play.ctrl.seed_key("5")  # a twenty-first digit is not taken
+    assert play.ctrl.seed_entry == "9" * 20
+    play.key(pygame.K_RETURN)
+    assert play.ctrl.fixed_seed is None and play.ctrl.message_is_error and "from 0 to 18446744073709551615" in play.ctrl.message
+    play.key(pygame.K_d)
+    play.key(pygame.K_4)
+    play.click("party:back")  # leaving the screen ends the entry: the keys of the main menu work
+    play.key(pygame.K_s)
+    assert play.ctrl.screen == Screen.SETTINGS and play.ctrl.seed_entry is None
+    play.key(pygame.K_ESCAPE)
+    play.key(pygame.K_n)
+    play.key(pygame.K_d)
+    play.key(pygame.K_5)
+    play.click("party:begin")  # a seed still being typed counts as entered
+    assert play.ctrl.engine is not None and play.ctrl.engine.state.seed == 5 and play.ctrl.seed_entry is None
+
+
+def test_a_long_save_path_is_shortened_with_its_label_and_nothing_else_is(tmp_path, monkeypatch):
+    """On Windows the save sits deep in the user's folders. The path may be cut; it keeps its label, and no other text is cut."""
+    from battle_dice.settings import Settings
+
+    deep = tmp_path / ("a_very_long_folder_name_" * 4) / ("another_long_folder_name_" * 4) / "saves"
+    play = Configured(tmp_path, settings=Settings(class_evolution=True, save_dir=str(deep)))
+    drawn, shortened = record_text(monkeypatch)
+    play.ctrl.open_settings()
+    play.ctrl.select_settings_tab("evolution")
+    play.app.frame(0)
+    assert len(str(play.ctrl.progression.path)) > 220
+    assert shortened and all(text.startswith(("Saved in ", "Save file: ")) for text in shortened), shortened
+    assert any(text.startswith("Save file: ") for text in drawn)

@@ -1707,6 +1707,61 @@ lost that were won; used 92 times. Run by run the same as the measured option "1
 **Not verified:** no person has played it. The gain is measured with one simulated player on
 four fixed compositions.
 
+### 7.28 The configuration as decided (D-31), part 1: groups, the seed on the New Run screen (2026-11-12)
+
+**Owner decisions (D-31).** The demo options get a group of their own at the bottom of
+Settings; the dice seed is chosen on the New Run screen; a small set of comfort and play-aid
+settings is built. This section is the structure; the new settings follow in their own change.
+
+**What changed**
+
+| Before | Now |
+|--------|-----|
+| One flat list of eight settings | Four groups, in this order: Display and comfort, Play aids, Class Evolution, Demo and testing (keys 1 to 4) |
+| Mastery pace, start preset, roster size and third battle mixed with player settings | In "Demo and testing", greyed with the reason while Class Evolution is off |
+| "Reset the saved profile" at the bottom of the list | A row of the group Class Evolution |
+| The dice seed was a Settings row: random, or a fixed seed the game drew | **On the party setup: "Dice seed (D)"**, random or a seed the player types |
+| Settings only from the main menu | Also from the pause menu of a run |
+| No way back to the defaults | "Reset all settings to defaults", asked twice |
+| "Animation" | "Motion and flashes" |
+| The controls help only from the main menu and the pause menu | Also a row of "Play aids"; it returns to the Settings |
+
+**How it is built**
+
+- **From the pause menu** the run waits and nothing advances. Display and comfort apply at
+  once. Class Evolution, the demo group and both resets are locked with the reason "Not during
+  a run": each would close the save and with it the run. A command sent anyway is refused.
+- **The typed seed.** While a seed is typed every key belongs to the entry: digits (also the
+  number pad), Backspace, Enter, Esc. The number keys add no hero and B begins no run until the
+  entry ends. A seed is 0 to 2^64 - 1; more is refused with the range. Leaving the screen ends
+  the entry; beginning the run takes what was typed. The seed is kept in the settings file as
+  before, and the `--seed` launch flag still wins and locks the control.
+- **Reset to defaults** keeps the save folder (a place, not a preference) and the saved
+  heroes. Class Evolution goes off with it, as its default says.
+- The settings file has the same fields as before. No rule of a battle is touched; the replay
+  pin and the content are unchanged.
+
+**Evidence**
+
+- 1137 tests pass (1131 before). Lint and type checks are clean.
+- The existing Settings tests were rewritten for the groups. New tests: the groups and their
+  order; the help from the Settings and back; reset to defaults (asked twice, cancelled by
+  anything else, the heroes kept); the Settings from the pause menu with every lock and every
+  refused command; the typed seed (digits and number pad, keys of the screen silent meanwhile,
+  Backspace, Enter, Esc, too large, leaving, beginning, the file, the launch flag); **no text
+  cut off at both sizes under three fonts**, including a seed of 20 digits.
+- The README's tour was changed to the groups, and the test that plays it follows.
+- **Deliberate breaks:** 39 breaks of the new code. 38 were caught at first; the one miss was a
+  test gap (choosing a group that does not exist), now closed. Run without bytecode files and
+  with a control run.
+- **Found by the Windows check, fixed:** the new "Saved profile" row drew the save file's path
+  as a wrapped paragraph. A path has no spaces to wrap at, so on Windows (a long path) it stood
+  on a line of its own and was cut without its "Save file:" label. It is one labelled line
+  again. The failure was reproduced here with a long folder name before the fix; that test stays.
+
+**Not verified:** no person has used the screens; checked by tests and by screenshots made in
+this session.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one
