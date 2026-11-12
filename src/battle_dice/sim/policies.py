@@ -13,7 +13,7 @@ from typing import Any
 
 from battle_dice import rng
 from battle_dice.core import commands as cmd
-from battle_dice.core import planning, progression, reactions
+from battle_dice.core import planning, progression, reactions, skills
 from battle_dice.core.effects import damage_breakdown, shield_bonus
 from battle_dice.core.engine import Engine
 from battle_dice.core.models import (
@@ -199,11 +199,15 @@ class HeuristicPolicy:
         """
         best: list[dict[str, Any]] = []
         best_score = 0.0
+        options = planning.die_options(engine, hero, turn)
         choices = {
             o["die_id"]: [[]] if o["face"].target_scope in ("all_enemies", "all_allies", "self")
             else [[t] for t in o["eligible_target_ids"]]
-            for o in planning.die_options(engine, hero, turn)
+            for o in options
         }
+        # Downed allies a die may revive through Field Medic. Such an action is a dearer face, so a
+        # plan that holds one is built by the rules themselves (which may refuse it for its mana).
+        medic = {o["die_id"]: set(skills.field_medic_targets(engine, hero, o["face"])) for o in options if not o["face"].is_blank}
         for shape in planning.enumerate_plans(engine, hero, turn, include_targets=False):
             try:
                 template = planning.build_plan(engine, hero, turn, shape)
@@ -212,10 +216,18 @@ class HeuristicPolicy:
             fixed = {i.source_die_id: i.committed_target_ids for i in template}
             for targets in itertools.product(*(choices[a["die_id"]] for a in shape)):
                 chosen = {a["die_id"]: t for a, t in zip(shape, targets, strict=True)}
-                intents = [
-                    dataclasses.replace(i, committed_target_ids=chosen[i.source_die_id] or fixed[i.source_die_id])
-                    for i in template
-                ]
+                if any(t and t[0] in medic.get(die_id, ()) for die_id, t in chosen.items()):
+                    try:
+                        intents = planning.build_plan(
+                            engine, hero, turn, [{"die_id": a["die_id"], "target_ids": list(chosen[a["die_id"]])} for a in shape]
+                        )
+                    except planning.PlanError:
+                        continue
+                else:
+                    intents = [
+                        dataclasses.replace(i, committed_target_ids=chosen[i.source_die_id] or fixed[i.source_die_id])
+                        for i in template
+                    ]
                 score = self._score_plan(engine, hero, intents)
                 if score > best_score + 1e-9:
                     best = [{"die_id": a["die_id"], "target_ids": list(chosen[a["die_id"]])} for a in shape]

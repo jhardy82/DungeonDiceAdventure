@@ -205,6 +205,9 @@ class Combatant:
     state: str = STATE_STANDING
     #: Enemy-only per-encounter stat adjustments: ``{action_id: {"power": int, "weight": int}}``.
     action_overrides: dict[str, dict[str, int]] = field(default_factory=dict)
+    #: Hero-only: once-per-encounter skills already used in this battle (``core.skills``). It is left out
+    #: of the plain form while empty, so a run that never uses such a skill hashes as it always did.
+    skill_uses: dict[str, int] = field(default_factory=dict, metadata={"omit_when_empty": True})
 
     @property
     def standing(self) -> bool:
@@ -362,7 +365,12 @@ class CombatEvent:
 def to_plain(value: Any) -> Any:
     """Recursively convert dataclasses to plain JSON-compatible containers."""
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return {f.name: to_plain(getattr(value, f.name)) for f in dataclasses.fields(value)}
+        return {
+            f.name: to_plain(getattr(value, f.name))
+            for f in dataclasses.fields(value)
+            # A field added after the hash format was fixed says so, and is absent while it holds nothing.
+            if not (f.metadata.get("omit_when_empty") and not getattr(value, f.name))
+        }
     if isinstance(value, dict):
         return {str(k): to_plain(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):

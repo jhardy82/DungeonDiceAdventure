@@ -161,6 +161,8 @@ class AppController:
         self.progression_error: str | None = None
         self.career_hero: str | None = None
         self.career_vocation: str | None = None
+        self._sprite_classes: dict[str, str] = {}
+        self.career_tab = "vocation"  # the right half of the career screen: a vocation's details, or the hero's skills
         self.career_return = Screen.PARTY_SETUP
         #: Offer the optional third battle after battle 2 (owner decision D-27). A setting of the demo.
         self.third_battle = self.settings.third_battle
@@ -493,7 +495,8 @@ class AppController:
                 self._report_draft()
             else:
                 self.targeting_die = die_id
-                self.info(f"Choose a target for {option['face']['name']} (Esc cancels).")
+                skill = f" {option['skill_note']} (once per battle)." if option.get("skill_note") else ""
+                self.info(f"Choose a target for {option['face']['name']} (Esc cancels).{skill}")
             return
         self.draft.append({"die_id": die_id, "target_ids": []})
         self._report_draft()
@@ -913,10 +916,12 @@ class AppController:
         """The class whose picture stands for a vocation: itself, or the starting class it grew from."""
         if class_id in self.content.classes or self.vocations is None:
             return class_id
-        try:
-            return self.vocations.build(class_id).upgrade_family
-        except Exception:  # noqa: BLE001 - a picture is never worth an error
-            return class_id
+        if class_id not in self._sprite_classes:  # asked for every card in every frame: looked up once
+            try:
+                self._sprite_classes[class_id] = self.vocations.build(class_id).upgrade_family
+            except Exception:  # noqa: BLE001 - a picture is never worth an error (an enemy is its own picture)
+                self._sprite_classes[class_id] = class_id
+        return self._sprite_classes[class_id]
 
     def member_name(self, member: dict[str, str]) -> str:
         if self.progression is not None and "hero_id" in member:
@@ -1016,7 +1021,7 @@ class AppController:
     # -- career ----------------------------------------------------------------------------------
 
     def open_career(self, hero_id: str) -> None:
-        self.career_hero, self.career_vocation = hero_id, None
+        self.career_hero, self.career_vocation, self.career_tab = hero_id, None, "vocation"
         self.career_return = self.screen
         self.screen = Screen.CAREER
         self.info("A hero's career: what it has mastered, what it can become, and what is still hidden.")
@@ -1027,7 +1032,46 @@ class AppController:
         self.career_hero = None
 
     def select_career_vocation(self, vocation_id: str) -> None:
-        self.career_vocation = vocation_id
+        self.career_vocation, self.career_tab = vocation_id, "vocation"
+
+    def toggle_career_skills(self) -> None:
+        self.career_tab = "vocation" if self.career_tab == "skills" else "skills"
+
+    def skills_view(self) -> dict[str, Any]:
+        """The skills the career screen's hero has learned, and for each whether it can be equipped or taken off, and why not."""
+        link, hero_id = self.progression, self.career_hero
+        assert link is not None and hero_id is not None
+        view = link.skills(hero_id)
+        in_run = link.state.run is not None and link.state.run.phase not in ("victory", "defeat")
+        for row in view["rows"]:
+            locked = "A hero's skills cannot change during a run." if in_run else None
+            row["can_equip"] = not row["equipped"] and locked is None and row["problem"] is None
+            row["can_unequip"] = row["equipped"] and locked is None
+            row["reason"] = locked or row["problem"]
+        view["name"] = link.state.heroes[hero_id].display_name or hero_id
+        view["in_run"] = in_run
+        return view
+
+    def equip_skill(self, skill_id: str) -> None:
+        self._guard(self._skill_command, "equip", skill_id)
+
+    def unequip_skill(self, skill_id: str) -> None:
+        self._guard(self._skill_command, "unequip", skill_id)
+
+    def _skill_command(self, what: str, skill_id: str) -> None:
+        link, hero_id = self.progression, self.career_hero
+        assert link is not None and hero_id is not None
+        result = link.equip_skill(hero_id, skill_id) if what == "equip" else link.unequip_skill(hero_id, skill_id)
+        name = str(link.catalog.skills[skill_id]["name"])
+        hero_name = link.state.heroes[hero_id].display_name
+        if not result.accepted:
+            reasons = {"PHASE_LOCKED": "A hero's skills cannot change during a run.", "CAPACITY_EXCEEDED": f"{hero_name} has too little capacity for {name}.",
+                       "NO_LEGAL_FACE": f"None of {hero_name}'s dice has a face {name} can work on.",
+                       "PREREQUISITE_UNMET": f"{hero_name} cannot equip {name}."}
+            self.warn(reasons.get(str(result.error_code), "That is not allowed right now."))
+            return
+        self._refresh_party()
+        self.info(f"{hero_name} has equipped {name}." if what == "equip" else f"{hero_name} has taken off {name}.")
 
     def career_view(self) -> dict[str, Any]:
         """One hero's career tree with, for each listed vocation, what the hero may do with it and why not."""

@@ -19,7 +19,7 @@ from typing import Any
 from battle_dice import RNG_ALGORITHM, RULES_VERSION, rng
 from battle_dice.content.loader import Content, load_content
 from battle_dice.core import commands as cmd
-from battle_dice.core import effects, enemy_ai, planning, progression, reactions, terminal, timeline
+from battle_dice.core import effects, enemy_ai, planning, progression, reactions, skills, terminal, timeline
 from battle_dice.core.build import (
     BuildNotSupported,
     BuildSource,
@@ -165,7 +165,8 @@ class Engine:
         actor = self.combat.combatants[intent.actor_id]
         if intent.source_die_id is not None:
             assert intent.face_index is not None
-            return self.die_for(actor.id, intent.source_die_id).faces[intent.face_index]
+            face = self.die_for(actor.id, intent.source_die_id).faces[intent.face_index]
+            return skills.as_field_medic(face) if skills.FIELD_MEDIC_TAG in intent.tags else face
         assert intent.ability_id is not None
         return self.enemy_action(actor, intent.ability_id)
 
@@ -420,6 +421,7 @@ class Engine:
             table = self.encounters.encounter(encounter_id, len(heroes))
         combat = CombatState(encounter_id=encounter_id, event_seq=event_seq)
         for hero in heroes:
+            hero.skill_uses = {}  # once per encounter: every battle starts with every skill unused
             combat.combatants[hero.id] = hero
         for enemy in progression.make_enemies(self.content, len(heroes), battle, table):
             combat.combatants[enemy.id] = enemy
@@ -788,6 +790,8 @@ class Engine:
         turn.queue_index += 1
         if effects.resolve_action(self, intent, self.intent_face(intent)):
             turn.resolved_categories.append(intent.category)
+            if skills.FIELD_MEDIC_TAG in intent.tags:  # used: not again in this encounter
+                self.combat.combatants[intent.actor_id].skill_uses[skills.FIELD_MEDIC] = 1
         if self.check_terminal():
             return
         if turn.queue_index >= len(turn.plan):

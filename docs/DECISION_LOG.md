@@ -1274,6 +1274,118 @@ Plus **Reset the saved profile**, which asks twice.
 **Not verified:** no person has used the Settings screen; it was checked by tests and by
 screenshots made in this session.
 
+### 7.20 Class Evolution Phase 4, step E: Field Medic in battle, and the skills panel (2026-11-12)
+
+**Owner decision (D-27):** Field Medic works in battle in the first slice, as its last step.
+
+**The rule as built**
+
+- A hero with **Guardian Field Medic** equipped may use a Healing face that cannot revive on a
+  **downed** ally. Used so, the action costs **1 more mana**, brings the ally back at **1 HP**,
+  and is named "Heal (Field Medic)" in the plan, the log and the record.
+- **Once per encounter.** The use is counted on the hero and cleared when the next battle is
+  built. Two such revivals cannot be planned in one activation.
+- On a standing ally the face is what it always was, and the skill stays ready.
+- Refusals use the plan codes of section 7.14: too little mana is `INSUFFICIENT_MANA` ("Heal
+  (Field Medic) needs 2 mana but only 1 will be available"); a downed ally without the skill, or
+  after its use, is `TARGET_DOWNED`.
+- It does not create a new action and does not change a face that already revives.
+
+**Readings that are mine, written here so they can be changed**
+
+| Question | Reading | Why |
+|----------|---------|-----|
+| Which face does it apply to? | Any Healing face with one ally as its target that the hero rolls | Fixture CE-29 shows it as an option on the face; the catalog says "one equipped Healing face" and names no way to choose one |
+| When is the use spent? | When the action resolves. A revival that is cancelled or loses its target is not spent | The same moment the mana is paid |
+| Where is a skill equipped? | On the Career screen, between runs | The career rules already lock a build during a run |
+
+**How it is built**
+
+- `src/battle_dice/core/skills.py` is the one place that knows the skill. The plan, the die's
+  target list, the resolution and the simulated player all ask it.
+- **The hashed state.** The per-encounter counter is a new field on a combatant. It is left out
+  of the plain form while empty, so a run that never uses a skill hashes exactly as before. The
+  replay pin and the six content files are unchanged; the gate-off simulator on seeds 300 to 339
+  is identical to the stored reference (1703 of 2200).
+- A hero's equipped skills reach the run in its build snapshot (section 7.17), so a record
+  replays from the command log and the pinned catalog alone.
+- **Catalog 0.4.0:** `guardian_field_medic` is marked `existing` and leaves the engine gap
+  `inherited_skills`. A test holds the catalog and the rules to the same list. The catalog's
+  hash changes, so a record of an evolved run made with catalog 0.3.0 no longer verifies; that
+  is what the pin is for.
+
+**The skills panel**
+
+- Career screen, key **K**: the skills a hero has learned, who teaches each, what it costs in
+  capacity, and Equip or Take off. A skill is free while the vocation that teaches it is active.
+- Every reason an Equip button is off is written in the row: not in this version yet, too
+  little capacity, no face it can work on, or a run is under way.
+- **Squire Anchor is listed and cannot be equipped.** The rules of battle do not know it, and
+  a hero should not spend capacity on something that does nothing.
+- The start preset "a mastered Guardian" now has Field Medic equipped.
+- In battle the die says "Field Medic: revive for 2 mana" while the skill can be used, and the
+  downed ally is a target.
+
+**Found and fixed on the way**
+
+- **An evolved hero had no picture in battle** (the card, the turn order, the intent panel and
+  the outcome screen asked for a picture named after the vocation). It now uses the picture of
+  the class it grew from, as the party setup already did. Present since step D.
+- A long plan line was cut off under the widest font. Plan lines are now set smaller before
+  they are cut.
+
+**Not built, and why**
+
+| Not built | Why |
+|-----------|-----|
+| Putting a family die back (the plan's build panel) | No hero owns dice of its own in the playable slice; a hero fights with its vocation's starting dice. There is nothing to put back until a later wave gives heroes dice |
+| Squire Anchor in battle | The plan closes the skill gap for this one skill kind. Anchor on top of the Guardian's own passive needs a balance decision first |
+| Fixtures CE-29 and CE-30 as written | They need the Champion. Their situation (a revival that costs more than the hero has) is tested with the Guardian |
+
+**Measured (simulated player, not a balance claim)**
+
+Guardian parties of sizes 2 to 5, one fixed composition each, seeds 500 to 559, third battle
+always fought, the same seeds with and without the skill:
+
+| Party size | Wins without | Wins with | Revivals used |
+|------------|--------------|-----------|---------------|
+| 2 | 46 of 60 | 46 of 60 | 0 |
+| 3 | 46 of 60 | 45 of 60 | 2 |
+| 4 | 35 of 60 | 35 of 60 | 3 |
+| 5 | 26 of 60 | 26 of 60 | 5 |
+
+- **No measurable effect for this player:** 153 wins without, 152 with, in 240 runs each.
+- **Why:** in 120 of these runs (seeds 500 to 539, sizes 2 to 4) the Guardian had a rolled Heal
+  in front of it with an ally down at 128 keep-or-reroll decisions, and had the 2 mana at 4 of
+  them. It used the skill 4 times. The simulated player spends mana on its reaction as soon as
+  it can and never saves it.
+- A person who keeps 2 mana back may get more from it. Whether the cost should be lower is an
+  owner decision with these numbers; nothing was tuned.
+- These are whole-run rates of four fixed compositions with heroes at their catalog numbers.
+  They are not the measure the third battle's table was tuned on (section 7.16).
+
+**Evidence**
+
+- 1070 tests pass (1038 before). Lint and type checks are clean. Core coverage 97%.
+- New tests: the rule (12 tests: the revival, once per encounter, ready again next battle, the
+  two refusal codes, faces it must not change, an unknown skill, the hashed state, replay, two
+  revivals in one plan, the simulated player); the save link (the skills view, equip and take
+  off by slot, capacity away from the vocation, the skill inside a real run, eight whole runs
+  with replay); the screens (the panel, equip and take off with the save's events, the lock
+  during a run, every refusal's wording, the die's note, the revival played through the screen,
+  pictures, **no text of the new parts cut off at both sizes under three fonts**).
+- Both self-checks pass; the gate-on one now opens the skills panel.
+- **Deliberate breaks:** 39 breaks of the new code. 36 were caught at first. Two misses were
+  test gaps (taking off a skill that is not in the first slot; the Career screen reopening on
+  the skills), now closed. The third was not a break: it changed nothing a player could see, and
+  was replaced by one that is. All 39 are caught. Run without bytecode files and with a control
+  run.
+
+**Not verified:** no person has played it; checked by tests and by screenshots made in this
+session.
+
+**Still to do for the slice:** the vocation change inside a run (CE-19).
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

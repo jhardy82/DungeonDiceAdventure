@@ -303,6 +303,11 @@ names.
    - *How hard is it?* **Answer:** an informed player with a Guardian in the party wins
      70-85%, per party size.
    - *Does Field Medic work in battle in this slice?* **Answer:** yes, as its last step.
+     **Built 2026-11-12** (catalog 0.4.0): once per encounter, a Healing face that cannot revive
+     may be used on a downed ally; used so it costs 1 more mana and brings the ally back at
+     1 HP. The reading that it applies to any such face the hero rolls, and that the hero's
+     skills are equipped on the Career screen between runs, is the builder's
+     (`docs/DECISION_LOG.md`, section 7.20).
    - The steps and what each one proves are in `docs/DECISION_LOG.md`, section 7.15.
 
 ## 11. Risks

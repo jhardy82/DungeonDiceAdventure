@@ -301,7 +301,7 @@ def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float
         border = side_color if standing else Theme.FAINT
     ui.panel(x, y, w, h, fill=fill, border=border, width=3 if active else 1)
     ui.decorate(key, rect, enabled)
-    sprite_key = ui.assets.combatant_key(c["archetype_id"])
+    sprite_key = ui.assets.combatant_key(ctrl.sprite_class(c["archetype_id"]))
     if standing or c["side"] == "hero":
         ui.sprite(sprite_key, x + 3, y + 21, 44, 44, variant="" if standing else "grey")
     else:
@@ -429,7 +429,7 @@ def draw_center(ui: UI, ctrl: AppController, view: dict[str, Any], inspect: dict
         ui.panel(478, 88, 324, 144, "Enemy intent (committed)", border=Theme.ENEMY, width=2)
         state = "CANCELLED" if intent["cancelled"] else "elite-resistant" if intent["elite_resistant"] else "interruptible" if intent["interruptible"] else "not interruptible"
         actor_archetype = next((c["archetype_id"] for c in view["combatants"] if c["id"] == intent["actor_id"]), "")
-        ui.sprite(ui.assets.combatant_key(actor_archetype), 760, 106, 36, 36)
+        ui.sprite(ui.assets.combatant_key(ctrl.sprite_class(actor_archetype)), 760, 106, 36, 36)
         ui.sprite(ui.assets.category_key(intent["category"]), 722, 106, 36, 36)
         # The lines flow, so a long name or rule wraps instead of being cut on a wide font.
         y = ui.paragraph(488, 108, f"{intent['actor_name']}: {intent['name']}", 230, 16, Theme.TEXT, line_height=18, max_lines=2, bold=True)
@@ -478,7 +478,7 @@ def draw_header(ui: UI, ctrl: AppController, view: dict[str, Any], fast: bool) -
         hero = cid.startswith("h")
         ui.panel(x, 46, 146, 28, fill=Theme.PANEL, border=Theme.ACCENT if position == 0 else Theme.HERO if hero else Theme.ENEMY,
                  width=2 if position == 0 else 1)
-        ui.sprite(ui.assets.combatant_key(archetypes.get(cid, "")), x + 3, 49, 22, 22)
+        ui.sprite(ui.assets.combatant_key(ctrl.sprite_class(archetypes.get(cid, ""))), x + 3, 49, 22, 22)
         ui.text(x + 28, 53, ui.fit_name(name, 13, False, 114), 13, Theme.TEXT)
         x += 151
 
@@ -549,6 +549,9 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
                 ui.text(x + 8, 612, "IN PLAN", 13, Theme.ACCENT, bold=True)
             elif awaiting:
                 ui.text(x + 8, 612, "CHOOSE A TARGET", 13, Theme.ACCENT, bold=True)
+            elif die.get("skill_note"):
+                # An equipped skill widens what this face may do right now (Field Medic: a downed ally is a target).
+                ui.text(x + 8, 612, die["skill_note"], 13, Theme.GOOD, bold=True, max_width=232)
         keep_key = (pygame.K_z, pygame.K_x)[index]
         ui.button(f"die:{die['die_id']}:keep", x + 8, 628, 112, 48, "Unkeep" if die["kept"] else "Keep",
                   partial(ctrl.toggle_keep, die["die_id"]), selected=die["kept"], hotkeys=(keep_key,),
@@ -571,7 +574,10 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
     for number, entry in enumerate(preview["ordered"], start=1):
         targets = ", ".join(entry["target_names"]) or "-"
         cost = f", {entry['mana_cost']} mana" if entry["mana_cost"] else ""
-        ui.text(px0, y, f"{number}. {entry['name']} -> {targets}  (speed {entry['action_speed']}{cost})", 14, Theme.TEXT, bold=True, max_width=372)
+        line = f"{number}. {entry['name']} -> {targets}  (speed {entry['action_speed']}{cost})"
+        # A long action name (a skill's, for one) is set smaller before it is ever cut off.
+        line_size = next((size for size in (14, 13, 12, 11) if ui.text_width(line, size, True) <= 372), 11)
+        ui.text(px0, y, line, line_size, Theme.TEXT, bold=True, max_width=372)
         if entry["forecast"]:
             ui.text(px0 + 14, y + 16, f"Now {entry['forecast']}", 12, Theme.WARN, bold=True, max_width=358)
             y += 34
@@ -866,7 +872,7 @@ def draw_outcome(ui: UI, ctrl: AppController) -> None:
 
     party = [c for c in ctrl.view()["combatants"] if c["side"] == "hero"]
     for position, hero in enumerate(party[:5]):
-        ui.sprite(ui.assets.combatant_key(hero["archetype_id"]), 130, 190 + position * 64, 60, 60,
+        ui.sprite(ui.assets.combatant_key(ctrl.sprite_class(hero["archetype_id"])), 130, 190 + position * 64, 60, 60,
                   variant="" if hero["state"] == "standing" else "grey")
         ui.text(198, 202 + position * 64, ui.fit_name(hero["name"], 15, True, 134), 15, Theme.TEXT, bold=True)
         ui.text(198, 222 + position * 64, "standing" if hero["state"] == "standing" else "DOWNED", 13,
@@ -1010,6 +1016,15 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
                       tooltip="Unlock this vocation for the hero. It costs nothing.")
         y += 36 if index < len(view["rows"]) - 1 else 0
 
+    skills_tab = ctrl.career_tab == "skills"
+    ui.button("career:tab", 248, 630, 220, 44, "Vocation  (K)" if skills_tab else "Skills  (K)", ctrl.toggle_career_skills,
+              hotkeys=(pygame.K_k,), tooltip="Show the vocation's details." if skills_tab else "Show the skills this hero has learned and equip them.")
+    if skills_tab:
+        draw_career_skills(ui, ctrl)
+        ui.button("career:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_career, hotkeys=(pygame.K_b,), default=True)
+        ui.escape_action = ctrl.close_career
+        status_bar(ui, ctrl)
+        return
     info = ctrl.class_view(view["selected"])
     ui.panel(788, 78, 476, 540, info["name"])
     ui.sprite(ui.assets.combatant_key(ctrl.sprite_class(view["selected"])), 1206, 82, 50, 50)
@@ -1039,6 +1054,37 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
     ui.button("career:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_career, hotkeys=(pygame.K_b,), default=True)
     ui.escape_action = ctrl.close_career
     status_bar(ui, ctrl)
+
+
+def draw_career_skills(ui: UI, ctrl: AppController) -> None:
+    """The right half of the career screen as the hero's skills: what it has learned, what is equipped, and why not."""
+    view = ctrl.skills_view()
+    ui.panel(788, 78, 476, 540, "Skills")
+    x, y = 802.0, 106.0
+    ui.text(x, y, f"Capacity used: {view['used']} of {view['capacity']} as a {view['vocation_name']}", 15, Theme.TEXT, bold=True, max_width=448)
+    y = ui.paragraph(x, y + 22, "A mastered vocation teaches a skill. It is free while that vocation is active; "
+                                "with another vocation it takes capacity.", 448, 13, Theme.DIM, line_height=16, max_lines=3) + 8
+    if not view["rows"]:
+        ui.paragraph(x, y, "This hero has learned no skill yet. Skills come with mastery ranks; the vocation's rows on the left "
+                           "show how far it is.", 448, 14, Theme.DIM, line_height=18, max_lines=4)
+        return
+    for row in view["rows"][:3]:
+        ui.panel(798, y, 456, 128, fill=(24, 27, 35))
+        ui.text(808, y + 8, row["name"], 16, Theme.ACCENT, bold=True, max_width=300)
+        state = "EQUIPPED" if row["equipped"] else "not equipped"
+        ui.text(1244, y + 10, state, 13, Theme.GOOD if row["equipped"] else Theme.FAINT, bold=row["equipped"], align="right", max_width=130)
+        cost = "free here" if row["cost"] == 0 else f"capacity {row['cost']}"
+        ui.text(808, y + 30, f"Taught by the {row['taught_by']}; {cost}", 13, Theme.FAINT, max_width=300)
+        ui.paragraph(808, y + 48, row["summary"], 300, 12, Theme.TEXT if row["in_battle"] else Theme.DIM, line_height=14, max_lines=4)
+        if row["reason"] and not row["equipped"]:
+            ui.text(808, y + 108, row["reason"], 12, Theme.WARN, max_width=436)
+        if row["equipped"]:
+            ui.button(f"skill:{row['skill_id']}:unequip", 1118, y + 44, 126, 44, "Take off", partial(ctrl.unequip_skill, row["skill_id"]),
+                      enabled=row["can_unequip"], reason=row["reason"], size=14, tooltip="The skill stays learned and can be equipped again.")
+        else:
+            ui.button(f"skill:{row['skill_id']}:equip", 1118, y + 44, 126, 44, "Equip", partial(ctrl.equip_skill, row["skill_id"]),
+                      enabled=row["can_equip"], reason=row["reason"], size=14, tooltip="The hero brings this skill into its next run.")
+        y += 134
 
 
 def draw_continue(ui: UI, ctrl: AppController) -> None:

@@ -20,7 +20,7 @@ from battle_dice.features import CLASS_EVOLUTION
 from battle_dice.sim.policies import HeuristicPolicy
 from battle_dice.ui import screens
 from battle_dice.ui.app import GameApp
-from tests.conftest import win_battle
+from tests.conftest import begin_hero, down, unit, win_battle
 from tests.ui.test_ui_flow import SIZES, Play, font, record_text  # noqa: F401 - font is a fixture
 
 OPENED: list[AppController] = []
@@ -637,3 +637,216 @@ def test_a_fault_while_drawing_the_settings_reaches_the_error_screen(tmp_path, m
     monkeypatch.setattr(screens, "draw_settings", boom)
     play.app.frame(0)
     assert play.app.render_faults == 1 and play.ctrl.screen == Screen.ERROR
+
+
+# --------------------------------------------------------------------------------------------
+# Skills: the build panel of the career screen, and Field Medic in a battle (Phase 4, step E)
+# --------------------------------------------------------------------------------------------
+
+
+def medic_game(tmp_path, size=(1280, 720), preset="guardian_mastered") -> Configured:
+    """A game whose new profile starts with a mastered Guardian (Field Medic equipped), a Scout and an Apprentice."""
+    from battle_dice.settings import Settings
+
+    play = Configured(tmp_path, settings=Settings(class_evolution=True, demo_preset=preset), size=size, fixed_seed=11)
+    play.ctrl.new_run()
+    play.app.frame(0)
+    return play
+
+
+def in_a_battle_with_a_downed_scout(play: Configured, mana: int = 2):
+    """The Guardian and the Scout fight; the Scout is down and the Guardian has rolled its Heal."""
+    for hero_id in ("hero_001", "hero_002"):
+        play.ctrl.add_saved_hero(hero_id)
+    play.ctrl.begin_run()
+    engine = play.ctrl.engine
+    assert engine is not None
+    down(engine, "h02")
+    begin_hero(engine, "h01", guardian_d4=1, guardian_d6=5)
+    unit(engine, "h01").mana = mana
+    play.ctrl.refresh()
+    play.app.frame(0)
+    return engine
+
+
+def heal_die(play: Configured) -> dict:
+    view = play.ctrl._turn_view()
+    assert view is not None
+    return next(d for d in view["dice"] if d["die_id"] == "guardian_d6")
+
+
+def test_k_shows_the_heros_skills_and_what_each_one_is(tmp_path, monkeypatch):
+    play = medic_game(tmp_path)
+    play.ctrl.open_career("hero_001")
+    play.app.frame(0)
+    drawn, shortened = record_text(monkeypatch)
+    play.key(pygame.K_k)
+    assert play.ctrl.career_tab == "skills" and play.ctrl.screen == Screen.CAREER
+    view = play.ctrl.skills_view()
+    assert (view["used"], view["capacity"], view["vocation_name"], view["in_run"]) == (0, 4, "Guardian", False)
+    rows = {row["skill_id"]: row for row in view["rows"]}
+    medic, anchor = rows["guardian_field_medic"], rows["squire_anchor"]
+    assert (medic["equipped"], medic["cost"], medic["taught_by"], medic["in_battle"], medic["can_unequip"]) == (True, 0, "Guardian", True, True)
+    assert (anchor["equipped"], anchor["cost"], anchor["in_battle"], anchor["can_equip"]) == (False, 1, False, False)
+    assert anchor["reason"] == "Not in this version yet: the rules of battle do not know this skill."
+    assert "Capacity used: 0 of 4 as a Guardian" in drawn and anchor["reason"] in drawn and "EQUIPPED" in drawn
+    assert play.ui.widget("skill:squire_anchor:equip").enabled is False
+    assert play.ui.widget("skill:squire_anchor:equip").reason == anchor["reason"]
+    assert shortened == [] and play.app.render_faults == 0
+    play.key(pygame.K_k)
+    assert play.ctrl.career_tab == "vocation" and play.ui.widget("skill:squire_anchor:equip") is None
+    play.key(pygame.K_k)
+    play.click("career:scout:select")
+    assert play.ctrl.career_tab == "vocation", "choosing a vocation shows that vocation"
+    play.key(pygame.K_k)
+    assert play.ctrl.career_tab == "skills"
+    play.ctrl.close_career()
+    play.ctrl.open_career("hero_002")
+    assert play.ctrl.career_tab == "vocation", "a career opens on the vocations, whatever was shown last"
+    play.ctrl.toggle_career_skills()
+    play.app.frame(0)
+    assert play.ctrl.skills_view()["rows"] == [] and any(text.startswith("This hero has learned no skill yet.") for text in drawn)
+    assert play.app.render_faults == 0
+
+
+def test_a_skill_is_taken_off_and_equipped_again_and_the_save_keeps_it(tmp_path):
+    play = medic_game(tmp_path)
+    hero = play.ctrl.progression.state.heroes["hero_001"]
+    assert hero.equipped_skills == {0: "guardian_field_medic"}
+    play.ctrl.open_career("hero_001")
+    play.app.frame(0)
+    play.key(pygame.K_k)
+    play.click("skill:guardian_field_medic:unequip")
+    assert hero.equipped_skills == {} and play.ctrl.message == "Squire 1 has taken off Guardian Field Medic."
+    assert play.ui.widget("skill:guardian_field_medic:unequip") is None
+    play.click("skill:guardian_field_medic:equip")
+    assert hero.equipped_skills == {0: "guardian_field_medic"} and play.ctrl.message == "Squire 1 has equipped Guardian Field Medic."
+    play.click("career:back")
+    play.ctrl.add_saved_hero("hero_001")
+    assert play.ctrl.progression.party_entry("hero_001", "front")["hero"]["skills"] == ["guardian_field_medic"]
+    events = [row[0] for row in play.ctrl.progression.store.conn.execute(
+        "SELECT event_type FROM progression_event_log WHERE event_type IN ('SkillEquipped', 'SkillUnequipped') ORDER BY event_seq")]
+    assert events == ["SkillEquipped", "SkillUnequipped", "SkillEquipped"]  # the preset's, then the two clicks
+
+
+def test_a_heros_skills_cannot_change_during_a_run(tmp_path):
+    play = medic_game(tmp_path)
+    for hero_id in ("hero_001", "hero_002"):
+        play.ctrl.add_saved_hero(hero_id)
+    play.ctrl.begin_run()
+    play.ctrl.open_career("hero_001")
+    play.ctrl.toggle_career_skills()
+    play.app.frame(0)
+    button = play.ui.widget("skill:guardian_field_medic:unequip")
+    assert button.enabled is False and button.reason == "A hero's skills cannot change during a run."
+    play.ctrl.unequip_skill("guardian_field_medic")  # sent anyway: the career rules refuse it
+    assert play.ctrl.message == "A hero's skills cannot change during a run." and play.ctrl.message_is_error
+    assert play.ctrl.progression.state.heroes["hero_001"].equipped_skills == {0: "guardian_field_medic"}
+
+
+def test_a_refused_skill_command_says_why(tmp_path, monkeypatch):
+    play = medic_game(tmp_path)
+    link = play.ctrl.progression
+    play.ctrl.open_career("hero_001")
+    assert link.change("hero_001", "squire").accepted  # a Squire has capacity 2; Field Medic needs 3 away from the Guardian
+    assert link.state.heroes["hero_001"].equipped_skills == {}
+    medic = next(row for row in play.ctrl.skills_view()["rows"] if row["skill_id"] == "guardian_field_medic")
+    assert (medic["cost"], medic["can_equip"], medic["reason"]) == (3, False, "Needs 3 capacity; 2 of 2 is free.")
+    play.ctrl.equip_skill("guardian_field_medic")
+    assert play.ctrl.message == "Squire 1 has too little capacity for Guardian Field Medic." and play.ctrl.message_is_error
+    assert link.change("hero_001", "guardian").accepted
+    monkeypatch.setattr(type(link.career.service), "skill_has_a_face", lambda *args, **kwargs: False)
+    medic = next(row for row in play.ctrl.skills_view()["rows"] if row["skill_id"] == "guardian_field_medic")
+    assert medic["reason"] == "None of this hero's dice has a face the skill can work on." and not medic["can_equip"]
+    play.ctrl.equip_skill("guardian_field_medic")
+    assert play.ctrl.message == "None of Squire 1's dice has a face Guardian Field Medic can work on."
+
+
+def test_field_medic_is_offered_on_the_die_and_revives_the_downed_ally(tmp_path, monkeypatch):
+    play = medic_game(tmp_path)
+    drawn, shortened = record_text(monkeypatch)
+    engine = in_a_battle_with_a_downed_scout(play)
+    assert engine.build("h01").skills == ("guardian_field_medic",)
+    die = heal_die(play)
+    assert (die["skill_note"], die["skill_target_ids"], die["eligible_target_ids"]) == ("Field Medic: revive for 2 mana", ["h02"], ["h01", "h02"])
+    assert "Field Medic: revive for 2 mana" in drawn and "Field Medic: revive for 2 mana" not in shortened
+    play.click("die:guardian_d6:use")
+    assert play.ctrl.message == "Choose a target for Heal (Esc cancels). Field Medic: revive for 2 mana (once per battle)."
+    play.click("unit:h02")
+    assert play.ctrl.draft == [{"die_id": "guardian_d6", "target_ids": ["h02"]}] and not play.ctrl.message_is_error
+    assert any(text.startswith("1. Heal (Field Medic) -> Scout 2") and "2 mana" in text for text in drawn), "the plan names the dearer action"
+    play.ctrl.confirm_plan()
+    for _ in range(40):
+        if unit(engine, "h02").state == "standing":
+            break
+        play.ctrl.refresh()
+        play.app.frame(0)
+        if engine.needs_input():
+            break
+        assert engine.do(cmd.ADVANCE_PHASE).accepted
+    scout, guardian = unit(engine, "h02"), unit(engine, "h01")
+    assert (scout.state, scout.hp, guardian.mana) == ("standing", 1, 0) and guardian.skill_uses == {"guardian_field_medic": 1}
+    assert play.app.render_faults == 0 and not [text for text in shortened if "Field Medic" in text]
+
+
+def test_too_little_mana_for_the_revival_is_said_in_the_plan(tmp_path):
+    play = medic_game(tmp_path)
+    in_a_battle_with_a_downed_scout(play, mana=1)
+    play.click("die:guardian_d6:use")
+    play.click("unit:h02")
+    assert play.ctrl.message == "Heal (Field Medic) needs 2 mana but only 1 will be available." and play.ctrl.message_is_error
+    assert play.ui.widget("plan:confirm").enabled is False
+
+
+def test_without_the_skill_the_downed_ally_is_not_a_target(tmp_path):
+    play = medic_game(tmp_path)
+    assert play.ctrl.progression.unequip_skill("hero_001", "guardian_field_medic").accepted
+    in_a_battle_with_a_downed_scout(play)
+    die = heal_die(play)
+    assert die["skill_note"] is None and die["eligible_target_ids"] == ["h01"]
+    play.click("die:guardian_d6:use")
+    play.click("unit:h02")
+    assert play.ctrl.draft == [] and play.ctrl.message_is_error
+
+
+def test_an_evolved_hero_is_drawn_with_the_picture_of_the_class_it_grew_from(tmp_path, monkeypatch):
+    play = medic_game(tmp_path)
+    assert play.ctrl.sprite_class("guardian") == "squire" and play.ctrl.sprite_class("scout") == "scout"
+    assert play.ctrl.sprite_class("goblin_skirmisher") == "goblin_skirmisher", "an enemy is its own picture"
+    asked: list[str] = []
+    original = type(play.ui.assets).combatant_key
+
+    def recorded(self, archetype):
+        asked.append(archetype)
+        return original(self, archetype)
+
+    monkeypatch.setattr(type(play.ui.assets), "combatant_key", recorded)
+    in_a_battle_with_a_downed_scout(play)
+    assert "guardian" not in asked and "squire" in asked, "the battle screen never asks for a picture that does not exist"
+
+
+@pytest.mark.parametrize("size", SIZES)
+def test_no_text_is_cut_off_on_the_skills_panel_or_with_field_medic_in_battle(tmp_path, monkeypatch, font, size):  # noqa: F811
+    play = medic_game(tmp_path, size=size)
+    drawn, shortened = record_text(monkeypatch)
+    play.ctrl.open_career("hero_001")
+    play.app.frame(0)
+    play.ctrl.toggle_career_skills()
+    play.app.frame(0)
+    play.ctrl.unequip_skill("guardian_field_medic")
+    play.app.frame(0)
+    play.ctrl.equip_skill("guardian_field_medic")
+    play.ctrl.close_career()
+    play.ctrl.open_career("hero_003")
+    play.ctrl.toggle_career_skills()
+    play.app.frame(0)
+    play.ctrl.close_career()
+    assert "Skills  (K)" in drawn and "Vocation  (K)" in drawn and shortened == [], shortened
+    in_a_battle_with_a_downed_scout(play)
+    play.click("die:guardian_d6:use")
+    play.click("unit:h02")
+    # The battle screen shortens some long names under the widest font, as it always did; what Field Medic adds must fit.
+    added = [text for text in drawn if "Field Medic" in text]
+    assert "Field Medic: revive for 2 mana" in added and any(text.startswith("1. Heal (Field Medic)") for text in added)
+    assert not [text for text in shortened if "Field Medic" in text], shortened
+    assert play.app.render_faults == 0

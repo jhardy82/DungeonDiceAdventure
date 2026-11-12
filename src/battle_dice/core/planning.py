@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from battle_dice.core import skills
 from battle_dice.core.models import ActionIntent, Combatant, FaceDefinition, HeroTurn
 from battle_dice.core.schedule import Schedule, ScheduleError
 from battle_dice.core.targeting import eligible_targets, protected_targets
@@ -90,7 +91,13 @@ def build_plan(ctx: Engine, hero: Combatant, turn: HeroTurn, actions: list[dict[
         else:
             if len(requested) != 1:
                 raise PlanError(f"{face.name} needs exactly one target.", "WRONG_TARGET_COUNT")
-            if requested[0] not in eligible:
+            if requested[0] in skills.field_medic_targets(ctx, hero, face):
+                # A downed ally, and the hero has Field Medic ready: the face is used as a revival
+                # (1 more mana, back at 1 HP). The mana check below is made on that dearer face.
+                if any(skills.FIELD_MEDIC_TAG in earlier[0].tags for earlier in chosen):
+                    raise PlanError("Field Medic can revive once per encounter.", "TARGET_DOWNED")
+                face = skills.as_field_medic(face)
+            elif requested[0] not in eligible:
                 code, message = target_refusal(ctx, hero, face, requested[0])
                 raise PlanError(message, code)
             targets = requested
@@ -161,6 +168,9 @@ def die_options(ctx: Engine, hero: Combatant, turn: HeroTurn) -> list[dict[str, 
         face_index = turn.rolled[die_id]
         face = die.faces[face_index]
         eligible = [] if face.is_blank else eligible_targets(combat, hero, face)
+        # Field Medic: a downed ally is a target too, while the skill is ready.
+        medic = [] if face.is_blank else skills.field_medic_targets(ctx, hero, face)
+        eligible = [*eligible, *medic]
         reason = None
         needs_mana = False
         if face.is_blank:
@@ -184,6 +194,8 @@ def die_options(ctx: Engine, hero: Combatant, turn: HeroTurn) -> list[dict[str, 
                 "reason": reason,
                 "eligible_target_ids": eligible,
                 "protected_target_ids": [] if face.is_blank else protected_targets(combat, hero, face),
+                "skill_target_ids": medic,
+                "skill_note": skills.field_medic_note(face) if medic else None,
             }
         )
     return options

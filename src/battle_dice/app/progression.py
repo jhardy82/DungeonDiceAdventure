@@ -27,6 +27,7 @@ from battle_dice.career.service import FINISHED_PHASES, CareerResult, career_tre
 from battle_dice.career.store import SqliteProfileStore, StoredCareerService, utc_now
 from battle_dice.content.loader import Content
 from battle_dice.content.vocations import load_catalog
+from battle_dice.core import skills as battle_skills
 from battle_dice.core.engine import Engine
 from battle_dice.core.events import EventType
 
@@ -110,6 +111,8 @@ class Progression:
                 raise RuntimeError("The preset could not make the first hero a Guardian.")
         if preset == "guardian_mastered":
             self.career.grant_mastery(hero_id, "guardian", self.catalog.thresholds("guardian")[-1], reason)
+            if not self.equip_skill(hero_id, battle_skills.FIELD_MEDIC).accepted:
+                raise RuntimeError("The preset could not equip Field Medic.")
 
     def close(self) -> None:
         self.store.close()
@@ -155,6 +158,56 @@ class Progression:
 
     def tree(self, hero_id: str) -> Json:
         return career_tree_view(self.career.service, hero_id)
+
+    # ----------------------------------------------------------------------------------------
+    # Skills
+    # ----------------------------------------------------------------------------------------
+
+    def skills(self, hero_id: str) -> Json:
+        """The skills a hero has learned, which are equipped, and for each other one why it can or cannot be."""
+        hero, service = self.state.heroes[hero_id], self.career.service
+        capacity = self.catalog.inheritance_capacity(hero.active_vocation_id)
+        used = service.capacity_used(hero)
+        slot_of = {skill_id: slot for slot, skill_id in hero.equipped_skills.items()}
+        rows = []
+        for skill_id in hero.learned_skills:
+            skill = self.catalog.skills[skill_id]
+            cost = service.skill_cost(hero, skill_id)
+            in_battle = skill_id in battle_skills.KNOWN
+            problem = None
+            if skill_id in slot_of:
+                pass  # equipped: it can always be taken off (outside a run)
+            elif not in_battle:
+                problem = "Not in this version yet: the rules of battle do not know this skill."
+            elif skill["transfer"] == "active_only":
+                problem = "This skill only works for the vocation that teaches it."
+            elif not service.skill_has_a_face(hero, skill_id):
+                problem = "None of this hero's dice has a face the skill can work on."
+            elif used + cost > capacity:
+                problem = f"Needs {cost} capacity; {capacity - used} of {capacity} is free."
+            rows.append({
+                "skill_id": skill_id,
+                "name": str(skill["name"]),
+                "summary": str(skill["summary"]),
+                "taught_by": self.catalog.name(self.catalog.skill_origin[skill_id][0]),
+                "cost": cost,
+                "equipped": skill_id in slot_of,
+                "slot_index": slot_of.get(skill_id),
+                "in_battle": in_battle,
+                "problem": problem,
+            })
+        return {"capacity": capacity, "used": used, "vocation_name": self.catalog.name(hero.active_vocation_id), "rows": rows}
+
+    def equip_skill(self, hero_id: str, skill_id: str) -> CareerResult:
+        """Equip a learned skill in the hero's first free slot."""
+        hero = self.state.heroes[hero_id]
+        slot = next(index for index in range(len(hero.equipped_skills) + 1) if index not in hero.equipped_skills)
+        return self._command("EquipInheritedSkill", hero, skill_id=skill_id, slot_index=slot)
+
+    def unequip_skill(self, hero_id: str, skill_id: str) -> CareerResult:
+        hero = self.state.heroes[hero_id]
+        slot = next((slot for slot, equipped in hero.equipped_skills.items() if equipped == skill_id), -1)
+        return self._command("UnequipInheritedSkill", hero, slot_index=slot)
 
     def roster(self) -> list[Json]:
         """Every saved hero, as the party setup shows it."""
