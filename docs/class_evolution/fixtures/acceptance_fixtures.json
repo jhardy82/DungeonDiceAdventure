@@ -4031,7 +4031,7 @@
           "max_available_threat": 3
         }
       },
-      "notes": "Decided by the owner on 2026-11-11: the available encounters are the ones the catalog marks 'shipped', at the catalog's ratings: training_01 (shipped battle 1) is threat 1 and training_03 (shipped battle 2) is threat 3. The highest available threat is therefore 3, with this case's pool and with the catalog as it stands. An advanced vocation needs threat 4 at rank 7, so it cannot be mastered until a threat 4 encounter is authored (planned for Phase 4). For an advanced vocation rank 7 is the only dead end; capstone and secret vocations have more. The validator reports one line per vocation and rank; this case names the group."
+      "notes": "Decided by the owner on 2026-11-11: the available encounters are the ones the catalog marks 'shipped', at the catalog's ratings: training_01 (shipped battle 1) is threat 1 and training_03 (shipped battle 2) is threat 3. With this case's pool, and with the shipped battles alone, the highest available threat is therefore 3. An advanced vocation needs threat 4 at rank 7, so on that pool it cannot be mastered. Phase 4 authored the threat 4 encounter training_04 (the optional third battle of a run); an authored encounter counts as available like a shipped one, so with the catalog as it stands the highest available threat is 4 and this dead end is gone. For an advanced vocation rank 7 is the only dead end; capstone and secret vocations have more. The validator reports one line per vocation and rank; this case names the group."
     },
     {
       "id": "CE-37",

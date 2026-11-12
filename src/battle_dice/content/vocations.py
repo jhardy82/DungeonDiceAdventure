@@ -46,7 +46,7 @@ from battle_dice.content.loader import (
     load_content,
     load_schema,
 )
-from battle_dice.core.build import BuildNotSupported, HeroBuild, build_from_class
+from battle_dice.core.build import BuildNotSupported, EncounterNotPlayable, HeroBuild, build_from_class
 from battle_dice.core.models import CATEGORY_BLANK, CATEGORY_HEALING, EXECUTABLE_CATEGORIES
 
 CATALOG_PATH = Path(__file__).resolve().parent / "class_evolution" / "vocation_catalog.json"
@@ -650,7 +650,7 @@ def unlockable(catalog: Json, max_wave: int | None = None) -> dict[str, list[str
     be played; without it every vocation exists and every quest and item is assumed obtainable.
     """
     pool = [v for v in catalog["vocations"] if max_wave is None or v["wave"] <= max_wave]
-    obtainable = None if max_wave is None else {e["id"] for e in catalog["encounters"] if e["source"] == "shipped"}
+    obtainable = None if max_wave is None else {e["id"] for e in catalog["encounters"] if e["source"] in PLAYABLE_SOURCES}
     open_ids = {v["id"] for v in pool if "prerequisite" not in v}
     while True:
         gained = {v["id"] for v in pool
@@ -715,10 +715,37 @@ def _mastery_lines(catalog: Json) -> list[str]:
 # --------------------------------------------------------------------------------------------
 
 
+#: Encounter sources a player can actually fight: a shipped battle, or one authored in the catalog.
+PLAYABLE_SOURCES = ("shipped", "authored")
+
+
+def _authored_problems(encounter: Json, shipped: Content) -> list[str]:
+    """An authored encounter must have enemies for every party size, and obey the rules of a shipped battle.
+
+    The shipped content loader does the checking: the encounter is put in place of battle 2 in a
+    copy of the shipped documents, so an authored fight cannot hold anything a shipped one could not.
+    """
+    limits = shipped.balance["party"]
+    sizes = [str(size) for size in range(limits["min_size"], limits["max_size"] + 1)]
+    table = encounter.get("enemies", {})
+    if sorted(table) != sorted(sizes):
+        return [f"encounters: '{encounter['id']}' is authored but its enemies are not listed for exactly the party sizes {', '.join(sizes)}"]
+    documents = copy.deepcopy(shipped.documents)
+    for size, battles in documents["encounters"]["encounters"].items():
+        next(battle for battle in battles if battle["battle"] == 2)["enemies"] = copy.deepcopy(table[size])
+    try:
+        build_content(documents)
+    except ContentError as error:
+        return [f"encounters: '{encounter['id']}': {problem.replace('encounters.json: ', '')}" for problem in error.problems]
+    return []
+
+
 def _encounter_problems(catalog: Json, shipped: Content) -> list[str]:
     problems = []
     claimed: dict[int, str] = {}
     for encounter in catalog["encounters"]:
+        if encounter["source"] == "authored":
+            problems += _authored_problems(encounter, shipped)
         if encounter["source"] != "shipped":
             continue
         battle = encounter["shipped_ref"]["battle"]
@@ -742,7 +769,7 @@ def available_threat(catalog: Json, pool: Iterable[str] | None = None) -> int:
     encounters instead, for a check against a planned or a reduced set.
     """
     if pool is None:
-        ratings = [e["threat_rating"] for e in catalog["encounters"] if e["source"] == "shipped"]
+        ratings = [e["threat_rating"] for e in catalog["encounters"] if e["source"] in PLAYABLE_SOURCES]
     else:
         wanted = set(pool)
         ratings = [e["threat_rating"] for e in catalog["encounters"] if e["id"] in wanted]
@@ -966,9 +993,33 @@ class VocationCatalog:
     builds: dict[str, HeroBuild]
     #: vocation id -> the engine gaps that keep it from being played.
     unsupported: dict[str, tuple[str, ...]]
+    #: Every encounter the catalog lists: id -> (threat rating, source).
+    encounter_list: dict[str, tuple[int, str]] = dataclasses.field(default_factory=dict)
+    #: Authored encounters: id -> party size -> the enemies, in the shape of the shipped encounter table.
+    authored: dict[str, dict[int, list[Json]]] = dataclasses.field(default_factory=dict)
+    #: Shipped battle number -> the encounter id and threat rating the catalog gives it.
+    shipped_battles: dict[int, tuple[str, int]] = dataclasses.field(default_factory=dict)
 
     def known(self, vocation_id: str) -> bool:
         return vocation_id in self.builds or vocation_id in self.unsupported
+
+    # -- core.build.EncounterSource -----------------------------------------------------------
+
+    def has_encounter(self, encounter_id: str) -> bool:
+        return encounter_id in self.encounter_list
+
+    def encounter(self, encounter_id: str, party_size: int) -> list[Json]:
+        table = self.authored.get(encounter_id)
+        if table is None:
+            source = self.encounter_list[encounter_id][1]
+            reason = "it is a shipped battle of every run" if source == "shipped" else "its enemies have not been authored"
+            raise EncounterNotPlayable(f"The encounter '{encounter_id}' cannot be added to a run: {reason}.")
+        if party_size not in table:
+            raise EncounterNotPlayable(f"The encounter '{encounter_id}' has no enemies for a party of {party_size}.")
+        return copy.deepcopy(table[party_size])
+
+    def threat_rating(self, encounter_id: str) -> int:
+        return self.encounter_list[encounter_id][0]
 
     def build(self, vocation_id: str) -> HeroBuild:
         if vocation_id in self.unsupported:
@@ -1008,7 +1059,12 @@ def load_vocation_catalog(content: Content, path: Path = CATALOG_PATH) -> Vocati
             dice={die_id: extended.dice[die_id] for die_id in own_dice},
         )
     digest = hashlib.sha256(canonical_json(catalog).encode("ascii")).hexdigest()
-    return VocationCatalog(catalog["catalog_version"], digest, builds, unsupported)
+    listed = {e["id"]: (int(e["threat_rating"]), str(e["source"])) for e in catalog["encounters"]}
+    authored = {e["id"]: {int(size): enemies for size, enemies in e["enemies"].items()}
+                for e in catalog["encounters"] if e["source"] == "authored"}
+    shipped_battles = {int(e["shipped_ref"]["battle"]): (e["id"], int(e["threat_rating"]))
+                       for e in catalog["encounters"] if e["source"] == "shipped"}
+    return VocationCatalog(catalog["catalog_version"], digest, builds, unsupported, listed, authored, shipped_battles)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

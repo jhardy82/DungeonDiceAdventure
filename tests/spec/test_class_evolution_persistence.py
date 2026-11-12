@@ -27,6 +27,7 @@ from typing import Any
 import jsonschema
 import pytest
 
+from battle_dice.career import model as career_model
 from battle_dice.core import commands as game_commands
 from battle_dice.core import planning
 from battle_dice.core.models import RunPhase
@@ -299,8 +300,14 @@ def test_every_foreign_key_states_its_on_delete_action_and_names_a_unique_parent
 def test_run_phases_are_the_engine_phases(loaded):
     """Defect 9: v0.1 used party_setup / preparation / combat / outcome, which the engine does not have."""
     engine_phases = sorted(value for name, value in vars(RunPhase).items() if name.isupper())
-    assert engine_phases == ["battle", "defeat", "equipment", "upgrade", "victory"]
-    for number, phase in enumerate(engine_phases):
+    assert engine_phases == ["battle", "continue", "defeat", "equipment", "upgrade", "victory"]
+    # 'continue' (Phase 4: stop or fight on) is saved as 'equipment': between battles, every build fixed.
+    assert career_model.SAVED_AS == {"continue": "equipment"}
+    saved_phases = sorted({career_model.saved_run_phase(phase) for phase in engine_phases})
+    assert saved_phases == sorted(career_model.SAVED_RUN_PHASES) == ["battle", "defeat", "equipment", "upgrade", "victory"]
+    with pytest.raises(ValueError, match="no run phase"):
+        career_model.saved_run_phase("party_setup")
+    for number, phase in enumerate(saved_phases):
         add_run(loaded, f"run_phase_{number}", phase)
     for old_name in ("party_setup", "preparation", "combat", "outcome"):
         with pytest.raises(sqlite3.IntegrityError, match="CHECK constraint failed"):

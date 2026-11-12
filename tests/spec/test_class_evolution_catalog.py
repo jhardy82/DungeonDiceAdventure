@@ -18,6 +18,7 @@ import jsonschema
 import pytest
 
 from battle_dice.content.loader import Content, ContentError, build_content, load_content
+from battle_dice.core.build import EncounterNotPlayable
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -30,7 +31,14 @@ SCHEMA_PATH = CATALOG_PATH.with_name("vocation_catalog.schema.json")
 Json = dict[str, Any]
 
 #: Ranks at which a hero has no shipped encounter left that awards mastery (shipped threat tops out at 3).
+#: With the authored threat-4 encounter (Phase 4, step B) the highest available threat is 4. What still
+#: cannot be trained needs threat 5: the upper ranks of the capstones and of the Dragon Knight.
 TRAINING_DEAD_ENDS: dict[str, list[int]] = {
+    "champion": [4, 5, 6, 7], "archmage": [4, 5, 6, 7],
+    "hero": [4, 5, 6, 7], "dragon_knight": [4, 5, 6, 7],
+}
+#: The same without the threat-4 encounter, as it was before step B (highest threat 3).
+DEAD_ENDS_AT_THREAT_3: dict[str, list[int]] = {
     "guardian": [7],
     "spellblade": [7], "ranger": [7],
     "duelist": [7], "arcanist": [7], "shadowbinder": [7],
@@ -219,10 +227,26 @@ def test_face_rules_mirror_the_shipped_loader(shipped: Content) -> None:
 # -- (c) training and unlock reachability, wave by wave -------------------------------------------
 
 
-def test_wave_1_training_dead_end_is_exactly_guardian_rank_7(pristine: Json, shipped: Content) -> None:
-    """Wave 1 is NOT fully trainable: the Guardian's last rank-up needs threat 4 and shipped content tops out at 3."""
+def not_authored(catalog: Json) -> Json:
+    """The catalog as it was before the threat-4 encounter was authored."""
+    encounter = by_id(catalog["encounters"], "training_04")
+    del encounter["enemies"]
+    encounter["source"] = "to_author"
+    return catalog
+
+
+def test_wave_1_is_fully_trainable_because_the_threat_4_encounter_is_authored(catalog: Json, pristine: Json, shipped: Content) -> None:
+    """The Guardian's last rank-up needs threat 4. Shipped battles stop at 3; the authored third battle supplies it."""
     assert vc.problems_only(vc.validate(pristine, shipped, wave=0)) == []
-    assert vc.problems_only(vc.validate(pristine, shipped, wave=1)) == ["TRAINING_DEAD_END guardian rank 7"]
+    assert vc.problems_only(vc.validate(pristine, shipped, wave=1)) == []
+    assert vc.available_threat(pristine) == 4
+    without = not_authored(catalog)
+    assert vc.available_threat(without) == 3
+    assert vc.problems_only(vc.validate(without, shipped, wave=1)) == ["TRAINING_DEAD_END guardian rank 7"]
+    by_vocation: dict[str, list[int]] = {}
+    for vocation, rank in vc.training_dead_ends(without):
+        by_vocation.setdefault(vocation["id"], []).append(rank)
+    assert by_vocation == DEAD_ENDS_AT_THREAT_3
 
 
 def test_training_and_unlock_dead_ends_by_wave(pristine: Json, shipped: Content) -> None:
@@ -232,8 +256,9 @@ def test_training_and_unlock_dead_ends_by_wave(pristine: Json, shipped: Content)
         problems = vc.problems_only(vc.validate(pristine, shipped, wave=wave))
         assert [p for p in problems if p.startswith("TRAINING_DEAD_END")] == dead_end_lines(released), wave
         unlock = sorted(p.split()[1] for p in problems if p.startswith("UNLOCK_DEAD_END"))
-        # No vocation is released before its prerequisites; the two secret vocations need encounters not shipped yet.
-        assert unlock == {0: [], 1: [], 2: [], 3: [], 4: [], 5: ["dragon_knight", "trickster"]}[wave], wave
+        # No vocation is released before its prerequisites. The Trickster needs an encounter nobody can play yet;
+        # the Dragon Knight's item comes from the threat-4 encounter, which is authored.
+        assert unlock == {0: [], 1: [], 2: [], 3: [], 4: [], 5: ["trickster"]}[wave], wave
         assert len(problems) == len(dead_end_lines(released)) + len(unlock), wave
 
 
@@ -241,14 +266,29 @@ def test_without_a_wave_every_dead_end_is_a_warning(pristine: Json, shipped: Con
     lines = vc.validate(pristine, shipped)
     everyone = [v for wave in sorted(WAVES) for v in WAVES[wave]]
     assert [line for line in lines if "TRAINING_DEAD_END" in line] == ["warning: " + line for line in dead_end_lines(everyone)]
-    assert sorted(line.split()[2] for line in lines if "UNLOCK_DEAD_END" in line) == ["dragon_knight", "trickster"]
+    assert sorted(line.split()[2] for line in lines if "UNLOCK_DEAD_END" in line) == ["trickster"]
 
 
-def test_wave_1_clears_once_a_threat_4_encounter_is_shipped(catalog: Json, shipped: Content) -> None:
-    del by_id(catalog["encounters"], "training_03")["shipped_ref"]
-    by_id(catalog["encounters"], "training_03")["source"] = "to_author"
-    by_id(catalog["encounters"], "training_04").update(source="shipped", shipped_ref={"battle": 2})
-    assert vc.problems_only(vc.validate(catalog, shipped, wave=1)) == []
+def test_the_authored_encounter_has_enemies_for_every_party_size_and_loads(pristine: Json, shipped: Content) -> None:
+    encounter = by_id(pristine["encounters"], "training_04")
+    assert (encounter["source"], encounter["threat_rating"]) == ("authored", 4)
+    assert sorted(encounter["enemies"]) == ["1", "2", "3", "4", "5"]
+    # Its line-up keeps the v0.1 idea where the party is big enough: two captains and a hex adept.
+    assert [[e["archetype"] for e in encounter["enemies"][size]] for size in ("1", "2", "3")] == [
+        ["captain"], ["captain", "hex_adept"], ["captain", "captain", "hex_adept"]]
+    assert all(e["archetype"] in shipped.enemies for row in encounter["enemies"].values() for e in row)
+    loaded = vc.load_vocation_catalog(shipped)
+    assert loaded.has_encounter("training_04") and loaded.threat_rating("training_04") == 4
+    assert loaded.encounter("training_04", 3) == encounter["enemies"]["3"]
+    assert loaded.shipped_battles == {1: ("training_01", 1), 2: ("training_03", 3)}
+    loaded.encounter("training_04", 3)[0]["archetype"] = "changed"  # a copy: the catalog cannot be altered through it
+    assert loaded.encounter("training_04", 3)[0]["archetype"] == "captain"
+    for encounter_id, reason in (("training_05", "have not been authored"), ("training_01", "shipped battle of every run")):
+        with pytest.raises(EncounterNotPlayable, match=reason):
+            loaded.encounter(encounter_id, 3)
+    with pytest.raises(EncounterNotPlayable, match="no enemies for a party of 9"):
+        loaded.encounter("training_04", 9)
+    assert not loaded.has_encounter("nowhere")
 
 
 # -- (d) seeded violations -----------------------------------------------------------------------
@@ -304,7 +344,33 @@ def unknown_effect_type(c: Json) -> None:
 
 
 def unshipped_encounter_marked_shipped(c: Json) -> None:
+    del by_id(c["encounters"], "training_04")["enemies"]
     by_id(c["encounters"], "training_04").update(source="shipped", shipped_ref={"battle": 2})
+
+
+def authored_encounter_without_enemies(c: Json) -> None:
+    del by_id(c["encounters"], "training_04")["enemies"]
+
+
+def unauthored_encounter_with_enemies(c: Json) -> None:
+    by_id(c["encounters"], "training_05")["enemies"] = by_id(c["encounters"], "training_04")["enemies"]
+
+
+def authored_encounter_missing_a_party_size(c: Json) -> None:
+    del by_id(c["encounters"], "training_04")["enemies"]["4"]
+
+
+def authored_encounter_with_an_unknown_enemy(c: Json) -> None:
+    by_id(c["encounters"], "training_04")["enemies"]["2"][0]["archetype"] = "dragon"
+
+
+def authored_encounter_overriding_an_unknown_action(c: Json) -> None:
+    by_id(c["encounters"], "training_04")["enemies"]["2"][0]["overrides"]["actions"] = {"breath": {"power": 9}}
+
+
+def authored_encounter_with_an_enemy_that_cannot_act(c: Json) -> None:
+    by_id(c["encounters"], "training_04")["enemies"]["1"][0]["overrides"]["actions"] = {
+        name: {"weight": 0} for name in ("blight_wave", "corrupt_mark", "strike", "war_cry")}
 
 
 def shipped_encounter_without_a_battle(c: Json) -> None:
@@ -388,6 +454,12 @@ SEEDED: list[tuple[Callable[[Json], None], str]] = [
     (missing_upgrade_family, "'upgrade_family' is a required property"),
     (unknown_effect_type, "'teleport' is not one of"),
     (unshipped_encounter_marked_shipped, "'training_04' is marked shipped as battle 2, which 'training_03' already is"),
+    (authored_encounter_without_enemies, "'enemies' is a required property"),
+    (unauthored_encounter_with_enemies, "encounters/4"),
+    (authored_encounter_missing_a_party_size, "'training_04' is authored but its enemies are not listed for exactly the party sizes 1, 2, 3, 4, 5"),
+    (authored_encounter_with_an_unknown_enemy, "'training_04': party size 2 uses unknown enemy 'dragon'"),
+    (authored_encounter_overriding_an_unknown_action, "overrides unknown action 'breath' of enemy 'captain'"),
+    (authored_encounter_with_an_enemy_that_cannot_act, "leaves enemy 'captain' with no action of positive weight"),
     (shipped_encounter_without_a_battle, "'shipped_ref' is a required property"),
     (third_shipped_battle, "3 is not one of [1, 2]"),
     (upgrade_family_not_shipped, "upgrade_family 'paladin', which is not a shipped class"),
@@ -432,8 +504,10 @@ def test_main_prints_ok_and_exits_zero(capsys: pytest.CaptureFixture[str]) -> No
     assert out[-1] == "OK" and all(line.startswith("warning: ") for line in out[:-1])
 
 
-def test_main_with_wave_1_reports_the_dead_end_and_exits_one(capsys: pytest.CaptureFixture[str]) -> None:
-    assert vc.main(["--wave", "1"]) == 1
+def test_main_reports_a_dead_end_of_the_wave_asked_for_and_exits_one(capsys: pytest.CaptureFixture[str]) -> None:
+    assert vc.main(["--wave", "1"]) == 0  # the first wave is trainable since the threat-4 encounter is authored
+    assert capsys.readouterr().out.splitlines()[-1] == "OK"
+    assert vc.main(["--wave", "4"]) == 1  # the capstones still need a threat-5 encounter
     out = capsys.readouterr().out.splitlines()
-    assert out[-1] == "TRAINING_DEAD_END guardian rank 7" and "OK" not in out
+    assert "TRAINING_DEAD_END champion rank 4" in out and "TRAINING_DEAD_END archmage rank 7" in out and "OK" not in out
     assert vc.main(["--wave", "0"]) == 0

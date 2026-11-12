@@ -20,7 +20,14 @@ from battle_dice import RNG_ALGORITHM, RULES_VERSION, rng
 from battle_dice.content.loader import Content, load_content
 from battle_dice.core import commands as cmd
 from battle_dice.core import effects, enemy_ai, planning, progression, reactions, terminal, timeline
-from battle_dice.core.build import BuildNotSupported, BuildSource, HeroBuild, build_from_class
+from battle_dice.core.build import (
+    BuildNotSupported,
+    BuildSource,
+    EncounterNotPlayable,
+    EncounterSource,
+    HeroBuild,
+    build_from_class,
+)
 from battle_dice.core.commands import Command, CommandRejected, CommandResult
 from battle_dice.core.events import EventType
 from battle_dice.core.models import (
@@ -47,12 +54,19 @@ def _fingerprint(command: Command) -> tuple[str, str]:
 
 
 class Engine:
-    def __init__(self, content: Content | None = None, vocations: BuildSource | None = None):
+    def __init__(self, content: Content | None = None, vocations: BuildSource | None = None,
+                 encounters: EncounterSource | None = None):
         self.content: Content = content if content is not None else load_content()
         #: Builds beyond the shipped classes (Class Evolution). ``None`` unless the feature gate is on.
         self.vocations: BuildSource | None = vocations
+        #: Battles beyond the shipped ones. The vocation catalog supplies both, so it is the default.
+        self.encounters: EncounterSource | None = (
+            encounters if encounters is not None else vocations if isinstance(vocations, EncounterSource) else None
+        )
         self._state: RunState | None = None
         self._builds: dict[str, HeroBuild] = {}  # hero id -> build; derived at StartRun, not hashed state
+        #: Encounters to offer after the shipped battles, from StartRun. Derived like the builds; not hashed state.
+        self._extra_encounters: list[str] = []
         self.events: list[CombatEvent] = []
         self.command_log: list[Command] = []
         self._accepted: dict[str, tuple[str, str]] = {}  # command_id -> (type, canonical params)
@@ -94,9 +108,26 @@ class Engine:
         ``None`` for a party of shipped classes, whether or not the gate is on: such a run is
         byte for byte the run the game has always produced.
         """
-        if self.vocations is None or all(b.vocation_id in self.content.classes for b in self._builds.values()):
+        if self.vocations is not None and any(b.vocation_id not in self.content.classes for b in self._builds.values()):
+            return {"version": self.vocations.version, "sha256": self.vocations.sha256}
+        if self._extra_encounters and self.encounters is not None:  # a run that may fight an encounter from the catalog
+            return {"version": self.encounters.version, "sha256": self.encounters.sha256}
+        return None
+
+    @property
+    def shipped_battle_count(self) -> int:
+        return int(self.content.documents["encounters"]["battle_count"])
+
+    @property
+    def battle_count(self) -> int:
+        """The battles this run can have: the shipped ones, plus the extra encounters it was started with."""
+        return self.shipped_battle_count + len(self._extra_encounters)
+
+    def offered_encounter(self) -> str | None:
+        """The encounter the player may fight on to, while the run waits for that decision."""
+        if self._state is None or self.state.phase != RunPhase.CONTINUE:
             return None
-        return {"version": self.vocations.version, "sha256": self.vocations.sha256}
+        return self._extra_encounters[self.state.encounter_index + 1 - self.shipped_battle_count]
 
     def _resolve_build(self, class_id: str) -> HeroBuild:
         if self.vocations is not None and self.vocations.known(class_id):
@@ -202,6 +233,7 @@ class Engine:
         del self.events[event_count:]
         if backup is None:  # a StartRun that failed leaves no builds behind
             self._builds = {}
+            self._extra_encounters = []
 
     def force_draws(self, stream: str, values: list[int]) -> None:
         """Fixture hook: queue forced bounded results for a stream (e.g. specific die faces).
@@ -290,7 +322,8 @@ class Engine:
     # Run lifecycle
     # ----------------------------------------------------------------------------------------
 
-    def _start_run(self, seed: int, party: list[dict[str, str]], run_id: str | None = None) -> None:
+    def _start_run(self, seed: int, party: list[dict[str, str]], run_id: str | None = None,
+                   encounters: list[str] | None = None) -> None:
         if self._state is not None:
             raise CommandRejected("A run is already in progress; start a new run with a new engine.")
         try:
@@ -308,6 +341,19 @@ class Engine:
                 raise CommandRejected(f"Unknown class '{member['class_id']}'.")
             if member["row"] not in ROWS:
                 raise CommandRejected(f"Row must be 'front' or 'back' (got '{member['row']}').")
+        extra = list(encounters or [])
+        if extra:
+            if self.encounters is None:
+                raise CommandRejected("This game has no encounters beyond the shipped battles.")
+            if len(set(extra)) != len(extra):
+                raise CommandRejected("An encounter can be added to a run only once.")
+            for encounter_id in extra:
+                if not self.encounters.has_encounter(encounter_id):
+                    raise CommandRejected(f"Unknown encounter '{encounter_id}'.")
+                try:
+                    self.encounters.encounter(encounter_id, len(party))
+                except EncounterNotPlayable as refusal:
+                    raise CommandRejected(str(refusal)) from refusal
 
         state = RunState(
             run_id=run_id or f"run-{seed}",
@@ -328,6 +374,7 @@ class Engine:
             state.inventory[hero_id] = list(build.bench_dice)
             heroes.append(progression.hero_from_build(self.content, hero_id, build, member["row"]))
         self._state = state
+        self._extra_encounters = extra
         state.combat = self._build_combat(1, heroes, event_seq=0)
         started: dict[str, Any] = {
             "run_id": state.run_id,
@@ -339,16 +386,24 @@ class Engine:
             "rng_streams": list(rng.STREAM_NAMES),
             "party": state.party,
         }
+        if extra:
+            started["encounters"] = list(extra)
         if self.vocation_catalog_pin is not None:
             started["vocation_catalog"] = self.vocation_catalog_pin
         self.emit(EventType.RUN_STARTED, delta=started)
         self._emit_battle_started()
 
     def _build_combat(self, battle: int, heroes: list[Combatant], event_seq: int) -> CombatState:
-        combat = CombatState(encounter_id=f"p{len(heroes)}_b{battle}", event_seq=event_seq)
+        table = None
+        encounter_id = f"p{len(heroes)}_b{battle}"
+        if battle > self.shipped_battle_count:  # an extra encounter of this run, from the encounter source
+            assert self.encounters is not None
+            encounter_id = self._extra_encounters[battle - self.shipped_battle_count - 1]
+            table = self.encounters.encounter(encounter_id, len(heroes))
+        combat = CombatState(encounter_id=encounter_id, event_seq=event_seq)
         for hero in heroes:
             combat.combatants[hero.id] = hero
-        for enemy in progression.make_enemies(self.content, len(heroes), battle):
+        for enemy in progression.make_enemies(self.content, len(heroes), battle, table):
             combat.combatants[enemy.id] = enemy
         return combat
 
@@ -387,14 +442,35 @@ class Engine:
             self.emit(EventType.RUN_DEFEAT, delta={"battle": battle})
             return
         self.emit(EventType.BATTLE_WON, delta={"battle": battle})
-        if battle >= self.content.documents["encounters"]["battle_count"]:
+        if battle >= self.battle_count:
             state.phase = RunPhase.VICTORY
             state.outcome = terminal.OUTCOME_VICTORY
             self.emit(EventType.RUN_VICTORY, delta={"battle": battle})
             return
+        if battle >= self.shipped_battle_count:
+            # The shipped battles are won. The party recovers, and the player decides: stop or fight on.
+            state.phase = RunPhase.CONTINUE
+            progression.apply_recovery(self)
+            self.emit(EventType.EXTRA_BATTLE_OFFERED, delta={"battle": battle + 1, "encounter_id": self.offered_encounter()})
+            return
         state.phase = RunPhase.UPGRADE
         progression.apply_recovery(self)
         progression.generate_offers(self)
+
+    def _continue_run(self) -> None:
+        if self.state.phase != RunPhase.CONTINUE:
+            raise CommandRejected("No further battle is on offer.")
+        self._start_next_battle()
+
+    def _end_run(self) -> None:
+        state = self.state
+        declined = self.offered_encounter()
+        if declined is None:
+            raise CommandRejected("A run can be ended by choice only while a further battle is on offer.")
+        battle = state.encounter_index + 1
+        state.phase = RunPhase.VICTORY
+        state.outcome = terminal.OUTCOME_VICTORY
+        self.emit(EventType.RUN_VICTORY, delta={"battle": battle, "declined": declined})
 
     def _start_next_battle(self) -> None:
         state = self.state
@@ -412,7 +488,7 @@ class Engine:
 
     def _set_formation(self, hero_id: str, row: str) -> None:
         state = self.state
-        if state.phase not in (RunPhase.UPGRADE, RunPhase.EQUIPMENT):
+        if state.phase not in (RunPhase.UPGRADE, RunPhase.EQUIPMENT, RunPhase.CONTINUE):
             raise CommandRejected("Formation can only be changed between battles, not during combat.")
         if row not in ROWS:
             raise CommandRejected(f"Row must be 'front' or 'back' (got '{row}').")
@@ -624,6 +700,8 @@ class Engine:
             return
         if state.phase == RunPhase.UPGRADE:
             raise CommandRejected("A dice upgrade must be chosen before Battle 2 can start.")
+        if state.phase == RunPhase.CONTINUE:
+            raise CommandRejected("Choose to fight on (ContinueRun) or to end the run with a victory (EndRun).")
         if state.phase != RunPhase.BATTLE:
             raise CommandRejected("The run is over.")
         combat = self.combat
@@ -826,6 +904,8 @@ class Engine:
             if any(state.swaps_used.get(member["id"], 0) < limit for member in state.party):
                 allowed.append(cmd.SWAP_DIE)
             return allowed
+        if state.phase == RunPhase.CONTINUE:
+            return [cmd.CONTINUE_RUN, cmd.END_RUN, cmd.SET_FORMATION]
         if state.phase != RunPhase.BATTLE:
             return []
         phase = self.combat.phase
@@ -853,6 +933,8 @@ _HANDLERS = {
     cmd.CHOOSE_UPGRADE: "_choose_upgrade",
     cmd.SWAP_DIE: "_swap_die",
     cmd.ADVANCE_PHASE: "_advance_phase",
+    cmd.CONTINUE_RUN: "_continue_run",
+    cmd.END_RUN: "_end_run",
 }
 
 _STEPS = {

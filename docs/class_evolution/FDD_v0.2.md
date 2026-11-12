@@ -241,7 +241,7 @@ names.
 | CE-31 | What exactly does Duelist's Parry reaction do in the engine? |
 | CE-32 | Which fields are left out of every hash, and what is the canonical encoding of progression events? **Decided 2026-11-11:** as built. An event hash covers the previous hash, the event id, the event type and the canonical JSON of the payload (sorted keys, no space between tokens, non-ASCII escaped; UTF-8). Times are stored and are in no hash. The recorded session is made by the test on every run. |
 | CE-35 | How do evolved heroes enter `StartRun` (class ids today, hero ids with build snapshots later)? **Decided 2026-11-11:** with the gate on, the party names saved heroes and each hero's complete build is written into the run's log as a snapshot; with the gate off the command is unchanged. |
-| CE-36 | Which encounters count as available, and what are their threat ratings? **Decided 2026-11-11:** the ones the catalog marks `shipped`, at the catalog's ratings: shipped battle 1 is threat 1 and shipped battle 2 is threat 3. So the highest available threat is 3 until the threat-4 encounter of Phase 4 is authored. |
+| CE-36 | Which encounters count as available, and what are their threat ratings? **Decided 2026-11-11:** the ones the catalog marks `shipped`, at the catalog's ratings: shipped battle 1 is threat 1 and shipped battle 2 is threat 3. So the highest available threat is 3 until the threat-4 encounter of Phase 4 is authored. **Extended 2026-11-12 (Phase 4, step B):** an encounter authored in the catalog counts as available too, because a player can fight it. `training_04` (threat 4) is authored as the optional third battle, so the highest available threat is now 4. |
 | CE-39 | May a vocation change happen before recovery? Otherwise "a downed hero stays down" is unreachable. **Decided 2026-11-11:** no: the change happens after recovery, so the hero is standing. The rule that a change never revives stays. |
 | CE-40 | With the gate on and a fresh profile, must the replay pin match exactly, final state hash included? **Decided 2026-11-11:** yes, byte for byte. Progression data stays outside the run's hashed state. |
 
@@ -260,7 +260,7 @@ names.
 - Every phase leaves the game shippable with the gate off.
 - Progress, with the evidence for each step, is recorded in `docs/DECISION_LOG.md` sections 7.11
   (Phase 1), 7.12 (Phase 2), 7.13 (Phase 3), 7.14 (the decisions taken before Phase 4) and
-  7.15 (Phase 4: its decisions, its steps, and step A).
+  7.15 (Phase 4: its decisions, its steps, and step A) and 7.16 (step B: the third battle).
 - The first playable evolution arrives before the expensive engine work of waves 3 to 5.
 
 ## 10. Decisions put to the owner, and the answers (2026-11-11)

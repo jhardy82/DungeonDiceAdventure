@@ -989,8 +989,15 @@
     {
       "id": "training_04",
       "threat_rating": 4,
-      "source": "to_author",
-      "notes": "v0.1 line-up: captain, captain, hex_adept. Awards a drake_scale on a hero's first win."
+      "source": "authored",
+      "enemies": {
+        "1": [{"archetype": "captain", "overrides": {"max_hp": 18, "actions": {"strike": {"power": 4}}}}],
+        "2": [{"archetype": "captain", "overrides": {"max_hp": 23, "actions": {"strike": {"power": 4}}}}, {"archetype": "hex_adept", "overrides": {"max_hp": 13, "actions": {"shadow_bolt": {"power": 4}}}}],
+        "3": [{"archetype": "captain", "overrides": {"max_hp": 13, "actions": {"strike": {"power": 4}}, "speed": 11}}, {"archetype": "captain", "overrides": {"max_hp": 13, "actions": {"strike": {"power": 4}}, "speed": 11}}, {"archetype": "hex_adept", "overrides": {"max_hp": 10, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}],
+        "4": [{"archetype": "captain", "overrides": {"max_hp": 17, "actions": {"strike": {"power": 4}}, "speed": 11}}, {"archetype": "captain", "overrides": {"max_hp": 17, "actions": {"strike": {"power": 4}}, "speed": 11}}, {"archetype": "goblin", "overrides": {"max_hp": 8, "actions": {"slash": {"power": 3}}, "speed": 12}}, {"archetype": "hex_adept", "overrides": {"max_hp": 9, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}],
+        "5": [{"archetype": "captain", "overrides": {"max_hp": 16, "actions": {"strike": {"power": 4}}, "speed": 11}}, {"archetype": "captain", "overrides": {"max_hp": 16, "actions": {"strike": {"power": 4}}, "speed": 11}}, {"archetype": "goblin", "overrides": {"max_hp": 8, "actions": {"slash": {"power": 3}}, "speed": 12}}, {"archetype": "hex_adept", "overrides": {"max_hp": 9, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}, {"archetype": "hex_adept", "overrides": {"max_hp": 9, "actions": {"shadow_bolt": {"power": 4}}, "speed": 10}}]
+      },
+      "notes": "The optional third battle of a run. v0.1 line-up: captain, captain, hex_adept; here with its own enemies per party size, as the shipped battles have. Awards a drake_scale on a hero's first win."
     },
     {"id": "training_05", "threat_rating": 5, "source": "to_author", "notes": "v0.1 line-up: captain, captain, hex_adept, hex_adept."},
     {

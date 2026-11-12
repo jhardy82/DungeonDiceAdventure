@@ -1462,7 +1462,7 @@
     },
     "encounter": {
       "type": "object",
-      "description": "A mastery-eligible encounter. 'shipped' is one of the two battles in the shipped encounters.json; 'to_author' needs an enemy line-up the game does not have yet and cannot be used for training until it does.",
+      "description": "A mastery-eligible encounter. 'shipped' is one of the two battles in the shipped encounters.json. 'authored' is a fight written here, with its enemies for every party size; a run may add it after the shipped battles. 'to_author' needs an enemy line-up the game does not have yet and cannot be used for training until it does.",
       "required": [
         "id",
         "threat_rating",
@@ -1480,6 +1480,7 @@
         "source": {
           "enum": [
             "shipped",
+            "authored",
             "to_author"
           ]
         },
@@ -1501,6 +1502,21 @@
         "notes": {
           "type": "string",
           "minLength": 1
+        },
+        "enemies": {
+          "description": "Party size -> the enemies, in the shape of the shipped encounter table.",
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "patternProperties": {
+            "^[1-9]$": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/encounter_enemy"
+              }
+            }
+          }
         }
       },
       "allOf": [
@@ -1524,6 +1540,30 @@
             "not": {
               "required": [
                 "shipped_ref"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "authored"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "required": [
+              "enemies"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "enemies"
               ]
             }
           }
@@ -2329,6 +2369,53 @@
           },
           "minItems": 8,
           "maxItems": 8
+        }
+      }
+    },
+    "encounter_enemy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "archetype"
+      ],
+      "properties": {
+        "archetype": {
+          "$ref": "#/$defs/id"
+        },
+        "overrides": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_hp": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 999
+            },
+            "speed": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 99
+            },
+            "actions": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "power": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 99
+                  },
+                  "weight": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 99
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

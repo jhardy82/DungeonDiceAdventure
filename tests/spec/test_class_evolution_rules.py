@@ -320,15 +320,16 @@ def test_ce36_an_advanced_vocation_cannot_reach_rank_8_on_the_available_encounte
     expected, pool = case["then"]["error_details"], override["value"]
     assert case["then"]["result"] == "rejected" and case["then"]["error_code"] in vocations.CONTENT_VALIDATION_CODES
 
-    for available in (pool, None):  # the case's pool, and the catalog as it stands (its shipped encounters)
+    shipped_only = [e["id"] for e in raw["encounters"] if e["source"] == "shipped"]
+    for available in (pool, shipped_only):  # the case's pool, and the shipped battles alone
         details = vocations.training_dead_end_details(raw, available)
         advanced = [entry for entry in details if entry["vocation_group"] == expected["vocation_group"]]
         assert advanced and all({key: entry[key] for key in expected} == expected for entry in advanced), advanced
         assert {entry["vocation_id"] for entry in advanced} == {v["id"] for v in raw["vocations"] if v["group"] == "advanced"}
         assert vocations.available_threat(raw, available) == expected["max_available_threat"] == 3
-    # Every dead end on the available encounters, as (rank, threat that rank needs), group by group.
+    # Every dead end on the case's pool, as (rank, threat that rank needs), group by group.
     by_vocation: dict[str, list[tuple[int, int]]] = {}
-    for entry in vocations.training_dead_end_details(raw):
+    for entry in vocations.training_dead_end_details(raw, pool):
         by_vocation.setdefault(entry["vocation_id"], []).append((entry["rank"], entry["required_threat"]))
     assert by_vocation == {
         **{v["id"]: [(7, 4)] for v in raw["vocations"] if v["group"] == "advanced"},
@@ -339,11 +340,19 @@ def test_ce36_an_advanced_vocation_cannot_reach_rank_8_on_the_available_encounte
     # The decision: only encounters marked shipped count, at the catalog's ratings.
     shipped = {e["id"]: e["threat_rating"] for e in raw["encounters"] if e["source"] == "shipped"}
     assert shipped == {"training_01": 1, "training_03": 3} and set(shipped) <= set(pool)
-    # What the validator prints for the first wave is this dead end and nothing else.
-    lines = vocations.problems_only(vocations.validate(raw, packaged_content(), wave=1))
-    assert lines == [f"{case['then']['error_code']} guardian rank {expected['rank']}"]
-    # With a threat 4 encounter available the dead end is gone (the encounter Phase 4 is to author).
+    # With a threat 4 encounter available the dead end is gone. Phase 4 authored that encounter, and an
+    # authored encounter counts as available like a shipped one: so the catalog as it stands has no such dead end.
     assert not [e for e in vocations.training_dead_end_details(raw, [*pool, "training_04"]) if e["vocation_group"] == "advanced"]
+    assert vocations.available_threat(raw) == 4 and vocations.PLAYABLE_SOURCES == ("shipped", "authored")
+    assert not [e for e in vocations.training_dead_end_details(raw) if e["vocation_group"] == "advanced"]
+    assert vocations.problems_only(vocations.validate(raw, packaged_content(), wave=1)) == []
+    # Taken away again, the validator prints exactly this case's dead end for the first wave.
+    without = json.loads(json.dumps(raw))
+    fight = next(e for e in without["encounters"] if e["id"] == "training_04")
+    del fight["enemies"]
+    fight["source"] = "to_author"
+    lines = vocations.problems_only(vocations.validate(without, packaged_content(), wave=1))
+    assert lines == [f"{case['then']['error_code']} guardian rank {expected['rank']}"]
     assert vocations.available_threat(raw, []) == -1
 
 

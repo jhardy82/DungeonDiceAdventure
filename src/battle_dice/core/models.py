@@ -56,6 +56,9 @@ class RunPhase:
     BATTLE = "battle"
     UPGRADE = "upgrade"  # RECOVERY_AND_UPGRADE: mandatory upgrade not yet chosen
     EQUIPMENT = "equipment"  # RECOVERY_AND_UPGRADE: optional swap / formation, then start Battle 2
+    #: The shipped battles are won and the run was started with a further encounter: stop here with a
+    #: victory, or fight on. Only a run whose ``StartRun`` named extra encounters ever enters this phase.
+    CONTINUE = "continue"
     VICTORY = "victory"
     DEFEAT = "defeat"
 
