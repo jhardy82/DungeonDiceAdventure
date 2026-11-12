@@ -29,9 +29,10 @@
 - Owner decisions of 2026-11-12: the Guardian's numbers and the third battle's table accepted as built (D-28); a hero may also change vocation at the stop-or-fight-on decision (D-29, built)
 - The demo's configuration (D-31), part 1: Settings in four groups with a demo group, reset to defaults, Settings from the pause menu, the dice seed typed on the New Run screen
 - Field Medic at the owner's numbers (D-30): no extra mana, the ally back at 5 HP; catalog 0.5.0. Measured: 316 wins of 480 against 297 without the skill
+- The demo's configuration (D-31), part 2a: four new settings: high contrast, battle speed at start, confirm a pass that leaves a die unused, help text delay
 
 ### In Progress
-- The demo's configuration as decided by the owner (D-31), part 2: the new comfort and play-aid settings (battle speed at start, confirm before passing, tooltip delay, high contrast, text size)
+- The demo's configuration (D-31), part 2b: text size (Normal, Large) with a layout check on every screen
 
 ### Pending
 

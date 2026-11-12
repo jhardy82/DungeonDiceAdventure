@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1137 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1155 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -347,8 +347,12 @@ at once and takes effect at once.
 | Group | Setting | Values | What it does |
 |-------|---------|--------|--------------|
 | 1. Display and comfort | Window size | 960x540, 1280x720 (default), 1600x900, 1920x1080 | The window can also be dragged to any size |
+| | High contrast | Off (default), On | White text on black, bright borders, no picture behind the battle. Every text colour has at least 7:1 contrast |
 | | Motion and flashes | On (default), Off | Reduced motion |
-| 2. Play aids | Controls | (opens the help) | Mouse and keyboard controls, and how a turn works |
+| | Battle speed at start | Normal (default), Fast | How fast a battle plays when it begins. F still switches during a battle |
+| 2. Play aids | Confirm a pass | On (default), Off | Pass asks once more when a die could still act |
+| | Help text delay | None (default), Short, Long | How long the pointer rests on a control before its help shows. Why a control is off always shows at once |
+| | Controls | (opens the help) | Mouse and keyboard controls, and how a turn works |
 | 3. Class Evolution | Class Evolution | Off (default), On | Saved heroes, mastery, vocations and the third battle. Off is the game as shipped, with no save file |
 | | Saved profile | Reset the saved profile | Deletes every saved hero and starts again from the chosen start. Asks twice |
 | 4. Demo and testing | Mastery pace | Normal (default), Fast, Very fast | How many points a rank needs. Fast asks for about half; Very fast for one point a rank |

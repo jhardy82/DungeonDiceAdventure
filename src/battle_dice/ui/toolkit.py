@@ -50,6 +50,47 @@ class Theme:
     BUTTON_SELECTED = (88, 80, 44)
     BUTTON_DISABLED = (36, 39, 48)
     FOCUS = (255, 255, 255)
+    #: Darker fills: an inset panel, the card of a downed unit, the top and status bars.
+    PANEL_DEEP = (24, 27, 35)
+    PANEL_DOWN = (26, 26, 30)
+    BAR = (12, 13, 18)
+    #: The name of the palette in use: "normal" or "high_contrast".
+    NAME = "normal"
+
+
+#: The colours of ``Theme`` as shipped, kept so the normal palette can be put back.
+NORMAL_PALETTE = {name: value for name, value in vars(Theme).items() if name.isupper() and isinstance(value, tuple)}
+#: High contrast (owner decision D-31; Xbox Accessibility Guideline 102 asks for 7:1): every text colour is at
+#: least 7:1 against every surface it is drawn on, surfaces are black or near black, borders are bright.
+HIGH_CONTRAST_PALETTE = {
+    **NORMAL_PALETTE,
+    "BG": (0, 0, 0), "PANEL": (0, 0, 0), "PANEL_ALT": (12, 12, 12), "PANEL_DEEP": (0, 0, 0), "PANEL_DOWN": (0, 0, 0), "BAR": (0, 0, 0),
+    "BORDER": (200, 200, 200), "TEXT": (255, 255, 255), "DIM": (225, 225, 225), "FAINT": (195, 195, 195),
+    "ACCENT": (255, 215, 90), "HERO": (130, 190, 255), "ENEMY": (255, 150, 130), "GOOD": (130, 230, 145), "BAD": (255, 150, 150),
+    "WARN": (255, 180, 110), "SHIELD": (170, 205, 245), "MANA": (160, 180, 255), "CORRUPT": (220, 160, 245), "GAUGE": (225, 215, 130),
+    "BUTTON": (0, 0, 48), "BUTTON_HOVER": (0, 0, 84), "BUTTON_SELECTED": (60, 46, 0), "BUTTON_DISABLED": (22, 22, 22),
+}
+PALETTES = {"normal": NORMAL_PALETTE, "high_contrast": HIGH_CONTRAST_PALETTE}
+
+
+def apply_theme(name: str) -> None:
+    """Switch every colour of ``Theme``. Screens read ``Theme`` when they draw, so the next frame is in the new palette."""
+    for colour, value in PALETTES[name].items():
+        setattr(Theme, colour, value)
+    Theme.NAME = name
+
+
+def contrast_ratio(first: tuple[int, int, int], second: tuple[int, int, int]) -> float:
+    """The WCAG contrast ratio of two colours, 1 (none) to 21 (black on white)."""
+    def luminance(colour: tuple[int, int, int]) -> float:
+        parts = []
+        for channel in colour:
+            c = channel / 255
+            parts.append(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
+        return 0.2126 * parts[0] + 0.7152 * parts[1] + 0.0722 * parts[2]
+
+    lighter, darker = sorted((luminance(first), luminance(second)), reverse=True)
+    return (lighter + 0.05) / (darker + 0.05)
 
 
 @dataclass
@@ -70,6 +111,10 @@ class UI:
         self._building: list[Widget] = []
         self.focus_key: str | None = None
         self.hover_key: str | None = None
+        #: How long the pointer has rested on the hovered control, and how long it must before its help shows.
+        self.hover_ms = 0.0
+        self.tooltip_delay_ms = 0
+        self._hover_timed: str | None = None
         self.mouse_pos = (-1, -1)
         self.scale = 1.0
         self.offset = (0, 0)
@@ -105,6 +150,12 @@ class UI:
         for widget in self.widgets:
             if widget.rect.collidepoint(self.mouse_pos):
                 self.hover_key = widget.key
+        if self.hover_key != self._hover_timed:  # the pointer reached another control: its rest starts now
+            self._hover_timed, self.hover_ms = self.hover_key, 0.0
+
+    def tick(self, dt_ms: float) -> None:
+        """Time passes: the pointer has rested that much longer on the control under it."""
+        self.hover_ms += max(0.0, dt_ms)
 
     # -- geometry and text -------------------------------------------------------------------
 
@@ -172,10 +223,11 @@ class UI:
         return self.fit(text, font, limit)
 
     def text(
-        self, x: float, y: float, text: str, size: int = 16, color: tuple[int, int, int] = Theme.TEXT,
+        self, x: float, y: float, text: str, size: int = 16, color: tuple[int, int, int] | None = None,
         bold: bool = False, max_width: float | None = None, align: str = "left",
     ) -> None:
         assert self.surface is not None
+        color = color or Theme.TEXT  # read when drawn: a default written in the signature would be the palette at start
         font = self.font(size, bold)
         if max_width is not None:
             text = self.fit(text, font, self.px(max_width))
@@ -206,10 +258,11 @@ class UI:
         return lines
 
     def paragraph(
-        self, x: float, y: float, text: str, width: float, size: int = 16, color: tuple[int, int, int] = Theme.TEXT,
+        self, x: float, y: float, text: str, width: float, size: int = 16, color: tuple[int, int, int] | None = None,
         line_height: float | None = None, max_lines: int | None = None, bold: bool = False,
     ) -> float:
         """Draw wrapped text. Returns the logical y just below the last line."""
+        color = color or Theme.TEXT
         step = line_height or size * 1.3
         lines = self.wrap_lines(text, width, size, bold)
         if max_lines is not None and len(lines) > max_lines:
@@ -224,9 +277,10 @@ class UI:
 
     def panel(
         self, x: float, y: float, w: float, h: float, title: str | None = None,
-        fill: tuple[int, int, int] = Theme.PANEL, border: tuple[int, int, int] = Theme.BORDER, width: int = 1,
+        fill: tuple[int, int, int] | None = None, border: tuple[int, int, int] | None = None, width: int = 1,
     ) -> None:
         assert self.surface is not None
+        fill, border = fill or Theme.PANEL, border or Theme.BORDER
         rect = self.r(x, y, w, h)
         pygame.draw.rect(self.surface, fill, rect, border_radius=self.px(5))
         pygame.draw.rect(self.surface, border, rect, self.px(width), border_radius=self.px(5))
@@ -246,7 +300,8 @@ class UI:
             pygame.draw.rect(self.surface, color, fill)
         pygame.draw.rect(self.surface, Theme.BORDER, rect, 1)
 
-    def line(self, x1: float, y1: float, x2: float, y2: float, color: tuple[int, int, int] = Theme.BORDER) -> None:
+    def line(self, x1: float, y1: float, x2: float, y2: float, color: tuple[int, int, int] | None = None) -> None:
+        color = color or Theme.BORDER
         assert self.surface is not None
         a, b = self.r(x1, y1, 1, 1), self.r(x2, y2, 1, 1)
         pygame.draw.line(self.surface, color, a.topleft, b.topleft, 1)
@@ -282,6 +337,9 @@ class UI:
         """Tiled dungeon floor behind a dark overlay, so text on top keeps its contrast."""
         assert self.surface is not None
         area = self.r(x, y, w, h)
+        if Theme.NAME == "high_contrast":  # no picture behind the cards: plain black
+            self.surface.fill(Theme.BG, area)
+            return
         cache_key = (area.width, area.height, wall_rows)
         cached = self._backdrops.get(cache_key)
         if cached is None:
@@ -510,7 +568,8 @@ class UI:
             if widget is None:
                 continue
             if not widget.enabled and widget.reason:
-                return f"Unavailable: {widget.reason}", True
-            if widget.tooltip:
+                return f"Unavailable: {widget.reason}", True  # why a control is off is never delayed
+            resting = key != self.hover_key or self.hover_ms >= self.tooltip_delay_ms
+            if widget.tooltip and resting:
                 return widget.tooltip, False
         return None

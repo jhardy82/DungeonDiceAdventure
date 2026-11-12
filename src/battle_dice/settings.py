@@ -25,6 +25,10 @@ PACES = {"normal": 1, "fast": 2, "very_fast": 4}
 PRESETS = ("fresh", "squire_near_mastery", "guardian_unlocked", "guardian_mastered")
 WINDOW_SIZES = ("960x540", "1280x720", "1600x900", "1920x1080")
 ROSTER_LIMITS = (6, 12, 24)
+#: How fast a battle plays when it starts (F still switches during a battle).
+BATTLE_SPEEDS = ("normal", "fast")
+#: How long the pointer rests on a control before its help is shown, in milliseconds.
+TOOLTIP_DELAYS = {"instant": 0, "short": 350, "long": 900}
 MAX_SEED = 2**64 - 1
 
 
@@ -43,6 +47,11 @@ class Settings:
     roster_limit: int = 12
     mastery_pace: str = "normal"
     demo_preset: str = "fresh"
+    #: Comfort and play aids (owner decision D-31). None of them changes a rule.
+    high_contrast: bool = False
+    battle_speed: str = "normal"
+    confirm_pass: bool = True
+    tooltip_delay: str = "instant"
 
     def size(self) -> tuple[int, int]:
         width, height = self.window_size.split("x")
@@ -51,8 +60,12 @@ class Settings:
 
 def _problem(name: str, value: Any) -> str | None:
     """Why ``value`` is not allowed for the setting ``name``; ``None`` when it is."""
-    if name in ("class_evolution", "third_battle", "animation"):
+    if name in ("class_evolution", "third_battle", "animation", "high_contrast", "confirm_pass"):
         return None if isinstance(value, bool) else "must be true or false"
+    if name == "battle_speed":
+        return None if value in BATTLE_SPEEDS else f"must be one of {', '.join(BATTLE_SPEEDS)}"
+    if name == "tooltip_delay":
+        return None if value in TOOLTIP_DELAYS else f"must be one of {', '.join(TOOLTIP_DELAYS)}"
     if name == "seed":
         ok = value is None or (isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= MAX_SEED)
         return None if ok else "must be null or a whole number from 0 to 2^64 - 1"
