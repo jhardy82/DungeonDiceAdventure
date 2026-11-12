@@ -34,6 +34,7 @@
 
 ### In Progress
 - Nothing is being built. Every setting the owner chose in D-31 is in
+- Waiting for the owner's playtest of the demo (D-32); "Confirm a pass" on by default is confirmed
 
 ### Pending
 

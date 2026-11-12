@@ -28,6 +28,8 @@ Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.30),
 `docs/class_evolution/FDD_v0.2.md`.
 
 ### Open Questions
+- **The owner's playtest (D-32):** the owner plays the demo and reports what is wrong or missing.
+  That report decides the next work.
 - Checkpoint 2: pacing (runs needed to master a vocation).
 - Squire Anchor in battle: needs a balance decision before it is built.
 - CE-31: what Duelist's Parry does (asked with the Duelist's wave).
