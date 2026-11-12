@@ -77,6 +77,10 @@ class CareerCatalog:
         vocation = self.vocations[vocation_id]
         return vocation["group"] == NOVICE or vocation["discovery"]["rule"] == "visible_from_start"
 
+    def starting_classes(self) -> list[str]:
+        """The vocations a hero can be recruited as, in catalog order: Squire, Apprentice, Scout."""
+        return [vocation_id for vocation_id, vocation in self.vocations.items() if vocation["group"] == NOVICE]
+
     def name(self, vocation_id: str) -> str:
         return str(self._definition(vocation_id)["name"])
 

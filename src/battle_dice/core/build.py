@@ -11,7 +11,8 @@ are derived data, like the content itself, and are not part of the hashed run st
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -49,6 +50,12 @@ class HeroBuild:
     upgrade_family: str
     #: Dice this build brings with it. Empty for a shipped class, whose dice are in the content.
     dice: dict[str, DieDefinition] = field(default_factory=dict)
+    #: The saved hero this build is a snapshot of (Class Evolution). Empty for a hero made from a class alone.
+    hero_id: str = ""
+    #: The saved hero's own name. Empty: the hero is named after its class and its place in the party.
+    display_name: str = ""
+    #: Inherited skills the hero has equipped, in slot order.
+    skills: tuple[str, ...] = ()
 
     @cached_property
     def schedule(self) -> Schedule:
@@ -80,6 +87,48 @@ class BuildSource(Protocol):
     def build(self, vocation_id: str) -> HeroBuild:
         """The vocation's build. Raises :class:`BuildNotSupported` when the rules cannot run it yet."""
         ...
+
+
+class SnapshotRefused(ValueError):
+    """A saved hero's build snapshot holds something the run cannot use. The message says what."""
+
+
+def build_from_snapshot(base: HeroBuild, snapshot: dict[str, Any], shipped_dice: Mapping[str, DieDefinition]) -> HeroBuild:
+    """The build of a saved hero: its vocation's build with the hero's own stats, dice, skills and name.
+
+    ``snapshot`` is the party entry's ``hero`` object. It is written into the run's command log, so a
+    replay needs the log and the pinned catalog only (owner decision of 2026-11-11, fixture CE-35).
+    The career rules decide what a hero may have; this function only refuses what a run cannot hold:
+    a stat below the vocation's own, a die that does not exist for this hero, the wrong number of dice.
+    """
+    who = snapshot["hero_id"]
+    stats = snapshot.get("stats", {})
+    for name, value in stats.items():
+        if value < getattr(base, name):
+            raise SnapshotRefused(f"{who}: {name} {value} is below the {getattr(base, name)} of a {base.name}.")
+    max_hp = stats.get("max_hp", base.max_hp)
+    max_mana = stats.get("max_mana", base.max_mana)
+    dice = tuple(snapshot.get("dice", base.starting_dice))
+    bench = tuple(snapshot.get("bench", base.bench_dice))
+    if len(dice) != base.dice_capacity:
+        raise SnapshotRefused(f"{who}: a {base.name} takes {base.dice_capacity} dice into a run, not {len(dice)}.")
+    if len(set(dice + bench)) != len(dice + bench):
+        raise SnapshotRefused(f"{who}: a die is listed twice.")
+    for die_id in dice + bench:
+        if die_id not in base.dice and die_id not in shipped_dice:
+            raise SnapshotRefused(f"{who}: the die '{die_id}' does not exist for a {base.name}.")
+    return replace(
+        base,
+        max_hp=max_hp,
+        start_hp=base.start_hp + (max_hp - base.max_hp),  # a bonus to the maximum is health the hero starts with
+        max_mana=max_mana,
+        speed=stats.get("speed", base.speed),
+        starting_dice=dice,
+        bench_dice=bench,
+        hero_id=who,
+        display_name=snapshot.get("name", ""),
+        skills=tuple(snapshot.get("skills", ())),
+    )
 
 
 class EncounterNotPlayable(ValueError):

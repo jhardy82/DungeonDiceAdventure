@@ -1050,6 +1050,88 @@ step) lets the owner change it without code. It stays an open owner decision.
 - Mastery is awarded per won battle (step C). Points from battles 1 and 2 are therefore kept
   when battle 3 is lost; a lost third battle costs the run's victory and nothing else.
 
+### 7.17 Class Evolution Phase 4, step C (part 1): saved heroes in real runs (2026-11-12)
+
+**What was built**
+
+- **Recruiting** (career command `RecruitHero`). A recruit is one of the three starting
+  classes, gets the next free hero id and a name from its class ("Squire 1"), and has all
+  three starting classes unlocked, as every hero in the acceptance fixtures does. Refused at 12
+  heroes with the new registry code `ROSTER_FULL`, inside a run with `PHASE_LOCKED`. The
+  save writes a recruited hero in the same transaction as its events.
+- **Build snapshots at run start** (fixture CE-35). A party entry of `StartRun` may carry a
+  `hero` object: the saved hero's id, name, stats with mastery bonuses, dice, bench and
+  equipped skills. The engine builds the hero from its vocation plus the snapshot and refuses
+  what a run cannot hold (a stat below the vocation's own, a die that does not exist for the
+  hero, the wrong number of dice, the same hero twice). The snapshot is in the command log and
+  in the run's start event, so a replay needs the log and the pinned catalog only.
+- **Bonus-challenge evidence** (`src/battle_dice/career/evidence.py`), counted from a
+  battle's events for the five playable vocations. No engine state was added.
+- **The hand-over** (`src/battle_dice/app/progression.py`): opens the save and makes the
+  profile on first use; builds party entries from saved heroes; reports run start, each
+  battle's result as one mastery award per saved hero, the run's phase, and its end. A run left
+  unfinished is closed as a defeat when the next one starts. Run ids come from the save, so the
+  same seed can be played twice.
+- **A career-aware simulator** (`src/battle_dice/sim/career.py`): plays runs with saved heroes
+  and keeps going until a hero has mastered its vocation.
+
+**Kept unchanged, and how that is known**
+
+- A `StartRun` without `hero` objects is the shipped command (CE-35 sends exactly that). The
+  replay pin and the six content files are unchanged.
+- The run's hashed state gains one key, `hero_id`, on the party entries of saved heroes only.
+- Nothing in the game uses any of this yet. The app still opens no save; that comes with the
+  screens (step D).
+
+**Pacing, measured (FDD open decision 5; the plan's Checkpoint 2)**
+
+Heuristic player, 8 new profiles per row, the first hero a Squire. Runs until the Squire is
+mastered, then (as a Guardian) until the Guardian is mastered.
+
+| Party | Third battle | Runs to master the Squire (least / median / most) | Then runs to master the Guardian |
+|-------|--------------|---------------------------------------------------:|---------------------------------:|
+| Squire, Scout | Fought every run | 4 / 6 / 7 | 13 / 17 / 20 |
+| Squire, Scout | Never | 8 / 10 / 12 | Cannot finish |
+| Squire, Scout, Apprentice | Fought every run | 4 / 5 / 6 | 14 / 17 / 17 |
+| Squire, Scout, Apprentice | Never | 8 / 9 / 11 | Cannot finish |
+| Squire, Scout, Apprentice, Scout | Fought every run | 4 / 5 / 6 | 12 / 13 / 14 |
+| Squire, Scout, Apprentice, Scout | Never | 8 / 9 / 10 | Cannot finish |
+
+- **Reading:** with the third battle a player masters the Squire in about 5 runs and the
+  Guardian in about 15 more, so about 20 runs to the first mastered evolved vocation. Without
+  the third battle the Squire takes about twice as long and the Guardian stops at rank 7,
+  because its last rank needs threat 4.
+- Why the third battle helps so much: battle 1 (threat 1) stops awarding a starting class from
+  rank 4 on, so later runs earn from battle 2 and the third battle only.
+- **Limits:** one simulated player; three party shapes; the hero measured is the Squire. The
+  decision itself (keep the v0.1 thresholds or change them) stays with the owner. The demo's
+  tuning file will let the points per win and the thresholds be changed without code.
+
+**Evidence**
+
+- 959 tests pass (913 before). Lint and type checks are clean; coverage is 97%.
+- 36 of the 40 acceptance cases run as tests (CE-35 is new).
+- New tests: recruiting (`tests/unit/test_recruit.py`), snapshots
+  (`tests/unit/test_snapshot.py`), evidence (`tests/unit/test_evidence.py`) and the
+  hand-over (`tests/integration/test_progression_link.py`), which plays the whole loop
+  through a save file: a Squire is mastered, becomes a Guardian with its +1 health, and plays on.
+- **Deliberate breaks:** 30 breaks of the new code, one at a time. 29 were caught at first. The
+  one miss changed nothing for any plan the tests used (a plan of three actions exposes it); a
+  test for that was added and all 30 are caught. Run without bytecode files and with a control
+  run.
+
+**This build's own readings, open to correction**
+
+- A recruit has all three starting classes unlocked (as in every fixture), not only its own.
+- Shields are attributed first in, first out per target, because the log does not say whose
+  shield absorbed a hit.
+- "Another ally" in the two shield challenges does not include the hero itself.
+- A run the player leaves unfinished is recorded as a defeat.
+- A hero in the party without a snapshot earns nothing (it is not a saved hero).
+
+**Still to do in step C:** the vocation change inside a run, after recovery and before the
+upgrade (CE-19).
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

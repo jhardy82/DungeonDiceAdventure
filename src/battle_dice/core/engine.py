@@ -26,7 +26,9 @@ from battle_dice.core.build import (
     EncounterNotPlayable,
     EncounterSource,
     HeroBuild,
+    SnapshotRefused,
     build_from_class,
+    build_from_snapshot,
 )
 from battle_dice.core.commands import Command, CommandRejected, CommandResult
 from battle_dice.core.events import EventType
@@ -322,7 +324,7 @@ class Engine:
     # Run lifecycle
     # ----------------------------------------------------------------------------------------
 
-    def _start_run(self, seed: int, party: list[dict[str, str]], run_id: str | None = None,
+    def _start_run(self, seed: int, party: list[dict[str, Any]], run_id: str | None = None,
                    encounters: list[str] | None = None) -> None:
         if self._state is not None:
             raise CommandRejected("A run is already in progress; start a new run with a new engine.")
@@ -369,8 +371,17 @@ class Engine:
         for slot, member in enumerate(party, start=1):
             hero_id = f"h{slot:02d}"
             build = self._resolve_build(member["class_id"])
+            entry = {"id": hero_id, "class_id": member["class_id"], "row": member["row"]}
+            if "hero" in member:  # a saved hero: its own stats, dice and skills on top of its vocation's build
+                try:
+                    build = build_from_snapshot(build, member["hero"], self.content.dice)
+                except SnapshotRefused as refusal:
+                    raise CommandRejected(str(refusal)) from refusal
+                if any(other.hero_id == build.hero_id for other in self._builds.values()):
+                    raise CommandRejected(f"The saved hero '{build.hero_id}' is in the party twice.")
+                entry["hero_id"] = build.hero_id
             self._builds[hero_id] = build
-            state.party.append({"id": hero_id, "class_id": member["class_id"], "row": member["row"]})
+            state.party.append(entry)
             state.inventory[hero_id] = list(build.bench_dice)
             heroes.append(progression.hero_from_build(self.content, hero_id, build, member["row"]))
         self._state = state
@@ -388,6 +399,13 @@ class Engine:
         }
         if extra:
             started["encounters"] = list(extra)
+        if any(build.hero_id for build in self._builds.values()):
+            # The builds the saved heroes fight with, so the log says what each hero was in this run.
+            started["heroes"] = [
+                {"id": hero_id, "hero_id": b.hero_id, "name": b.display_name, "vocation_id": b.vocation_id, "max_hp": b.max_hp,
+                 "max_mana": b.max_mana, "speed": b.speed, "dice": list(b.starting_dice), "bench": list(b.bench_dice), "skills": list(b.skills)}
+                for hero_id, b in self._builds.items() if b.hero_id
+            ]
         if self.vocation_catalog_pin is not None:
             started["vocation_catalog"] = self.vocation_catalog_pin
         self.emit(EventType.RUN_STARTED, delta=started)

@@ -15,12 +15,13 @@
 - Class Evolution Phase 1: hero build seam, slot schedules, vocation catalog, feature gate `class_evolution_v1` (off by default)
 - Class Evolution Phase 2: progression rules in memory
 - Class Evolution Phase 3: save file (SQLite profile store)
-- 39 of 40 acceptance cases decided; 35 run as tests
+- 39 of 40 acceptance cases decided; 36 run as tests
 - Class Evolution Phase 4, step A: the Guardian is playable by the rules (merged, pull request 19)
 - Class Evolution Phase 4, step B: encounters from the catalog and the optional third battle; the threat-4 table tuned to 75-77% per party size
+- Class Evolution Phase 4, step C (part 1): recruiting, build snapshots at run start, challenge evidence, the run-to-save hand-over, a career-aware simulator; pacing measured
 
 ### In Progress
-- Class Evolution Phase 4, step C: saved heroes in real runs
+- Class Evolution Phase 4, step C (rest): vocation change inside a run (CE-19)
 
 ### Pending
 - Phase 4, step D: screens (party setup with saved heroes, career screen, award panel, stop or fight on)

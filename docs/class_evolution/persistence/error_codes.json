@@ -88,6 +88,13 @@
       "status": "approved"
     },
     {
+      "code": "ROSTER_FULL",
+      "kind": "command_rejection",
+      "meaning": "The profile already holds as many heroes as the roster allows (12 by the owner's decision of 2026-11-11), so no hero can be recruited. error_details carries the limit and the number of heroes.",
+      "raised_by": ["RecruitHero"],
+      "status": "approved"
+    },
+    {
       "code": "UNDER_THREAT_CAP",
       "kind": "award_denial",
       "meaning": "The encounter was won, but its threat rating is below the minimum for the hero's active vocation at its current rank. Base and challenge points are both zero. The name is kept from v0.1; it means below the threat floor.",
@@ -196,9 +203,10 @@
   "check_order": {
     "status": "approved",
     "meaning": "When several conditions fail at once, the first one in this order is reported.",
-    "order": ["replay_result", "COMMAND_ID_REUSED", "CONTENT_MIGRATION_REQUIRED", "REVISION_CONFLICT", "PHASE_LOCKED", "HERO_NOT_ELIGIBLE", "UNSUPPORTED_SECONDARY_VOCATION", "NOT_DISCOVERED", "PREREQUISITE_UNMET", "ITEM_INSUFFICIENT", "INCOMPATIBLE_DIE", "NO_LEGAL_FACE", "CAPACITY_EXCEEDED"]
+    "order": ["replay_result", "COMMAND_ID_REUSED", "CONTENT_MIGRATION_REQUIRED", "REVISION_CONFLICT", "PHASE_LOCKED", "ROSTER_FULL", "HERO_NOT_ELIGIBLE", "UNSUPPORTED_SECONDARY_VOCATION", "NOT_DISCOVERED", "PREREQUISITE_UNMET", "ITEM_INSUFFICIENT", "INCOMPATIBLE_DIE", "NO_LEGAL_FACE", "CAPACITY_EXCEEDED"]
   },
   "unused_codes": [
+    {"code": "ROSTER_FULL", "reason": "Added with Phase 4 (recruiting), after the 40 CE fixtures were fixed; tests/unit/test_recruit.py raises it."},
     {"code": "NOT_DISCOVERED", "reason": "No CE fixture claims or previews a vocation the profile has not discovered; CE-09 and CE-10 cover discovery through the view and the signal only."},
     {"code": "INCOMPATIBLE_DIE", "reason": "No CE fixture equips a die by command; CE-18 covers the automatic move of incompatible dice to the bench."},
     {"code": "REVISION_CONFLICT", "reason": "No CE fixture sends a stale state_revision; the persistence test suite exercises it against the database."},

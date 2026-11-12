@@ -88,6 +88,7 @@
         "REVISION_CONFLICT",
         "UNSUPPORTED_SECONDARY_VOCATION",
         "COMMAND_ID_REUSED",
+        "ROSTER_FULL",
         "UNDER_THREAT_CAP",
         "ENCOUNTER_NOT_WON",
         "TRAINING_DEAD_END",
@@ -431,6 +432,14 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 5
+        },
+        "roster_limit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "heroes": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },

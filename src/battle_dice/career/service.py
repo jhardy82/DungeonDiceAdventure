@@ -42,6 +42,11 @@ PREVIEW = "PreviewVocation"
 EQUIP = "EquipInheritedSkill"
 UNEQUIP = "UnequipInheritedSkill"
 EQUIP_DIE = "EquipDie"
+RECRUIT = "RecruitHero"
+#: Owner decision of 2026-11-11 (D-27): heroes are recruited at party setup, free, up to this many.
+ROSTER_LIMIT = 12
+#: Run phases in which a run is over, so a new hero may be recruited and a new run started.
+FINISHED_PHASES = ("victory", "defeat")
 #: Commands that change the build a hero fights with.
 BUILD_COMMANDS = (CHANGE, EQUIP, UNEQUIP, EQUIP_DIE)
 #: Run phases in which the build is fixed: during a battle, and after the mandatory upgrade was chosen.
@@ -102,6 +107,8 @@ class CareerService:
     def __init__(self, catalog: CareerCatalog, state: CareerState):
         self.catalog = catalog
         self.state = state
+        #: How many heroes a profile may hold. A setting of the demo; the default is the owner's decision.
+        self.roster_limit = ROSTER_LIMIT
         #: Test-only: ``{"after": step}`` makes the next change fail right after that step.
         self.fault: Json | None = None
 
@@ -116,7 +123,7 @@ class CareerService:
         handlers = {CLAIM: self._claim, CHANGE: self._change, PREVIEW: self._preview, EQUIP: self._equip, UNEQUIP: self._unequip,
                     EQUIP_DIE: self._equip_die}
         handler = handlers.get(command_type)
-        if handler is None:
+        if handler is None and command_type != RECRUIT:
             raise ValueError(f"Unknown career command '{command_type}'.")
         fingerprint = command_fingerprint(command_type, params)
         seen = self.state.processed.get(command_id)
@@ -126,6 +133,9 @@ class CareerService:
             return CareerResult("rejected", error_code="COMMAND_ID_REUSED")
 
         def change() -> Json | None:
+            if handler is None:  # RecruitHero: there is no hero yet to check
+                self._recruit(params)
+                return None
             hero = self._checked_hero(command_type, command, params)
             return handler(hero, params)
 
@@ -293,6 +303,34 @@ class CareerService:
     # ----------------------------------------------------------------------------------------
     # Command handlers
     # ----------------------------------------------------------------------------------------
+
+    def _recruit(self, params: Json) -> None:
+        """A new hero of a starting class. It has every starting class unlocked, as all heroes do."""
+        if params.get("catalog_version") not in (None, self.catalog.version):
+            raise _Reject("CONTENT_MIGRATION_REQUIRED")
+        starting = self.catalog.starting_classes()
+        vocation_id = params["starting_class"]
+        if vocation_id not in starting:
+            raise ValueError(f"'{vocation_id}' is not a starting class; a hero is recruited as one of {', '.join(starting)}.")
+        run = self.state.run
+        if run is not None and run.phase not in FINISHED_PHASES:
+            raise _Reject("PHASE_LOCKED")  # heroes are recruited at party setup, not inside a run
+        heroes = self.state.heroes
+        if len(heroes) >= self.roster_limit:
+            raise _Reject("ROSTER_FULL", {"roster_limit": self.roster_limit, "heroes": len(heroes)})
+        number = max((int(h.rsplit("_", 1)[1]) for h in heroes if h.startswith("hero_") and h.rsplit("_", 1)[1].isdigit()), default=0) + 1
+        hero_id = f"hero_{number:03d}"
+        name = f"{self.catalog.name(vocation_id)} {number}"
+        hero = HeroRecord(hero_id, vocation_id, origin_vocation_id=vocation_id, display_name=name)
+        heroes[hero_id] = hero
+        self._emit("HeroRecruited", hero_id=hero_id, vocation_id=vocation_id, display_name=name)
+        for unlocked in starting:
+            self._emit("VocationClaimed", hero_id=hero_id, vocation_id=unlocked, route_id="route_0", consumed_items=[])
+            hero.unlocked_vocations.append(unlocked)
+            hero.unlock_routes[unlocked] = "route_0"
+            hero.mastery[unlocked] = MasteryRow(unlocked)
+            for skill_id in self.catalog.skills_learned_by(unlocked, 1):
+                hero.learned_skills.append(skill_id)
 
     def _require_discovered(self, vocation_id: str) -> None:
         if vocation_id not in self.catalog.vocations or self.discovery_state(vocation_id) != "discovered":
