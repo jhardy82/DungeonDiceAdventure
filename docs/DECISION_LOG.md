@@ -1485,6 +1485,27 @@ session.
 Checkpoint 1 (the Guardian's numbers, the third battle's table), Checkpoint 2 (pacing), Field
 Medic's cost, Squire Anchor in battle, the change at the stop-or-fight-on decision.
 
+### 7.22 A tour of the slice, played by a test (2026-11-12)
+
+**Why.** The owner's goal is a demo that can be shown. Everything the first slice can do is
+reachable from the screens, but nothing said in which order to click to see it.
+
+- `README.md` has **a tour in two runs**: Field Medic and the third battle; becoming a Guardian
+  inside a run. Each starts from Main menu, Settings, with one of the start presets.
+- `tests/ui/test_demo_tour.py` **plays both runs through the screens as they are written**:
+  every button and key the reader is told to use is clicked or pressed. Battles are won by
+  arrangement, so the tour does not depend on the dice. A third test holds the README to the
+  names the screens use.
+- The start preset once shown as "A mastered Guardian" is now shown as **"A Guardian with Field
+  Medic"**, which says what it is for. A longer name was cut off under the widest font; the
+  existing fit test caught it.
+- **Whole runs with a Guardian, drawn step by step.** The simulated player plays a Guardian
+  party from the first roll to the outcome on three seeds, and every step is drawn. The defect
+  of section 7.20 (a Guardian's upgrade broke the upgrade screen) existed because no test had
+  played an evolved hero through a run; with that fix taken out again, two of the three seeds
+  fail.
+- 1116 tests pass (1110 before).
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1110 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1116 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -308,6 +308,31 @@ python tools/class_evolution/check_persistence.py     # the save database script
 Both print `OK`. The first also lists, as warnings, every rank and vocation that cannot be reached
 yet. Of the 40 acceptance cases 37 run as tests (`docs/DECISION_LOG.md`, sections 7.14 to 7.21).
 
+### A tour of the slice in two runs
+
+Both runs start in **Main menu, Settings (S)**. Switch **Class Evolution** on, choose what a
+**new profile starts as**, then press **Reset the saved profile** twice so the profile is made
+with that start. Esc returns to the main menu; **New Run (N)** opens the party setup.
+
+**Run 1: Field Medic and the third battle** (start: *A Guardian with Field Medic*)
+
+1. In the roster on the right, click a hero to put it into the party. Take "Squire 1" (the
+   Guardian), the Scout and the Apprentice.
+2. Click **Career** on the Guardian's slot, then press **K**: Field Medic is equipped. Esc.
+3. **Begin Encounter (B)**. When an ally is down and the Guardian rolls its Heal, the die says
+   "Field Medic: revive for 2 mana". Use the die and pick the downed ally. It needs 2 mana, so
+   do not spend the Guardian's mana on its reaction first.
+4. Win Battle 1, choose an upgrade, win Battle 2. Then choose **Fight On (F)** for the third battle.
+
+**Run 2: becoming a Guardian inside a run** (start: *A Guardian at rank 1*)
+
+1. In the party setup, add "Squire 1" and click **Career** on its slot. Select **Squire** and
+   press **Make active**: the hero is a Squire again and keeps the Guardian unlocked. Esc.
+2. Add the Scout and begin. Win Battle 1.
+3. On the upgrade screen press **Career (C)**, select **Guardian**, press **Make active**. Esc.
+4. The upgrade cards are now for the Guardian's dice. Choose one and fight Battle 2 as a
+   Guardian.
+
 ## Settings
 
 **Main menu, Settings (S)** changes these without touching a file. Each button moves its setting
@@ -319,7 +344,7 @@ to the next value; the change is saved at once and takes effect at once.
 | Third battle | Offered (default), Not offered | The optional third battle after Battle 2 |
 | Mastery pace | Normal (default), Fast, Very fast | How many points a rank needs. Fast asks for about half; Very fast for one point a rank. Heroes are re-ranked from the points they have |
 | Roster size | 6, 12 (default), 24 | How many heroes a profile may hold (1 to 50 in the file) |
-| New profile starts as | Fresh (default); a Squire one win from mastery; a Guardian at rank 1; a mastered Guardian with Field Medic equipped | What a new or reset profile holds. Lets the evolution be shown in minutes |
+| New profile starts as | Fresh (default); A Squire one win from mastery; A Guardian at rank 1; A Guardian with Field Medic (mastered, the skill equipped) | What a new or reset profile holds. Lets the evolution be shown in minutes |
 | Dice seed | A new one each run (default), Fixed | A fixed seed gives the same dice every run |
 | Animation | On (default), Off | Reduced motion |
 | Window size | 960x540, 1280x720 (default), 1600x900, 1920x1080 | The window can also be dragged to any size |

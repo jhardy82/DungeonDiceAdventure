@@ -24,6 +24,7 @@
 - Class Evolution Phase 4, step E: Field Medic works in battle; the Career screen has a skills panel (equip, take off); catalog 0.4.0
 - Class Evolution Phase 4: a saved hero changes vocation inside a run, after Battle 1 and before the upgrade (CE-19). The approved Phase 4 plan is built in full
 - Fixed: a Guardian's upgrade broke the upgrade screen; an evolved hero had no picture in battle
+- A tour of the slice in two runs is in the README, and a test plays it through the screens
 
 ### In Progress
 (none: the approved Phase 4 plan is built; the open points below are owner decisions)
