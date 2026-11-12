@@ -2,7 +2,7 @@
 
 ## Project: Battle Dice
 **Current Phase:** Implementation (the project was already under way when this file was created)
-**Last Updated:** 2026-11-12 by the implementing engineer (Phase 4 complete)
+**Last Updated:** 2026-11-12 by the implementing engineer (owner answers of 2026-11-12)
 **Health:** On Track
 
 **Current goal (owner, 2026-11-11):** a fully configurable and playable demo.
@@ -26,9 +26,11 @@
 - Fixed: a Guardian's upgrade broke the upgrade screen; an evolved hero had no picture in battle
 - A tour of the slice in two runs is in the README, and a test plays it through the screens
 - The gate-on self-check also plays a whole run with a Guardian from the vocation catalog; the packaged Windows build must report it
+- Owner decisions of 2026-11-12: the Guardian's numbers and the third battle's table accepted as built (D-28); a hero may also change vocation at the stop-or-fight-on decision (D-29, built)
 
 ### In Progress
-(none: the approved Phase 4 plan is built; the open points below are owner decisions)
+- Field Medic at 1 mana and 5 HP on revival (owner decision D-30)
+- The demo's configuration as decided by the owner (D-31): grouped Settings with a demo group, the seed on the New Run screen, the small set of comfort and play-aid settings
 
 ### Pending
 
@@ -55,7 +57,6 @@ under Done was carried out before the team state existed.
 - Two tuning knobs named in the configuration assumption were not built (points per win; the third battle's enemies as a setting); the reasons are in docs/DECISION_LOG.md section 7.19.
 - Balance of the Guardian and of the threat-4 fight is measured only by a simulated player; the numbers await an owner decision (Checkpoint 1 of the Phase 4 plan).
 - Pacing: reaching the last capstone needs 52 to 104 winning runs on today's content (FDD open decision 5).
-- Field Medic made no measurable difference for the simulated player (153 against 152 wins in 240 runs): it rarely has the 2 mana. Whether the cost is right needs a person's play or an owner decision.
+- Field Medic as built (2 mana, back at 1 HP) is worth nothing to the simulated player (295 wins of 480 against 297 without it). At 1 mana and 5 HP it wins 19 more runs than it loses.
 - Squire Anchor is learned but does nothing in battle yet; the skills panel says so and does not let it be equipped.
-- A hero that masters its class in Battle 2 cannot evolve before the third battle (the only moment for a change inside a run is after Battle 1). An owner decision could open the stop-or-fight-on moment too.
 - Never launched on a physical Windows display; no human playtest yet.

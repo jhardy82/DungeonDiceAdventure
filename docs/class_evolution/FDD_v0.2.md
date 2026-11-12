@@ -311,6 +311,9 @@ names.
    - The steps and what each one proves are in `docs/DECISION_LOG.md`, section 7.15.
    - **Built in full on 2026-11-12** (sections 7.15 to 7.21), the vocation change inside a run
      (fixture CE-19) last. Of the 40 acceptance cases 37 run as tests.
+   - **Owner decisions of 2026-11-12** (`docs/DECISION_LOG.md`, section 7.24): the Guardian's
+     numbers and the third battle's enemy table are accepted as built (D-28); a hero may also
+     change vocation at the decision to stop or fight on after Battle 2 (D-29, beyond CE-19).
 
 ## 11. Risks
 

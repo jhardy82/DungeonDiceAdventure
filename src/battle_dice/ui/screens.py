@@ -994,10 +994,12 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
         note = "Master a vocation (rank 8) to open the ones that build on it. A hero fights as its active vocation."
     elif not view["open_now"]:
         note = view["locked"]
+    elif view["fighting"] and view["deciding"]:
+        note = "Before you stop or fight on this hero may take another vocation. Health and mana carry over; an upgraded die it gives up loses its upgrade."
     elif view["fighting"]:
         note = "Before the upgrade is chosen this hero may take another vocation. It fights on with that vocation's dice; health and mana carry over."
     else:
-        note = "Before the upgrade is chosen a hero may claim a vocation or change to one. This hero is not in the party of this run."
+        note = "Between battles a hero may claim a vocation or change to one. This hero is not in the party of this run."
     ui.text(24, 52, note, 15, Theme.DIM, max_width=1230)
 
     ui.panel(16, 78, 760, 540, "Vocations")
@@ -1109,10 +1111,15 @@ def draw_continue(ui: UI, ctrl: AppController) -> None:
     ui.text(640, 132, f"The third battle is harder than the first two{threat}. Losing it loses the run; mastery already earned is kept.", 15,
             Theme.DIM, align="center", max_width=1200)
 
-    ui.panel(240, 170, 380, 300, "Party after recovery")
+    ui.panel(140, 170, 480, 300, "Party after recovery")
     for position, hero in enumerate(view["heroes"][:5]):
         line_y = 200 + position * 52
-        ui.text(256, line_y, ui.fit_name(hero["name"], 16, True, 170), 16, Theme.TEXT, bold=True)
+        if hero["saved_hero_id"] is not None:  # Class Evolution: before the decision a saved hero may take another vocation
+            ui.button(f"continue:career:{hero['id']}", 150, line_y - 8, 84, 40, "Career", partial(ctrl.open_career, hero["saved_hero_id"]),
+                      size=14, hotkeys=(pygame.K_c,) if position == 0 else (),
+                      tooltip="Before you decide, this hero may claim a vocation or change to one. It fights the third battle as that vocation.")
+        ui.text(244, line_y - 6, ui.fit_name(hero["name"], 16, True, 170), 16, Theme.TEXT, bold=True)
+        ui.text(244, line_y + 14, hero["vocation_name"], 13, Theme.FAINT, max_width=170)
         ui.text(604, line_y, f"HP {hero['hp']}/{hero['max_hp']}   MP {hero['mana']}/{hero['max_mana']}   {hero['row']}", 14, Theme.DIM, align="right")
     ui.panel(640, 170, 400, 300, f"Mastery from Battle {view['battle']}")
     y = 200.0

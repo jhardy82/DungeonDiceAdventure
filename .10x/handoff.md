@@ -26,14 +26,8 @@ Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.21),
 `docs/class_evolution/FDD_v0.2.md`.
 
 ### Open Questions
-- What should "fully configurable" cover in the demo? Asked twice, not answered. Work proceeds
-  on an assumption recorded in `decisions.md`; the owner can widen or narrow it.
-- Checkpoint 1: Guardian's numbers and the threat-4 table, from measurement.
 - Checkpoint 2: pacing (runs needed to master a vocation).
-- Field Medic's cost: the simulated player can rarely pay it (section 7.20).
 - Squire Anchor in battle: needs a balance decision before it is built.
-- A vocation change at the stop-or-fight-on decision (after Battle 2): not in CE-19; without it
-  a hero that masters its class in Battle 2 cannot evolve before the third battle (section 7.21).
 - CE-31: what Duelist's Parry does (asked with the Duelist's wave).
 
 ---

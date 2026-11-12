@@ -225,7 +225,7 @@ def test_only_a_saved_hero_can_change_and_only_in_the_upgrade_phase(catalog):
                                                  {"class_id": "scout", "row": "back"}]))
     assert cmd.CHANGE_VOCATION not in engine.permissible_commands()
     in_battle = become_guardian(engine)
-    assert not in_battle.accepted and "only after a battle's recovery" in (in_battle.reason or "")
+    assert not in_battle.accepted and "only between battles" in (in_battle.reason or "")
     shipped = Engine(packaged_content())
     ok(shipped.do(cmd.START_RUN, seed=11, party=[{"class_id": "squire", "row": "front"}, {"class_id": "scout", "row": "back"}]))
     win_battle(shipped)
@@ -280,3 +280,85 @@ def test_a_run_started_with_shipped_classes_names_the_catalog_once_a_hero_evolve
     assert engine.vocation_catalog_pin is None
     ok(become_guardian(engine))
     assert engine.vocation_catalog_pin == {"version": catalog.version, "sha256": catalog.sha256}
+
+
+# --------------------------------------------------------------------------------------------
+# The second moment: the decision to stop or fight on (owner decision of 2026-11-12)
+# --------------------------------------------------------------------------------------------
+
+
+def at_the_decision(catalog: VocationCatalog) -> Engine:
+    """Battles 1 and 2 are won, the Squire's Iron d6 carries the upgrade: the run waits for stop or fight on."""
+    engine = after_battle_one(catalog, third=True)
+    offer = engine.state.upgrade_offers["h01"]["iron_d6"][0]
+    ok(engine.do(cmd.CHOOSE_UPGRADE, hero_id="h01", die_id="iron_d6", offer_id=offer["offer_id"]))
+    ok(engine.do(cmd.ADVANCE_PHASE))
+    win_battle(engine)
+    assert engine.state.phase == RunPhase.CONTINUE and "iron_d6" in engine.state.die_overrides["h01"]
+    return engine
+
+
+def test_at_the_decision_to_stop_or_fight_on_a_hero_may_change_and_no_upgrade_is_dealt(catalog):
+    engine = at_the_decision(catalog)
+    assert engine.permissible_commands() == [cmd.CONTINUE_RUN, cmd.END_RUN, cmd.SET_FORMATION, cmd.CHANGE_VOCATION]
+    squire = unit(engine, "h01")
+    hp, mana = squire.hp, squire.mana
+    offers, draws = engine.state.upgrade_offers, engine.state.rng["rewards"].draws
+    ok(become_guardian(engine))
+    guardian = unit(engine, "h01")
+    assert (guardian.archetype_id, guardian.max_hp, guardian.equipped_dice_ids) == ("guardian", 18, ["guardian_d6", "guardian_d4"])
+    assert guardian.hp == convert_pool(hp, 14, 18) and guardian.mana == convert_pool(mana, 3, 3)
+    assert engine.state.upgrade_offers == offers and engine.state.rng["rewards"].draws == draws, "no cards are dealt at this moment"
+    assert "h01" not in engine.state.die_overrides, "the upgraded Iron d6 left, and its upgrade with it"
+    assert engine.state.phase == RunPhase.CONTINUE
+    event = events_of(engine, EventType.VOCATION_CHANGED)[-1]
+    assert event.delta["offers"] == {} and (event.delta["from"], event.delta["to"]) == ("squire", "guardian")
+    assert describe_event(event, {"h01": "Aldric"}).endswith(f"mana {mana}/3 -> {guardian.mana}/3, new dice.")
+    ok(engine.do(cmd.CONTINUE_RUN))
+    assert engine.state.encounter_index == 2 and unit(engine, "h01").archetype_id == "guardian"
+    assert unit(engine, "h01").equipped_dice_ids == ["guardian_d6", "guardian_d4"]
+    in_battle = become_guardian(engine, class_id="squire", hero={"hero_id": "hero_001"})
+    assert not in_battle.accepted and "only between battles" in (in_battle.reason or "")
+    play_run(engine, HeuristicPolicy())
+    assert engine.finished()
+
+
+def test_a_run_may_also_end_with_its_victory_after_a_change_at_the_decision(catalog):
+    engine = at_the_decision(catalog)
+    ok(become_guardian(engine))
+    ok(engine.do(cmd.END_RUN))
+    assert engine.finished() and engine.state.outcome == "victory" and engine.build("h01").vocation_id == "guardian"
+
+
+def test_a_run_of_shipped_classes_is_offered_nothing_new_at_the_decision(catalog):
+    engine = Engine(packaged_content(), catalog)
+    ok(engine.do(cmd.START_RUN, seed=11, party=[{"class_id": "squire", "row": "front"}, {"class_id": "scout", "row": "back"}], encounters=["training_04"]))
+    win_battle(engine)
+    offer = engine.state.upgrade_offers["h01"]["iron_d6"][0]
+    ok(engine.do(cmd.CHOOSE_UPGRADE, hero_id="h01", die_id="iron_d6", offer_id=offer["offer_id"]))
+    ok(engine.do(cmd.ADVANCE_PHASE))
+    win_battle(engine)
+    assert engine.permissible_commands() == [cmd.CONTINUE_RUN, cmd.END_RUN, cmd.SET_FORMATION]
+
+
+def test_a_really_played_run_with_a_change_at_the_decision_replays(catalog):
+    for seed in range(11, 40):
+        engine = played_to_the_upgrade(catalog, seed)
+        if engine is None:
+            continue
+        policy = HeuristicPolicy()
+        while not engine.finished() and engine.state.phase != RunPhase.CONTINUE:
+            if engine.needs_input():
+                policy.act(engine)
+            else:
+                ok(engine.do(cmd.ADVANCE_PHASE))
+        if not engine.finished():
+            break
+    else:
+        raise AssertionError("no seed reached the decision")
+    ok(become_guardian(engine))
+    play_run(engine, HeuristicPolicy())
+    record = export_run(engine)
+    again = verify(packaged_content(), record)
+    assert (events_hash(again.events), state_hash(again.state)) == (events_hash(engine.events), state_hash(engine.state))
+    assert [c["type"] for c in record["commands"]].count(cmd.CHANGE_VOCATION) == 1 and again.build("h01").vocation_id == "guardian"

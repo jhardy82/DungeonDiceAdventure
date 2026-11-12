@@ -98,3 +98,40 @@ Started: 2026-11-11
   third battle. Put to the owner as an open question.
 - **Impacts:** Rules engine (command, event), save link, upgrade and Career screens, docs
   (`docs/DECISION_LOG.md`, section 7.21).
+
+### 2026-11-12 — Owner: Checkpoint 1 accepted; a second moment for a vocation change
+- **Decision:** (D-28) The Guardian's numbers and the third battle's enemy table are accepted as
+  built. (D-29) A hero may also claim or change vocation at the decision to stop or fight on
+  after Battle 2.
+- **Why:** Asked through the ask tool on 2026-11-12; the owner chose both.
+- **Alternatives considered:** A stronger Guardian; keeping the numbers as open defaults;
+  keeping the change to the moment after Battle 1 only.
+- **Trade-offs accepted:** D-29 goes beyond acceptance case CE-19. At that decision no upgrade
+  is dealt, and an upgraded die the hero gives up loses its upgrade.
+- **Impacts:** Rules engine, the saved run phase for that decision (now `upgrade`), the
+  stop-or-fight-on screen, docs (`docs/DECISION_LOG.md`, section 7.24).
+
+### 2026-11-12 — Owner: research the configuration, measure Field Medic first
+- **Decision:** The owner did not confirm the built Settings as the "configurable" scope and
+  asked for research into a more logical set of options. For Field Medic's cost the owner asked
+  for measurements before any change.
+- **Why:** The owner's answers of 2026-11-12.
+- **What exists now:** the research and a proposed structure (`docs/DECISION_LOG.md`, 7.26);
+  the measurement (7.25: the revival's health is the lever, not its cost).
+- **Open:** the owner's choice of what to build from the proposal, and of a Field Medic change.
+- **Impacts:** Settings and New Run screens (when chosen), the skill's numbers (when chosen).
+
+### 2026-11-12 — Owner: Field Medic's numbers, and the shape of the demo's configuration
+- **Decision:** (D-30) Field Medic: no extra mana, the ally comes back at 5 HP, once per
+  encounter. (D-31) Settings is grouped, with the demo options in a group of their own at the
+  bottom; the dice seed is chosen on the New Run screen and can be typed; the small set of new
+  settings is built (text size, high contrast, battle speed at start, confirm before passing
+  with an unused die, tooltip delay, Settings from the pause menu, reset all to defaults).
+- **Why:** The owner's answers of 2026-11-12, after the measurement and the research the owner
+  had asked for (`docs/DECISION_LOG.md`, sections 7.25 and 7.26).
+- **Alternatives considered:** Field Medic as built or at 2 mana and 5 HP; demo options behind
+  launch flags only; the seed left in Settings; regrouping without new settings; key remapping.
+- **Trade-offs accepted:** No difficulty presets, no remapping, no audio or controller settings
+  in the demo. Text size needs a layout check on every screen.
+- **Impacts:** `core/skills.py` and the vocation catalog; Settings, New Run and pause screens;
+  the settings file; docs.

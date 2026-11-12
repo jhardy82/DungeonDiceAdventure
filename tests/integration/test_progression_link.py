@@ -89,8 +89,8 @@ def test_each_battle_awards_mastery_to_each_saved_hero_by_the_rules(progression:
     win_battle(engine)
     second = progression.sync(engine)
     assert [(a["encounter_id"], a["threat_rating"], a["base_points"], a["rank_after"]) for a in second] == [("training_03", 3, 1, 3)] * 2
-    # The run waits for "stop or fight on": the save calls that phase equipment (every build is fixed).
-    assert engine.state.phase == RunPhase.CONTINUE and progression.state.run.phase == "equipment"
+    # The run waits for "stop or fight on": the save calls that phase upgrade (a build may change there).
+    assert engine.state.phase == RunPhase.CONTINUE and progression.state.run.phase == "upgrade"  # saved as the phase in which a build may change
     ok(engine.do(cmd.END_RUN))
     assert progression.sync(engine) == []
     run = progression.state.run
@@ -479,3 +479,25 @@ def test_when_the_run_refuses_the_hero_is_put_back(squire_who_may_be_a_guardian:
     result, run_reason = link.change_in_run(engine, "hero_001", "guardian")
     assert result.accepted and run_reason == "simulated refusal"
     assert link.state.heroes["hero_001"].active_vocation_id == "squire" and engine.build("h01").vocation_id == "squire"
+
+
+def test_at_the_stop_or_fight_on_decision_a_hero_may_change_too(squire_who_may_be_a_guardian: Progression, vocations):
+    """Owner decision of 2026-11-12: the decision after Battle 2 is a moment for a vocation change as well."""
+    link = squire_who_may_be_a_guardian
+    engine = start(link, vocations)
+    win_battle(engine)
+    offer = engine.state.upgrade_offers["h01"]["iron_d6"][0]
+    ok(engine.do(cmd.CHOOSE_UPGRADE, hero_id="h01", die_id="iron_d6", offer_id=offer["offer_id"]))
+    ok(engine.do(cmd.ADVANCE_PHASE))
+    win_battle(engine)
+    link.sync(engine)
+    assert engine.state.phase == RunPhase.CONTINUE and link.state.run is not None and link.state.run.phase == "upgrade"
+    result, run_reason = link.change_in_run(engine, "hero_001", "guardian")
+    assert result.accepted and run_reason is None
+    assert link.state.heroes["hero_001"].active_vocation_id == "guardian" and engine.build("h01").vocation_id == "guardian"
+    assert engine.state.phase == RunPhase.CONTINUE, "the decision is still to be made"
+    ok(engine.do(cmd.CONTINUE_RUN))
+    link.sync(engine)
+    assert link.state.run.phase == "battle" and engine.combat.combatants["h01"].equipped_dice_ids == ["guardian_d6", "guardian_d4"]
+    locked, _ = link.change_in_run(engine, "hero_001", "squire")
+    assert not locked.accepted and locked.error_code == "PHASE_LOCKED"
