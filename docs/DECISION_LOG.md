@@ -1506,6 +1506,29 @@ reachable from the screens, but nothing said in which order to click to see it.
   fail.
 - 1116 tests pass (1110 before).
 
+### 7.23 The self-check plays an evolved hero, in the packaged build too (2026-11-12)
+
+**Why.** `--smoke-test --feature class_evolution_v1` is the one check that runs inside the
+packaged Windows build. It recruited fresh heroes, so it never built a hero from the vocation
+catalog. A Guardian's dice, its picture, its upgrade cards and the third battle were therefore
+never exercised in the packaged app.
+
+- The gate-on self-check now has a second half: a new profile with a mastered Guardian (Field
+  Medic equipped), a Scout and an Apprentice plays a whole run with every step drawn. A drawing
+  fault, the error screen, a run that does not reach the outcome, or a result that does not
+  reach the save fails the check.
+- Its report line ends with `evolved_run=victory` or `evolved_run=defeat`. The packaging
+  workflow fails when the packaged app's report does not carry it.
+- Its logs and its save stay in the self-check's temporary folder, as before.
+- The mandatory upgrade is put on the Guardian's own die, so the upgrade screen has to show a
+  die that is not in the shipped content, and the Guardian's picture is asked for by name.
+- **Checked by breaking it:** with the upgrade-screen fix of section 7.20 taken out the
+  self-check fails; with the picture of an evolved hero taken away it fails. A first version
+  let the simulated player choose the upgrade and passed both breaks, because the player
+  happened to upgrade another hero's die. That is why the upgrade is now chosen on purpose.
+- The gate-off self-check is unchanged.
+- Time: about 20 seconds here for the gate-on check (about 7 before).
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

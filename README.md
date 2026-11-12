@@ -42,7 +42,7 @@ Options:
 | `--size 1280x720` | Window size. Minimum supported is `960x540`; the window is resizable. |
 | `--log-dir PATH` | Folder for JSONL event logs (default `./logs`, or `BATTLE_DICE_LOG_DIR`). |
 | `--no-animation` | Start with animation off (reduced motion). `M` toggles it during a battle. |
-| `--smoke-test` | Hidden self-check: one seeded run with every frame drawn, exit 0 on success. No window opens. |
+| `--smoke-test` | Hidden self-check: one seeded run with every frame drawn, exit 0 on success. No window opens. With `--feature class_evolution_v1` it also plays a run with a Guardian from the vocation catalog. |
 | `--version` | Print the rules and content versions. |
 
 ## Play on Windows

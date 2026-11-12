@@ -191,6 +191,7 @@ def test_the_self_check_walks_the_whole_flow_and_leaves_no_file_behind(tmp_path,
     line = capsys.readouterr().out.strip().splitlines()[-1]
     assert line.startswith("SMOKE TEST OK") and "features=class_evolution_v1" in line
     assert "'career'" in line and "'continue'" in line and "'outcome'" in line
+    assert " evolved_run=victory" in line or " evolved_run=defeat" in line, "a run with a Guardian from the catalog was played too"
     assert sorted(p.name for p in tmp_path.iterdir()) == ["report.txt"]  # its logs and its save were in its own temporary folder
 
 
