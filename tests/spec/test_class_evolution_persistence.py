@@ -75,6 +75,8 @@ ADDED_TABLES = ["hero_die_instance", "item_grant", "schema_migration"]
 #: CE-09, CE-29, CE-30, CE-32 and CE-36 (the career tree, plan codes, hashes, available encounters).
 #: CE-31 (what Duelist's Parry does) waits for the Duelist's wave.
 NEEDS_DESIGN_DECISION = {31}
+#: Codes added after the 40 fixtures were fixed: RecruitHero's refusal at the roster limit (D-27).
+ADDED_WITH_PHASE_4 = {"ROSTER_FULL"}
 BASELINE_DEFINITION = (
     "With the feature gate off, the replay pin tests/golden/replay_pin.json reproduces byte for byte."
 )
@@ -1074,13 +1076,14 @@ def test_the_registry_resolves_the_v01_code_conflicts():
     }
     assert v01_stated <= set(REGISTRY_CODES)
     plan_codes = {entry["code"] for entry in REGISTRY["codes"] if entry["kind"] == "plan_rejection"}
-    assert set(REGISTRY_CODES) - v01_stated - plan_codes == {
+    assert set(REGISTRY_CODES) - v01_stated - plan_codes - ADDED_WITH_PHASE_4 == {
         "UNDER_THREAT_CAP",
         "TRAINING_DEAD_END",
         "UNLOCK_DEAD_END",
         "ENCOUNTER_NOT_WON",
         "COMMAND_ID_REUSED",
     }
+    assert ADDED_WITH_PHASE_4 <= set(REGISTRY_CODES) and ADDED_WITH_PHASE_4 <= set(REGISTRY["check_order"]["order"])
     # Added on 2026-11-11 (fixtures CE-29 and CE-30): the codes of a refused action plan, as the rules engine names them.
     assert plan_codes == set(planning.PLAN_CODES) and len(plan_codes) == 11
     assert REGISTRY["plan_check_order"]["order"] == list(planning.PLAN_CODES)
@@ -1102,9 +1105,13 @@ def test_every_registry_code_is_used_by_a_fixture_or_listed_as_unused_with_a_rea
     used = fixture_codes()
     assert set(REGISTRY_CODES) - used == set(unused)
     assert all(len(reason) > 20 for reason in unused.values())
-    # A plan code no fixture uses must name the test that raises it; of every other kind at most five codes go unused.
+    # Of the codes the 40 fixtures were written for, at most five go unused. A code added later (the plan
+    # codes, and the codes of Phase 4) has no fixture; it must name the test that raises it instead.
     plan_codes = set(planning.PLAN_CODES)
-    assert len(set(unused) - plan_codes) <= 5
+    assert len(set(unused) - plan_codes - ADDED_WITH_PHASE_4) <= 5
+    for code in ADDED_WITH_PHASE_4:
+        named = [word.rstrip(".") for word in unused[code].split() if word.startswith("tests/")]
+        assert named and all((ROOT / path).is_file() for path in named), code
     assert plan_codes & used == {"INSUFFICIENT_MANA", "TARGET_DOWNED"}  # fixtures CE-29 and CE-30
     for code in plan_codes & set(unused):
         assert "tests/unit/test_plan_codes.py" in unused[code] and (ROOT / "tests" / "unit" / "test_plan_codes.py").is_file()

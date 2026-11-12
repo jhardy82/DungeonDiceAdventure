@@ -221,10 +221,10 @@ names.
   29, 30, 32, 35, 36, 39 and 40.)
 - **1 needs a design decision:** CE-31, what Duelist's Parry does. It is asked when the Duelist's
   wave (3) is built. The table lists the original 16, with the decided ones marked.
-- **35 of the 40 run as tests today.** The other five wait for something that is not built:
-  CE-19 and CE-35 for Phase 4 (the rules engine and the career rules working together), CE-29
-  and CE-30 for the Champion's wave (their codes and situations are tested on today's content
-  in the meantime), and CE-31 for its decision.
+- **36 of the 40 run as tests today** (CE-35 joined them with Phase 4, step C). The other four
+  wait for something that is not built: CE-19 for the vocation change inside a run, CE-29 and
+  CE-30 for the Champion's wave (their codes and situations are tested on today's content in
+  the meantime), and CE-31 for its decision.
 
 | Case | The question |
 |------|--------------|
@@ -260,7 +260,8 @@ names.
 - Every phase leaves the game shippable with the gate off.
 - Progress, with the evidence for each step, is recorded in `docs/DECISION_LOG.md` sections 7.11
   (Phase 1), 7.12 (Phase 2), 7.13 (Phase 3), 7.14 (the decisions taken before Phase 4) and
-  7.15 (Phase 4: its decisions, its steps, and step A) and 7.16 (step B: the third battle).
+  7.15 (Phase 4: its decisions, its steps, and step A), 7.16 (step B: the third battle) and
+  7.17 (step C: saved heroes in real runs, and the pacing measurement).
 - The first playable evolution arrives before the expensive engine work of waves 3 to 5.
 
 ## 10. Decisions put to the owner, and the answers (2026-11-11)

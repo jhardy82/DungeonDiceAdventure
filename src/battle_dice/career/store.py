@@ -280,6 +280,10 @@ class SqliteProfileStore:
             previous, count = stored_hash, count + 1
         return count
 
+    def run_count(self, profile_id: str) -> int:
+        """How many runs this profile has started, finished or not."""
+        return int(self.conn.execute("SELECT COUNT(*) FROM run WHERE profile_id = ?", (profile_id,)).fetchone()[0])
+
     def has_run(self, run_id: str) -> bool:
         return self.conn.execute("SELECT 1 FROM run WHERE run_id = ?", (run_id,)).fetchone() is not None
 
@@ -375,7 +379,16 @@ class SqliteProfileStore:
             self._fault("item_decrement")
             for hero_id, hero in after.heroes.items():
                 claimed = {e["vocation_id"]: e["event_id"] for e in new_events if e["type"] == "VocationClaimed" and e["hero_id"] == hero_id}
-                self._write_hero(conn, before.heroes[hero_id], hero, now, claimed)
+                earlier = before.heroes.get(hero_id)
+                if earlier is None:  # a hero recruited by this change
+                    origin = hero.origin_vocation_id or hero.active_vocation_id
+                    conn.execute(
+                        "INSERT INTO hero(hero_id, profile_id, catalog_version, origin_vocation_id, active_vocation_id, display_name, "
+                        "eligibility_state, revision, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (hero_id, profile_id, self.catalog.version, origin, hero.active_vocation_id, hero.display_name or hero_id,
+                         hero.eligibility_state, hero.revision, now))
+                    earlier = HeroRecord(hero_id, hero.active_vocation_id, hero.eligibility_state, hero.revision)
+                self._write_hero(conn, earlier, hero, now, claimed)
             self._fault("unlock_insert")
             self._write_profile_rows(conn, before, after, now)
             conn.execute("UPDATE player_profile SET revision = revision + 1 WHERE profile_id = ?", (profile_id,))
@@ -564,6 +577,19 @@ class StoredCareerService:
             raise ValueError(f"'{run_id}' is already in the save; a run id is used once.")
         before = copy.deepcopy(self.state)
         self.state.run = RunInfo(run_id, "battle")
+        self._write(before)
+
+    def report_run(self, phase: str, revision: int) -> None:
+        """Trusted event: the current run moved on. ``phase`` is a saved phase (``model.saved_run_phase``)."""
+        run = self.state.run
+        if run is None or run.phase in FINISHED_PHASES:
+            raise ValueError("There is no run in progress to report on.")
+        if phase in FINISHED_PHASES:
+            raise ValueError("A run is finished with end_run, not reported as finished.")
+        if (run.phase, run.revision) == (phase, revision):
+            return
+        before = copy.deepcopy(self.state)
+        run.phase, run.revision = phase, revision
         self._write(before)
 
     def end_run(self, run_id: str, outcome: str) -> None:

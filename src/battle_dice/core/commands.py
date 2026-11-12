@@ -114,6 +114,27 @@ class CommandResult:
         return self.accepted
 
 
+#: What a party entry's optional ``hero`` (a saved hero's build snapshot) may hold, and of which type.
+SNAPSHOT_KEYS = {"hero_id": str, "name": str, "stats": dict, "dice": list, "bench": list, "skills": list}
+SNAPSHOT_STATS = ("max_hp", "max_mana", "speed")
+
+
+def _snapshot_problem(snapshot: Any) -> str | None:
+    """Shape check of a build snapshot. Whether its content is legal is decided when the run starts."""
+    if not isinstance(snapshot, dict) or not set(snapshot) <= set(SNAPSHOT_KEYS) or "hero_id" not in snapshot:
+        return "a hero snapshot is an object with hero_id and optionally name, stats, dice, bench, skills."
+    for key, value in snapshot.items():
+        if not isinstance(value, SNAPSHOT_KEYS[key]):
+            return f"hero.{key} has the wrong type."
+        if key in ("dice", "bench", "skills") and not _is_str_list(value):
+            return f"hero.{key} must be a list of strings."
+        if key == "stats" and not (set(value) <= set(SNAPSHOT_STATS) and all(_is_int(v) for v in value.values())):
+            return f"hero.stats may hold whole numbers for {', '.join(SNAPSHOT_STATS)} only."
+        if key in ("hero_id", "name") and not value:
+            return f"hero.{key} must not be empty."
+    return None
+
+
 def _is_int(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
@@ -151,12 +172,16 @@ def validate_command(command: Command) -> str | None:
         if kind == _PARTY:
             if not isinstance(value, list) or not all(
                 isinstance(m, dict)
-                and set(m) == {"class_id", "row"}
+                and {"class_id", "row"} <= set(m) <= {"class_id", "row", "hero"}
                 and isinstance(m["class_id"], str)
                 and isinstance(m["row"], str)
                 for m in value
             ):
                 return "StartRun.party must be a list of {class_id, row} objects."
+            for member in value:
+                problem = _snapshot_problem(member["hero"]) if "hero" in member else None
+                if problem:
+                    return f"StartRun.party: {problem}"
         if kind == _PLAN:
             if not isinstance(value, list) or not all(
                 isinstance(a, dict)

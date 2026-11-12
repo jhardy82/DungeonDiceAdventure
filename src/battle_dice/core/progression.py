@@ -46,7 +46,7 @@ def hero_from_build(content: Content, hero_id: str, build: HeroBuild, row: str) 
         id=hero_id,
         side=SIDE_HERO,
         archetype_id=build.vocation_id,
-        name=f"{build.name} {hero_id[1:].lstrip('0')}",
+        name=build.display_name or f"{build.name} {hero_id[1:].lstrip('0')}",
         row=row,
         hp=build.start_hp,
         max_hp=build.max_hp,
