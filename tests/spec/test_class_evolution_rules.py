@@ -59,6 +59,8 @@ RUN_HERE_BY_NAME = ["CE-09", "CE-36"]
 #: Cases another module runs, and where.
 RUN_ELSEWHERE = {
     "CE-01": "the replay pin and tests/unit/test_vocations.py (gate off)",
+    "CE-19": "tests/integration/test_vocation_change_in_run.py (the change before the upgrade, the upgrade on the new die, "
+             "that die locked against a swap; the engine names dice by definition, not by instance)",
     "CE-25": "tests/spec/test_class_evolution_store.py (saved run upgrades)",
     "CE-32": "tests/spec/test_class_evolution_determinism.py (a recorded session, replayed with different clocks)",
     "CE-34": "tests/spec/test_class_evolution_store.py (a save of another catalog version)",
@@ -67,7 +69,6 @@ RUN_ELSEWHERE = {
 }
 #: Cases no test can run yet, and what each waits for. Their rules are decided unless the text says otherwise.
 NOT_EXECUTABLE_YET = {
-    "CE-19": "the rules engine and owned dice together: Phase 4",
     "CE-29": "names Champion dice (wave 4) and an inherited skill in battle (Phase 4); "
              "its code and situation are tested on today's content in tests/unit/test_plan_codes.py",
     "CE-30": "names Champion dice (wave 4); its code and situation are tested on today's content in tests/unit/test_plan_codes.py",
@@ -361,7 +362,7 @@ def test_every_case_is_run_or_accounted_for() -> None:
     assert len({*RUN_HERE, *RUN_HERE_BY_NAME, *NOT_RUN_HERE}) == len(CASES) == 40, "a fixture is listed twice"
     still_open = {case_id for case_id, case in CASES.items() if "needs_design_decision" in case}
     assert still_open == {"CE-31"} and still_open <= set(NOT_EXECUTABLE_YET)
-    assert len(RUN_HERE) == 28 and len(RUN_ELSEWHERE) == 6 and len(NOT_EXECUTABLE_YET) == 4
+    assert len(RUN_HERE) == 28 and len(RUN_ELSEWHERE) == 7 and len(NOT_EXECUTABLE_YET) == 3
     for case_id, where in RUN_ELSEWHERE.items():
         named = [word for word in where.replace("(", " ").split() if word.startswith("tests/")]
         assert named and all((ROOT / path).is_file() for path in named), f"{case_id}: {where}"

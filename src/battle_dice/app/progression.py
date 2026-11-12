@@ -27,6 +27,7 @@ from battle_dice.career.service import FINISHED_PHASES, CareerResult, career_tre
 from battle_dice.career.store import SqliteProfileStore, StoredCareerService, utc_now
 from battle_dice.content.loader import Content
 from battle_dice.content.vocations import load_catalog
+from battle_dice.core import commands as cmd
 from battle_dice.core import skills as battle_skills
 from battle_dice.core.engine import Engine
 from battle_dice.core.events import EventType
@@ -152,6 +153,30 @@ class Progression:
 
     def change(self, hero_id: str, vocation_id: str) -> CareerResult:
         return self._command("ChangeVocation", self.state.heroes[hero_id], target_vocation_id=vocation_id)
+
+    def run_hero(self, hero_id: str) -> str | None:
+        """The id a saved hero fights under in the current run (``h01``), or ``None`` when it is not in it."""
+        return next((run_id for run_id, saved in self._heroes.items() if saved == hero_id), None)
+
+    def change_in_run(self, engine: Engine, hero_id: str, vocation_id: str) -> tuple[CareerResult, str | None]:
+        """A hero takes another vocation while a run is under way (fixture CE-19).
+
+        The career rules decide first (they allow it between a battle's recovery and the upgrade).
+        When the hero is fighting in the run, the run follows with the hero's new build snapshot.
+        Returns the career's answer and, when the run refused, its reason; the hero is then put
+        back to what it was, so the save and the run never disagree.
+        """
+        previous = self.state.heroes[hero_id].active_vocation_id
+        result = self.change(hero_id, vocation_id)
+        fighter = self.run_hero(hero_id)
+        if not result.accepted or fighter is None or previous == vocation_id:
+            return result, None
+        sent = engine.do(cmd.CHANGE_VOCATION, hero_id=fighter, class_id=vocation_id, hero=self.snapshot(hero_id))
+        if not sent.accepted:
+            self.change(hero_id, previous)
+            return result, sent.reason or "The run refused the change."
+        self.sync(engine)
+        return result, None
 
     def preview(self, hero_id: str, vocation_id: str) -> CareerResult:
         return self._command("PreviewVocation", self.state.heroes[hero_id], target_vocation_id=vocation_id)

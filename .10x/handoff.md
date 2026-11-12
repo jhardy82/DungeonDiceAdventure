@@ -2,7 +2,7 @@
 
 > This file tracks the context passed from one role to the next. Each role overwrites the "Current Handoff" section when passing work forward. Previous handoffs are preserved in the History section below.
 
-## From: implementing engineer (Phase 4, step E) → To: next role
+## From: implementing engineer (Phase 4 complete) → To: next role
 **Date:** 2026-11-12
 **Phase:** Implementation
 
@@ -14,14 +14,15 @@
 Where things stand:
 
 - The first slice is playable behind the gate `class_evolution_v1` (off by default; Main menu,
-  Settings switches it on): recruit, earn mastery, master the Squire, become a Guardian, fight
-  the optional third battle, equip Field Medic and use it in battle.
+  Settings switches it on): recruit, earn mastery, master the Squire, become a Guardian (at
+  party setup or inside a run after Battle 1), fight the optional third battle, equip Field
+  Medic and use it in battle.
 - The demo is configured from the Settings screen (`README.md`, section Settings).
-- Step E is done: Field Medic in battle and the skills panel (`docs/DECISION_LOG.md`, 7.20).
-- Next: the vocation change inside a run, after recovery and before the mandatory upgrade
-  (acceptance case CE-19). It is the last rule of the approved Phase 4 plan (section 7.15).
+- **The approved Phase 4 plan is built in full** (`docs/DECISION_LOG.md`, sections 7.15 to 7.21).
+- What comes next is not decided: the open questions below, a person's playtest, or the next
+  wave of vocations (FDD section 9).
 
-Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.20),
+Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.21),
 `docs/class_evolution/FDD_v0.2.md`.
 
 ### Open Questions
@@ -31,6 +32,8 @@ Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.20),
 - Checkpoint 2: pacing (runs needed to master a vocation).
 - Field Medic's cost: the simulated player can rarely pay it (section 7.20).
 - Squire Anchor in battle: needs a balance decision before it is built.
+- A vocation change at the stop-or-fight-on decision (after Battle 2): not in CE-19; without it
+  a hero that masters its class in Battle 2 cannot evolve before the third battle (section 7.21).
 - CE-31: what Duelist's Parry does (asked with the Duelist's wave).
 
 ---
@@ -42,3 +45,6 @@ Project state initialized on an existing project. `main` held everything up to P
 
 ### 2026-11-12: implementing engineer (Phase 4, step B) → next role
 Step B was done (the optional third battle); steps C, D, the demo's settings and step E followed and are merged or in review.
+
+### 2026-11-12: implementing engineer (Phase 4, step E) → next role
+Field Medic in battle and the skills panel were done and merged (pull request 25); the vocation change inside a run followed.

@@ -382,3 +382,100 @@ def test_whole_runs_with_field_medic_equipped_end_and_replay(vocations):
             again = verify(packaged_content(), export_run(engine))
             assert (events_hash(again.events), state_hash(again.state)) == (events_hash(engine.events), state_hash(engine.state))
     assert used[503] == 1, used
+
+
+# --------------------------------------------------------------------------------------------
+# A vocation change inside a run (acceptance case CE-19)
+# --------------------------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def squire_who_may_be_a_guardian(tmp_path: Path):
+    """A hero that has the Guardian unlocked and is a Squire again, a Scout and an Apprentice."""
+    link = Progression(tmp_path, packaged_content(), preset="guardian_unlocked", clock=lambda: "2026-11-12T10:00:00Z")
+    assert link.change("hero_001", "squire").accepted
+    yield link
+    link.close()
+
+
+def test_a_hero_changes_vocation_inside_a_run_and_the_save_and_the_run_agree(squire_who_may_be_a_guardian: Progression, vocations):
+    link = squire_who_may_be_a_guardian
+    engine = start(link, vocations)
+    assert link.run_hero("hero_001") == "h01" and link.run_hero("hero_003") is None
+
+    def hero():  # read anew each time: a refused command puts the saved state back as new objects
+        return link.state.heroes["hero_001"]
+
+    # During the battle the career rules refuse, and the run is never asked.
+    revision = engine.revision
+    refused, run_reason = link.change_in_run(engine, "hero_001", "guardian")
+    assert not refused.accepted and refused.error_code == "PHASE_LOCKED" and run_reason is None
+    assert hero().active_vocation_id == "squire" and engine.revision == revision and engine.build("h01").vocation_id == "squire"
+
+    win_battle(engine)
+    link.sync(engine)
+    assert link.state.run is not None and link.state.run.phase == "upgrade"
+    hp = engine.combat.combatants["h01"].hp
+    accepted, run_reason = link.change_in_run(engine, "hero_001", "guardian")
+    assert accepted.accepted and run_reason is None
+    fighter = engine.combat.combatants["h01"]
+    assert hero().active_vocation_id == "guardian" and engine.build("h01").vocation_id == "guardian"
+    assert (fighter.max_hp, fighter.equipped_dice_ids) == (link.snapshot("hero_001")["stats"]["max_hp"], ["guardian_d6", "guardian_d4"])
+    assert fighter.hp == -((-hp * fighter.max_hp) // 15) and fighter.name == "Squire 1"  # a mastered Squire has 15 HP as a Squire
+    change = [c for c in engine.command_log if c.type == cmd.CHANGE_VOCATION][-1]
+    assert change.params == {"hero_id": "h01", "class_id": "guardian", "hero": link.snapshot("hero_001")}
+
+    # Battle 2 is won as a Guardian: the point goes to the Guardian's mastery.
+    offer = engine.state.upgrade_offers["h01"]["guardian_d6"][0]
+    ok(engine.do(cmd.CHOOSE_UPGRADE, hero_id="h01", die_id="guardian_d6", offer_id=offer["offer_id"]))
+    link.sync(engine)
+    late, _ = link.change_in_run(engine, "hero_001", "squire")
+    assert not late.accepted and late.error_code == "PHASE_LOCKED", "after the upgrade the build is locked again"
+    ok(engine.do(cmd.ADVANCE_PHASE))
+    before = hero().mastery["guardian"].points
+    foes = engine.combat.side("enemy")
+    for foe in foes[1:]:
+        foe.hp, foe.state = 0, "defeated"
+    foes[0].hp, foes[0].shields = 1, 0
+    from tests.conftest import action, begin_hero, commit
+
+    begin_hero(engine, "h01", guardian_d4=3, guardian_d6=4)  # Jab and Strike
+    commit(engine, action("guardian_d6", foes[0].id))
+    while engine.state.phase == RunPhase.BATTLE and not engine.needs_input():
+        ok(engine.do(cmd.ADVANCE_PHASE))
+    awards = link.sync(engine)
+    mine = next(a for a in awards if a["hero_id"] == "hero_001")
+    assert (mine["vocation_id"], mine["base_points"]) == ("guardian", 1) and hero().mastery["guardian"].points == before + 1
+
+
+def test_a_hero_outside_the_party_changes_in_the_save_only(squire_who_may_be_a_guardian: Progression, vocations):
+    link = squire_who_may_be_a_guardian
+    engine = start(link, vocations)
+    win_battle(engine)
+    link.sync(engine)
+    commands = len(engine.command_log)
+    result, run_reason = link.change_in_run(engine, "hero_003", "scout")
+    assert result.accepted and run_reason is None and link.state.heroes["hero_003"].active_vocation_id == "scout"
+    assert len(engine.command_log) == commands, "the run is not told about a hero that is not in it"
+    same, _ = link.change_in_run(engine, "hero_001", "squire")
+    assert same.accepted and len(engine.command_log) == commands, "a change to what the hero already is changes nothing"
+
+
+def test_when_the_run_refuses_the_hero_is_put_back(squire_who_may_be_a_guardian: Progression, vocations, monkeypatch):
+    link = squire_who_may_be_a_guardian
+    engine = start(link, vocations)
+    win_battle(engine)
+    link.sync(engine)
+    real = engine.do
+
+    def refuse_the_change(command_type, **params):
+        if command_type == cmd.CHANGE_VOCATION:
+            from battle_dice.core.commands import CommandResult
+
+            return CommandResult(False, engine.revision, reason="simulated refusal")
+        return real(command_type, **params)
+
+    monkeypatch.setattr(engine, "do", refuse_the_change)
+    result, run_reason = link.change_in_run(engine, "hero_001", "guardian")
+    assert result.accepted and run_reason == "simulated refusal"
+    assert link.state.heroes["hero_001"].active_vocation_id == "squire" and engine.build("h01").vocation_id == "squire"

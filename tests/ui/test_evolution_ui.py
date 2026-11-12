@@ -306,7 +306,8 @@ def test_a_hero_cannot_claim_or_change_during_a_run(tmp_path):
     assert view["in_run"] and not any(row["can_claim"] or row["can_activate"] for row in view["rows"])
     assert play.ui.widget("career:guardian:claim").enabled is False
     play.ctrl.claim_vocation("guardian")  # sent anyway: the career rules refuse it
-    assert play.ctrl.message == "That cannot be done during a run." and play.ctrl.message_is_error
+    assert play.ctrl.message == play.ctrl.CHANGE_LOCKED and play.ctrl.message_is_error
+    assert play.ui.widget("career:guardian:claim").reason == play.ctrl.CHANGE_LOCKED
     play.key(pygame.K_ESCAPE)
     assert play.ctrl.screen == Screen.BATTLE  # back to where the player was
 
@@ -877,3 +878,134 @@ def test_a_guardian_chooses_its_upgrade_and_the_screen_names_its_die(tmp_path, m
     assert any("was applied to Squire 1's Guardian d6" in text for text in drawn)
     assert play.ctrl.die_name("h02", "guardian_d4") == "Guardian d4" and play.ctrl.die_name("h01", "striker_d8") == "Striker d8"
     assert any("Guardian d6" in line for line in combat_log(engine)) and not any("guardian_d6" in line for line in combat_log(engine))
+
+
+# --------------------------------------------------------------------------------------------
+# A vocation change inside a run (acceptance case CE-19)
+# --------------------------------------------------------------------------------------------
+
+
+def after_battle_one_with_a_squire_who_may_be_a_guardian(tmp_path, size=(1280, 720)) -> Configured:
+    """hero_001 has the Guardian unlocked and fights as a Squire; with the Scout it has won Battle 1."""
+    play = medic_game(tmp_path, size=size, preset="guardian_unlocked")
+    assert play.ctrl.progression.change("hero_001", "squire").accepted
+    for hero_id in ("hero_001", "hero_002"):
+        play.ctrl.add_saved_hero(hero_id)
+    play.ctrl.begin_run()
+    engine = play.ctrl.engine
+    assert engine is not None and engine.build("h01").vocation_id == "squire"
+    win_battle(engine)
+    play.ctrl.refresh()
+    play.app.frame(0)
+    assert play.ctrl.screen == Screen.UPGRADE
+    return play
+
+
+def test_before_the_upgrade_a_hero_becomes_a_guardian_from_the_upgrade_screen(tmp_path, monkeypatch):
+    play = after_battle_one_with_a_squire_who_may_be_a_guardian(tmp_path)
+    engine = play.ctrl.engine
+    drawn, shortened = record_text(monkeypatch)
+    assert play.ctrl.change_window_open() and play.ctrl.saved_hero_of("h01") == "hero_001" and play.ctrl.saved_hero_of("h09") is None
+    assert play.ctrl.saved_hero_of("h02") == "hero_002"
+    play.app.frame(0)
+    assert "Career  (C)" in drawn and "change vocation before the upgrade" in drawn
+    play.click("up:hero:h02")  # the button is for the hero that is selected
+    play.key(pygame.K_c)
+    assert play.ctrl.screen == Screen.CAREER and play.ctrl.career_hero == "hero_002"
+    play.key(pygame.K_ESCAPE)
+    play.click("up:hero:h01")
+    play.click("up:offer:0")  # a card for the Squire's die is selected; it will not exist after the change
+    assert play.ctrl.upgrade_offer is not None and play.ctrl.upgrade_die == "iron_d6"
+    play.key(pygame.K_c)
+    assert play.ctrl.screen == Screen.CAREER and play.ctrl.career_hero == "hero_001"
+    view = play.ctrl.career_view()
+    assert (view["in_run"], view["open_now"], view["fighting"], view["locked"]) == (True, True, True, "")
+    assert any(text.startswith("Before the upgrade is chosen this hero may take another vocation.") for text in drawn)
+    button = play.ui.widget("career:guardian:activate")
+    assert button.enabled is True and button.tooltip == "The hero fights on as this vocation at once."
+    hp = engine.combat.combatants["h01"].hp
+    play.click("career:guardian:activate")
+    fighter = engine.combat.combatants["h01"]
+    assert (fighter.archetype_id, fighter.max_hp, fighter.equipped_dice_ids) == ("guardian", 18, ["guardian_d6", "guardian_d4"])
+    assert fighter.hp == -((-hp * 18) // 15), "health is carried over in proportion, rounded up"
+    assert play.ctrl.progression.state.heroes["hero_001"].active_vocation_id == "guardian"
+    assert play.ctrl.message.startswith("Squire 1 is now a Guardian and fights on as one.") and not play.ctrl.message_is_error
+    play.key(pygame.K_ESCAPE)
+    assert play.ctrl.screen == Screen.UPGRADE and (play.ctrl.upgrade_hero, play.ctrl.upgrade_die, play.ctrl.upgrade_offer) == ("h01", "guardian_d6", None)
+    assert play.ui.widget("up:die:guardian_d6") is not None and play.ui.widget("up:die:iron_d6") is None
+    assert [offer["die_id"] for offer in play.ctrl.current_offers()] == ["guardian_d6"] * 3
+    play.click("up:offer:0")
+    play.ctrl.apply_upgrade()
+    play.app.frame(0)
+    assert engine.state.phase == "equipment" and "guardian_d6" in engine.state.die_overrides["h01"]
+    assert play.app.render_faults == 0 and not play.ctrl.change_window_open()
+    # Once the upgrade is chosen the career can be looked at, and nothing can be changed.
+    assert "the upgrade is chosen: look only" in drawn
+    play.click("up:career")
+    again = play.ui.widget("career:squire:activate")
+    assert again.enabled is False and again.reason == play.ctrl.CHANGE_LOCKED and play.ctrl.CHANGE_LOCKED in drawn
+    play.ctrl.change_vocation("squire")  # sent anyway: the career rules refuse it
+    assert play.ctrl.message == play.ctrl.CHANGE_LOCKED and play.ctrl.message_is_error
+    assert engine.build("h01").vocation_id == "guardian" and shortened == [], shortened
+    play.key(pygame.K_ESCAPE)
+    play.key(pygame.K_RETURN)  # Start Battle 2
+    assert engine.state.encounter_index == 1 and play.ctrl.screen == Screen.BATTLE and play.app.render_faults == 0
+    assert engine.combat.combatants["h01"].archetype_id == "guardian"
+
+
+def test_a_hero_outside_the_party_may_change_in_that_moment_too(tmp_path):
+    play = after_battle_one_with_a_squire_who_may_be_a_guardian(tmp_path)
+    engine = play.ctrl.engine
+    commands = len(engine.command_log)
+    play.ctrl.open_career("hero_003")
+    play.app.frame(0)
+    view = play.ctrl.career_view()
+    assert (view["open_now"], view["fighting"]) == (True, False)
+    assert play.ui.widget("career:scout:activate").tooltip == "The hero fights as this vocation from the next run on."
+    play.click("career:scout:activate")
+    assert play.ctrl.progression.state.heroes["hero_003"].active_vocation_id == "scout" and play.ctrl.message == "Apprentice 3 is now a Scout."
+    assert len(engine.command_log) == commands, "the run is not touched"
+
+
+def test_a_change_the_run_refuses_is_said_and_undone(tmp_path, monkeypatch):
+    play = after_battle_one_with_a_squire_who_may_be_a_guardian(tmp_path)
+    link = play.ctrl.progression
+    monkeypatch.setattr(link, "change_in_run", lambda engine, hero_id, vocation_id: (link.preview(hero_id, vocation_id), "simulated refusal"))
+    play.ctrl.open_career("hero_001")
+    play.ctrl.change_vocation("guardian")
+    assert play.ctrl.message == "The run refused the change: simulated refusal" and play.ctrl.message_is_error
+
+
+def test_without_class_evolution_the_upgrade_screen_has_no_career_button(tmp_path):
+    play = Play(tmp_path, ("squire", "scout"))
+    play.ctrl.begin_run()
+    engine = play.ctrl.engine
+    assert engine is not None
+    win_battle(engine)
+    play.ctrl.refresh()
+    play.app.frame(0)
+    assert play.ctrl.screen == Screen.UPGRADE and play.ui.widget("up:career") is None
+    assert play.ctrl.saved_hero_of("h01") is None and cmd.CHANGE_VOCATION not in engine.permissible_commands()
+
+
+@pytest.mark.parametrize("size", SIZES)
+def test_no_text_is_cut_off_around_a_change_inside_a_run(tmp_path, monkeypatch, font, size):  # noqa: F811
+    play = after_battle_one_with_a_squire_who_may_be_a_guardian(tmp_path, size=size)
+    drawn, shortened = record_text(monkeypatch)
+    play.app.frame(0)
+    play.ctrl.open_career("hero_001")
+    play.app.frame(0)
+    play.ctrl.change_vocation("guardian")
+    play.app.frame(0)
+    play.ctrl.close_career()
+    play.app.frame(0)
+    play.ctrl.open_career("hero_003")
+    play.app.frame(0)
+    play.ctrl.close_career()
+    play.ctrl.select_offer(play.ctrl.current_offers()[0]["offer_id"])
+    play.ctrl.apply_upgrade()
+    play.app.frame(0)
+    play.ctrl.open_career("hero_001")
+    play.app.frame(0)
+    assert "Career  (C)" in drawn and play.ctrl.CHANGE_LOCKED in drawn
+    assert shortened == [] and play.app.render_faults == 0, shortened

@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1071 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1110 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -283,6 +283,11 @@ What changes with the gate on:
   1 more mana. The die says so when it can ("Field Medic: revive for 2 mana"), and the downed
   ally becomes a target. A skill the rules of battle do not know yet is listed and cannot be
   equipped.
+- **Changing vocation inside a run.** After Battle 1, before you choose the upgrade, the upgrade
+  screen's **Career (C)** button lets the selected hero claim a vocation or change to one it has
+  unlocked. It fights on with the new vocation's dice, its health and mana carry over in
+  proportion, and the upgrade cards are dealt anew for the new dice. During a battle and after
+  the upgrade nothing can be changed.
 - **After Battle 2** you may end the run with a victory or fight a third battle. Losing it
   loses the run; mastery already earned is kept.
 - **The save file** is `saves/profile.sqlite` beside the `logs` folder (the per-user application
@@ -301,7 +306,7 @@ python tools/class_evolution/check_persistence.py     # the save database script
 ```
 
 Both print `OK`. The first also lists, as warnings, every rank and vocation that cannot be reached
-yet. Of the 40 acceptance cases 36 run as tests (`docs/DECISION_LOG.md`, sections 7.14 to 7.18).
+yet. Of the 40 acceptance cases 37 run as tests (`docs/DECISION_LOG.md`, sections 7.14 to 7.21).
 
 ## Settings
 

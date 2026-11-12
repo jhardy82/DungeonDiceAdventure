@@ -29,6 +29,7 @@ from battle_dice.core.build import (
     SnapshotRefused,
     build_from_class,
     build_from_snapshot,
+    convert_pool,
 )
 from battle_dice.core.commands import Command, CommandRejected, CommandResult
 from battle_dice.core.events import EventType
@@ -216,24 +217,26 @@ class Engine:
         # afterwards, and the handler may keep what it is given inside the state.
         command = dataclasses.replace(command, params=copy.deepcopy(command.params))
         backup = copy.deepcopy(self._state)
+        builds = dict(self._builds)  # a build is never altered, only replaced: the old mapping is the backup
         event_count = len(self.events)
         handler = getattr(self, _HANDLERS[command.type])
         try:
             handler(**copy.deepcopy(command.params))
         except CommandRejected as rejection:
-            self._roll_back(backup, event_count)
+            self._roll_back(backup, event_count, builds)
             return CommandResult(False, self.revision, reason=str(rejection), code=rejection.code)
         except Exception:
-            self._roll_back(backup, event_count)
+            self._roll_back(backup, event_count, builds)
             raise
         self.state.revision += 1
         self._accepted[command.command_id] = _fingerprint(command)
         self.command_log.append(command)
         return CommandResult(True, self.revision, events=self.events[event_count:])
 
-    def _roll_back(self, backup: RunState | None, event_count: int) -> None:
+    def _roll_back(self, backup: RunState | None, event_count: int, builds: dict[str, HeroBuild]) -> None:
         self._state = backup
         del self.events[event_count:]
+        self._builds = builds
         if backup is None:  # a StartRun that failed leaves no builds behind
             self._builds = {}
             self._extra_encounters = []
@@ -530,6 +533,73 @@ class Engine:
         if problem:
             raise CommandRejected(problem)
         state.phase = RunPhase.EQUIPMENT
+
+    def _change_vocation(self, hero_id: str, class_id: str, hero: dict[str, Any]) -> None:
+        """A saved hero takes another vocation inside the run (fixture CE-19).
+
+        Allowed after a battle's recovery and before the mandatory upgrade is chosen, so the upgrade
+        is chosen for the dice the hero will fight with. Whether the hero *may* be that vocation is
+        the career rules' decision, made before this command is sent; ``hero`` is its build snapshot
+        as that vocation, and it is in the command log, so a replay needs the log and the catalog.
+        """
+        state = self.state
+        if state.phase != RunPhase.UPGRADE:
+            raise CommandRejected("A hero can change its vocation in a run only after a battle's recovery, before the upgrade is chosen.")
+        member = next((m for m in state.party if m["id"] == hero_id), None)
+        if member is None:
+            raise CommandRejected(f"Unknown hero '{hero_id}'.")
+        if "hero_id" not in member:
+            raise CommandRejected("Only a saved hero can change its vocation.")
+        if hero["hero_id"] != member["hero_id"]:
+            raise CommandRejected(f"The snapshot is of '{hero['hero_id']}', not of the hero in that slot.")
+        previous = self._builds[hero_id]
+        if class_id == previous.vocation_id:
+            raise CommandRejected(f"{previous.display_name or hero_id} is already a {previous.name}.")
+        if class_id not in self.content.classes and not (self.vocations is not None and self.vocations.known(class_id)):
+            raise CommandRejected(f"Unknown class '{class_id}'.")
+        try:
+            build = build_from_snapshot(self._resolve_build(class_id), hero, self.content.dice)
+        except SnapshotRefused as refusal:
+            raise CommandRejected(str(refusal)) from refusal
+
+        unit = self.combat.combatants[hero_id]
+        before = {"hp": unit.hp, "max_hp": unit.max_hp, "mana": unit.mana, "max_mana": unit.max_mana}
+        unit.hp, unit.max_hp = convert_pool(unit.hp, unit.max_hp, build.max_hp), build.max_hp
+        unit.mana, unit.max_mana = convert_pool(unit.mana, unit.max_mana, build.max_mana), build.max_mana
+        unit.max_corruption = build.max_corruption
+        unit.corruption = min(unit.corruption, build.max_corruption)
+        unit.speed, unit.base_initiative = build.speed, build.base_initiative
+        unit.archetype_id = build.vocation_id
+        if build.display_name:
+            unit.name = build.display_name
+        unit.equipped_dice_ids = list(build.starting_dice)
+        state.inventory[hero_id] = list(build.bench_dice)
+        # An upgrade belongs to the die it was made on; a die that leaves takes its upgrade with it.
+        kept = set(build.starting_dice) | set(build.bench_dice)
+        overrides = {die_id: die for die_id, die in state.die_overrides.get(hero_id, {}).items() if die_id in kept}
+        if overrides:
+            state.die_overrides[hero_id] = overrides
+        else:
+            state.die_overrides.pop(hero_id, None)
+        member["class_id"] = build.vocation_id
+        self._builds[hero_id] = build
+        # The offers drawn for the dice that left are void; the new dice get their own, from the same stream.
+        state.upgrade_offers[hero_id] = {
+            die_id: progression.offers_for_die(self, unit, self.die_for(hero_id, die_id)) for die_id in sorted(unit.equipped_dice_ids)
+        }
+        self.emit(
+            EventType.VOCATION_CHANGED,
+            actor_id=hero_id,
+            delta={
+                "id": hero_id, "hero_id": build.hero_id, "from": previous.vocation_id, "to": build.vocation_id,
+                "hp": [before["hp"], unit.hp], "max_hp": [before["max_hp"], unit.max_hp],
+                "mana": [before["mana"], unit.mana], "max_mana": [before["max_mana"], unit.max_mana],
+                "dice": list(unit.equipped_dice_ids),
+                "offers": {die_id: [o["offer_id"] + ":" + o["kind"] for o in offers] for die_id, offers in state.upgrade_offers[hero_id].items()},
+            },
+            rng_stream="rewards",
+            rng_draw_index=state.rng["rewards"].draws,
+        )
 
     def _swap_die(self, hero_id: str, out_die_id: str, in_die_id: str) -> None:
         if self.state.phase != RunPhase.EQUIPMENT:
@@ -919,7 +989,10 @@ class Engine:
             return [cmd.START_RUN]
         state = self.state
         if state.phase == RunPhase.UPGRADE:
-            return [cmd.CHOOSE_UPGRADE, cmd.SET_FORMATION]
+            allowed = [cmd.CHOOSE_UPGRADE, cmd.SET_FORMATION]
+            if any("hero_id" in member for member in state.party):  # a saved hero may take another vocation now
+                allowed.append(cmd.CHANGE_VOCATION)
+            return allowed
         if state.phase == RunPhase.EQUIPMENT:
             allowed = [cmd.ADVANCE_PHASE, cmd.SET_FORMATION]
             limit = self.content.balance["upgrades"]["max_swaps_per_hero"]
@@ -957,6 +1030,7 @@ _HANDLERS = {
     cmd.ADVANCE_PHASE: "_advance_phase",
     cmd.CONTINUE_RUN: "_continue_run",
     cmd.END_RUN: "_end_run",
+    cmd.CHANGE_VOCATION: "_change_vocation",
 }
 
 _STEPS = {
