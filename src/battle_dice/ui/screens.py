@@ -773,6 +773,12 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
                   sublabel=f"d{die['size']}  v{die['definition_version']}" + ("  locked against swapping" if entry["locked"] else ""),
                   tooltip="Show the three upgrade cards for this die.")
 
+    saved_hero = ctrl.saved_hero_of(hero_view["hero_id"])
+    if saved_hero is not None:  # Class Evolution: before the upgrade is chosen, a saved hero may take another vocation
+        ui.button("up:career", 20, 626, 284, 48, "Career  (C)", partial(ctrl.open_career, saved_hero), hotkeys=(pygame.K_c,),
+                  sublabel="change vocation before the upgrade" if not chosen else "the upgrade is chosen: look only",
+                  tooltip="Open this hero's career. Before the upgrade is chosen it may claim a vocation or change to one.")
+
     # Offer cards
     ui.panel(322, 56, 610, 628, "Upgrade cards" if not chosen else "Upgrade applied")
     offers = ctrl.current_offers() if not chosen else []
@@ -984,8 +990,14 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
     """One hero's career: every vocation it knows of, what it may claim or become, and what is still hidden."""
     view = ctrl.career_view()
     ui.text(24, 14, f"Career: {ui.fit_name(view['name'], 30, True, 520)}", 30, Theme.ACCENT, bold=True)
-    note = "During a run a hero cannot change. Come back between runs." if view["in_run"] else \
-        "Master a vocation (rank 8) to open the ones that build on it. A hero fights as its active vocation."
+    if not view["in_run"]:
+        note = "Master a vocation (rank 8) to open the ones that build on it. A hero fights as its active vocation."
+    elif not view["open_now"]:
+        note = view["locked"]
+    elif view["fighting"]:
+        note = "Before the upgrade is chosen this hero may take another vocation. It fights on with that vocation's dice; health and mana carry over."
+    else:
+        note = "Before the upgrade is chosen a hero may claim a vocation or change to one. This hero is not in the party of this run."
     ui.text(24, 52, note, 15, Theme.DIM, max_width=1230)
 
     ui.panel(16, 78, 760, 540, "Vocations")
@@ -1007,12 +1019,12 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
         if row["unlocked"]:
             ui.button(f"career:{vocation_id}:activate", 640, y, 126, 32, "Active" if row["active"] else "Make active",
                       partial(ctrl.change_vocation, vocation_id), enabled=row["can_activate"], size=14,
-                      reason="This is the active vocation." if row["active"] else "A hero cannot change during a run.",
-                      tooltip="The hero fights as this vocation from the next run on.")
+                      reason="This is the active vocation." if row["active"] else view["locked"] or "Not in this version yet.",
+                      tooltip="The hero fights on as this vocation at once." if view["fighting"] else "The hero fights as this vocation from the next run on.")
         else:
             ui.button(f"career:{vocation_id}:claim", 640, y, 126, 32, "Claim", partial(ctrl.claim_vocation, vocation_id),
                       enabled=row["can_claim"], size=14,
-                      reason=row["needs"] or "A hero cannot claim a vocation during a run.",
+                      reason=row["needs"] or view["locked"] or "Not in this version yet.",
                       tooltip="Unlock this vocation for the hero. It costs nothing.")
         y += 36 if index < len(view["rows"]) - 1 else 0
 

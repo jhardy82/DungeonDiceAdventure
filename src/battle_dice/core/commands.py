@@ -25,6 +25,10 @@ ADVANCE_PHASE = "AdvancePhase"
 #: Only in a run started with extra encounters, after the shipped battles are won.
 CONTINUE_RUN = "ContinueRun"
 END_RUN = "EndRun"
+#: A saved hero takes another vocation inside a run: after a battle's recovery, before the upgrade is chosen.
+#: The career rules have a command ``ChangeVocation`` of their own (it decides whether the hero may); this is
+#: what the run is told afterwards, so the two carry different names.
+CHANGE_VOCATION = "ChangeVocationInRun"
 
 COMMAND_TYPES = (
     START_RUN,
@@ -41,6 +45,7 @@ COMMAND_TYPES = (
     ADVANCE_PHASE,
     CONTINUE_RUN,
     END_RUN,
+    CHANGE_VOCATION,
 )
 
 _STR = "str"
@@ -48,6 +53,7 @@ _INT = "int"
 _STR_LIST = "list[str]"
 _PARTY = "party"
 _PLAN = "plan"
+_SNAPSHOT = "snapshot"
 
 #: ``{command type: {parameter: (kind, required)}}``. Unknown parameters are rejected.
 PARAM_SPECS: dict[str, dict[str, tuple[str, bool]]] = {
@@ -65,6 +71,7 @@ PARAM_SPECS: dict[str, dict[str, tuple[str, bool]]] = {
     ADVANCE_PHASE: {},
     CONTINUE_RUN: {},
     END_RUN: {},
+    CHANGE_VOCATION: {"hero_id": (_STR, True), "class_id": (_STR, True), "hero": (_SNAPSHOT, True)},
 }
 
 
@@ -182,6 +189,10 @@ def validate_command(command: Command) -> str | None:
                 problem = _snapshot_problem(member["hero"]) if "hero" in member else None
                 if problem:
                     return f"StartRun.party: {problem}"
+        if kind == _SNAPSHOT:
+            problem = _snapshot_problem(value)
+            if problem:
+                return f"{command.type}.{name}: {problem}"
         if kind == _PLAN:
             if not isinstance(value, list) or not all(
                 isinstance(a, dict)

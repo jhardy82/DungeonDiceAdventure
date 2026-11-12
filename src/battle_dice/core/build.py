@@ -89,6 +89,17 @@ class BuildSource(Protocol):
         ...
 
 
+def convert_pool(current: int, old_max: int, new_max: int) -> int:
+    """A health or mana pool carried into another vocation: ``ceil(current * new_max / old_max)``, at most ``new_max``.
+
+    Nothing stays nothing: a hero at 0 HP stays down, a change never revives. The one formula for the
+    career rules and for a change inside a run (fixture CE-17).
+    """
+    if current <= 0 or old_max <= 0:
+        return 0
+    return min(new_max, -((-current * new_max) // old_max))
+
+
 class SnapshotRefused(ValueError):
     """A saved hero's build snapshot holds something the run cannot use. The message says what."""
 

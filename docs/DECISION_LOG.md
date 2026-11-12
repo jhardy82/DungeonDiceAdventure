@@ -1391,7 +1391,99 @@ always fought, the same seeds with and without the skill:
 **Not verified:** no person has played it; checked by tests and by screenshots made in this
 session.
 
-**Still to do for the slice:** the vocation change inside a run (CE-19).
+**Still to do for the slice:** the vocation change inside a run (CE-19); done in section 7.21.
+
+### 7.21 Class Evolution Phase 4: a vocation change inside a run (2026-11-12)
+
+**Owner decision (fixture CE-19, decided 2026-11-11):** inside a run a hero may change vocation
+after recovery and before the mandatory upgrade, so the upgrade cards are offered for the new
+vocation's dice. Changing is also allowed at party setup, and never during a battle or after
+the upgrade.
+
+**The rule as built**
+
+- New engine command **`ChangeVocationInRun`** (hero, target vocation, the hero's build snapshot
+  as that vocation). Accepted only in the run phase `upgrade`, only for a saved hero.
+- **Health and mana carry over** by the career rule: `ceil(current * new maximum / old
+  maximum)`, at most the new maximum. A hero at 0 HP stays down. The one formula now serves the
+  career rules and the run (`core.build.convert_pool`).
+- The hero gets the new vocation's dice, bench, speed, passive, reaction and schedule.
+- **Its upgrade offers are drawn anew** for the new dice, from the same reward stream. Offers
+  of other heroes stay. An offer for a die that left is void.
+- The upgrade is then chosen on a die of the new vocation, and that die is locked against a
+  swap, as for every upgrade.
+- The command is in the run's log with its snapshot, so a record replays from the log and the
+  pinned catalog. A run that started with shipped classes names the catalog once a hero evolves.
+
+**Who decides what**
+
+| Question | Decided by |
+|----------|-----------|
+| May this hero be that vocation, now? | The career rules (`ChangeVocation`, their own command). They allow it in the run phase `upgrade` and lock it in battle and after the upgrade |
+| What does the hero look like in the run afterwards? | The run, from the snapshot it is sent |
+| What if the run refuses after the career rules agreed? | The hero is put back to what it was, and the player is told why |
+
+The two commands have different names on purpose. A test holds them apart.
+
+**In the game**
+
+- The upgrade screen has a **Career (C)** button for the selected hero (with Class Evolution
+  on). Before the upgrade is chosen, the Career screen lets the hero claim a vocation or change
+  to one; the screen says that it fights on with the new dice and that health and mana carry
+  over.
+- After the change the upgrade screen shows the new dice and their cards.
+- Once the upgrade is chosen, and during a battle, the Career screen can be looked at and
+  nothing can be changed; every disabled button says why.
+- A hero that is not in the party may change at that moment too; the run is not touched.
+- The mastery point of the next battle goes to the vocation the hero then fights as.
+
+**A limit of today's content, for the owner**
+
+- The only moment for a change inside a run is after Battle 1. A hero that masters the Squire
+  **in Battle 2** cannot become a Guardian before the third battle: after Battle 2 there is no
+  upgrade, only the decision to stop or fight on.
+- The start preset "a Squire one win from mastery" shows this: Battle 1 is too easy for its
+  rank and gives no point; the mastering win is Battle 2.
+- Option: also allow the change at the stop-or-fight-on decision. That is a new rule (CE-19
+  names the upgrade only), so it is not built. It needs an owner decision.
+
+**Readings that are mine**
+
+| Question | Reading | Why |
+|----------|---------|-----|
+| May a hero change back before the upgrade? | Yes, any number of times while the upgrade is not chosen | CE-19 sets the window, not a count; each change is in the log |
+| May a vocation be claimed at that moment? | Yes | The career rules lock a claim during a battle only |
+| Corruption | Kept, at most the new maximum | The career rule for a change says the same |
+
+**Evidence**
+
+- 1110 tests pass (1071 before). Lint and type checks are clean. Core coverage 97%.
+- Replay pin, the six content files and the vocation catalog unchanged. Gate-off simulator on
+  seeds 300 to 339 identical to the stored reference (1703 of 2200). Both self-checks pass.
+- New tests: the engine rule (the change and what it carries over, the offers, the upgrade on
+  the new die and its lock, a downed hero, changing back, the refusals (each changes nothing),
+  malformed commands, replay of a really played run, the catalog pin); the save link (the save
+  and the run agree, the award goes to the new vocation, a hero outside the party, a refusal by
+  the run is undone); the screens (the whole flow from the upgrade screen, the locks, **no text
+  cut off at both sizes under three fonts**, no Career button with Class Evolution off).
+- Acceptance case CE-19 is now run by tests: **37 of 40** (28 here, 7 elsewhere, 3 wait: CE-29
+  and CE-30 for the Champion, CE-31 for a decision).
+- **Deliberate breaks:** 40 breaks of the new code. 35 were caught at first. Four misses were
+  test gaps, now closed: mana that was refilled instead of carried over (after recovery it is
+  always full, so the first test could not tell); a build left changed by a change that fails
+  half way; a pool above its new maximum; an upgrade card that stayed selected for a die the
+  hero no longer has. The fifth changed nothing a player can reach and was replaced by one
+  that does. All 40 are caught. Run without bytecode files and with a control run.
+- **Found by the suite:** the first name of the engine's command was `ChangeVocation`, the name
+  the career rules already use for theirs. A specification test refused it. It is now
+  `ChangeVocationInRun`.
+
+**Not verified:** no person has played it; checked by tests and by screenshots made in this
+session.
+
+**The approved Phase 4 plan (section 7.15) is now built in full.** Open with the owner:
+Checkpoint 1 (the Guardian's numbers, the third battle's table), Checkpoint 2 (pacing), Field
+Medic's cost, Squire Anchor in battle, the change at the stop-or-fight-on decision.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 

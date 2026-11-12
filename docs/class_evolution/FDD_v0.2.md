@@ -309,6 +309,8 @@ names.
      skills are equipped on the Career screen between runs, is the builder's
      (`docs/DECISION_LOG.md`, section 7.20).
    - The steps and what each one proves are in `docs/DECISION_LOG.md`, section 7.15.
+   - **Built in full on 2026-11-12** (sections 7.15 to 7.21), the vocation change inside a run
+     (fixture CE-19) last. Of the 40 acceptance cases 37 run as tests.
 
 ## 11. Risks
 

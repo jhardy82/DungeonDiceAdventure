@@ -33,6 +33,7 @@ from battle_dice.career.model import (
     ProcessedCommand,
 )
 from battle_dice.content.loader import canonical_json
+from battle_dice.core.build import convert_pool
 
 Json = dict[str, Any]
 
@@ -465,15 +466,9 @@ class CareerService:
         combat = hero.combat
         assert combat is not None
         new = self.effective_stats(hero, target)
-
-        def scaled(current: int, old_max: int, new_max: int) -> int:
-            if current <= 0 or old_max <= 0:
-                return 0
-            return min(new_max, -((-current * new_max) // old_max))
-
-        combat.hp, combat.max_hp = scaled(combat.hp, combat.max_hp, new["max_hp"]), new["max_hp"]
+        combat.hp, combat.max_hp = convert_pool(combat.hp, combat.max_hp, new["max_hp"]), new["max_hp"]
         if combat.mana is not None and combat.max_mana is not None:
-            combat.mana, combat.max_mana = scaled(combat.mana, combat.max_mana, new["max_mana"]), new["max_mana"]
+            combat.mana, combat.max_mana = convert_pool(combat.mana, combat.max_mana, new["max_mana"]), new["max_mana"]
         if combat.corruption is not None:
             combat.corruption = min(combat.corruption, new["max_corruption"])
 

@@ -1085,6 +1085,9 @@ class AppController:
         assert link is not None and hero_id is not None
         hero = link.state.heroes[hero_id]
         in_run = link.state.run is not None and link.state.run.phase not in ("victory", "defeat")
+        # Inside a run a hero may claim and change at one moment only: after a battle's recovery, before the upgrade.
+        open_now = not in_run or self.change_window_open()
+        locked = "" if open_now else self.CHANGE_LOCKED
         rows = []
         for entry in link.tree(hero_id)["career_tree"]["entries"]:
             if entry["kind"] != "vocation":
@@ -1109,12 +1112,26 @@ class AppController:
                 progress = "mastered" if entry["mastered"] else f"rank {mastery.rank}, {mastery.points}/{top[mastery.rank]} to the next"
                 status = f"{status}: {progress}"
             rows.append({**entry, "status": status, "needs": needs, "playable": playable,
-                         "can_claim": playable and not entry["unlocked"] and not needs and not in_run,
-                         "can_activate": playable and entry["unlocked"] and not entry["active"] and not in_run})
+                         "can_claim": playable and not entry["unlocked"] and not needs and open_now,
+                         "can_activate": playable and entry["unlocked"] and not entry["active"] and open_now})
         selected = self.career_vocation or hero.active_vocation_id
         chosen = next(row for row in rows if row.get("vocation_id") == selected)
         return {"hero_id": hero_id, "name": hero.display_name or hero_id, "active_vocation_id": hero.active_vocation_id,
-                "rows": rows, "selected": selected, "selected_needs": chosen["needs"], "in_run": in_run}
+                "rows": rows, "selected": selected, "selected_needs": chosen["needs"], "in_run": in_run,
+                "open_now": open_now, "locked": locked, "fighting": in_run and link.run_hero(hero_id) is not None}
+
+    #: Why a hero cannot claim or change right now, inside a run.
+    CHANGE_LOCKED = "Inside a run a hero can change only right after a battle, before the upgrade is chosen."
+
+    def change_window_open(self) -> bool:
+        """True inside a run at the one moment a hero may take another vocation: recovery done, upgrade not chosen."""
+        return self.engine is not None and not self.engine.finished() and self.engine.state.phase == RunPhase.UPGRADE
+
+    def saved_hero_of(self, run_hero_id: str) -> str | None:
+        """The saved hero behind a hero of the current run, when there is one."""
+        if self.engine is None or self.progression is None:
+            return None
+        return next((m.get("hero_id") for m in self.engine.state.party if m["id"] == run_hero_id), None)
 
     def _requirement_text(self, hero_id: str, vocation_id: str) -> str:
         """What the hero still lacks for the cheapest route to a vocation; empty when it can be claimed."""
@@ -1147,16 +1164,35 @@ class AppController:
     def _career_command(self, what: str, vocation_id: str) -> None:
         link, hero_id = self.progression, self.career_hero
         assert link is not None and hero_id is not None
-        result = link.claim(hero_id, vocation_id) if what == "claim" else link.change(hero_id, vocation_id)
+        in_run = link.state.run is not None and link.state.run.phase not in ("victory", "defeat")
+        refused_by_run = None
+        if what == "claim":
+            result = link.claim(hero_id, vocation_id)
+        elif in_run and self.engine is not None:
+            result, refused_by_run = link.change_in_run(self.engine, hero_id, vocation_id)
+        else:
+            result = link.change(hero_id, vocation_id)
         name = link.catalog.name(vocation_id)
         hero_name = link.state.heroes[hero_id].display_name
         if not result.accepted:
-            reasons = {"PHASE_LOCKED": "That cannot be done during a run.", "PREREQUISITE_UNMET": f"{hero_name} does not meet what {name} needs yet.",
+            reasons = {"PHASE_LOCKED": self.CHANGE_LOCKED if in_run else "That cannot be done right now.",
+                       "PREREQUISITE_UNMET": f"{hero_name} does not meet what {name} needs yet.",
                        "NOT_DISCOVERED": "That vocation has not been discovered.", "ITEM_INSUFFICIENT": "An item it needs is missing."}
             self.warn(reasons.get(str(result.error_code), "That is not allowed right now."))
             return
+        if refused_by_run is not None:
+            self.warn(f"The run refused the change: {refused_by_run}")
+            return
         self._refresh_party()
         self.career_vocation = vocation_id
+        if what == "change" and in_run and link.run_hero(hero_id) is not None:
+            # The hero fights on with other dice: what was selected on the upgrade screen no longer exists.
+            run_hero = link.run_hero(hero_id)
+            assert run_hero is not None and self.engine is not None
+            self.upgrade_hero, self.upgrade_offer = run_hero, None
+            self.upgrade_die = self.engine.combat.combatants[run_hero].equipped_dice_ids[0]
+            self.info(f"{hero_name} is now a {name} and fights on as one. Its health and mana were carried over; choose the upgrade for its new dice.")
+            return
         self.info(f"{hero_name} has unlocked {name}." if what == "claim" else f"{hero_name} is now a {name}.")
 
     # -- the third battle ------------------------------------------------------------------------

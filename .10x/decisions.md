@@ -82,3 +82,19 @@ Started: 2026-11-11
   skill changes nothing (it rarely has the 2 mana); the cost was not tuned.
 - **Impacts:** Rules (`core/skills.py`), vocation catalog 0.4.0, save link, Career screen, docs
   (`docs/DECISION_LOG.md`, section 7.20).
+
+### 2026-11-12 — Engineer: the vocation change inside a run, and its one moment
+- **Decision:** A saved hero may change vocation inside a run in the run phase `upgrade` only
+  (after Battle 1's recovery, before the upgrade is chosen), as the owner decided for fixture
+  CE-19. The career rules decide whether the hero may; the run is then told with its own
+  command, `ChangeVocationInRun`, which carries the hero's build snapshot. Health and mana carry
+  over in proportion (rounded up); the upgrade offers are drawn anew for the new dice. A hero
+  may change back while the upgrade is not chosen, and may claim a vocation at that moment.
+- **Why:** CE-19 and the approved Phase 4 plan. Two command names because the career rules
+  already had `ChangeVocation` with other parameters.
+- **Alternatives considered:** Also opening the stop-or-fight-on decision after Battle 2 for a
+  change. Not built: CE-19 names the upgrade only.
+- **Trade-offs accepted:** A hero that masters its class in Battle 2 cannot evolve before the
+  third battle. Put to the owner as an open question.
+- **Impacts:** Rules engine (command, event), save link, upgrade and Career screens, docs
+  (`docs/DECISION_LOG.md`, section 7.21).
