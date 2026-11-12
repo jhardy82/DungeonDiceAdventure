@@ -124,6 +124,10 @@ class GameApp:
                 screens.draw_upgrade(ui, controller)
             elif screen == Screen.OUTCOME:
                 screens.draw_outcome(ui, controller)
+            elif screen == Screen.CAREER:
+                screens.draw_career(ui, controller)
+            elif screen == Screen.CONTINUE:
+                screens.draw_continue(ui, controller)
             else:
                 screens.draw_error(ui, controller)
         except Exception:  # noqa: BLE001 - a rendering fault must leave a usable error screen
@@ -142,9 +146,12 @@ class GameApp:
 
     def run(self) -> None:
         clock = pygame.time.Clock()
-        while self.running:
-            dt = clock.tick(60)
-            for event in pygame.event.get():
-                self.handle_event(event)
-            self.frame(dt)
-        pygame.quit()
+        try:
+            while self.running:
+                dt = clock.tick(60)
+                for event in pygame.event.get():
+                    self.handle_event(event)
+                self.frame(dt)
+        finally:
+            self.controller.close()  # the save file, when one is open
+            pygame.quit()

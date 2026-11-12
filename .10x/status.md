@@ -19,14 +19,13 @@
 - Class Evolution Phase 4, step A: the Guardian is playable by the rules (merged, pull request 19)
 - Class Evolution Phase 4, step B: encounters from the catalog and the optional third battle; the threat-4 table tuned to 75-77% per party size
 - Class Evolution Phase 4, step C (part 1): recruiting, build snapshots at run start, challenge evidence, the run-to-save hand-over, a career-aware simulator; pacing measured
+- Class Evolution Phase 4, step D: the screens. The first slice is playable behind the gate (recruit, mastery, career, Guardian, third battle)
 
 ### In Progress
-- Class Evolution Phase 4, step C (rest): vocation change inside a run (CE-19)
+- Demo configuration: settings file and Settings screen, Class Evolution tuning file, demo start presets
 
 ### Pending
-- Phase 4, step D: screens (party setup with saved heroes, career screen, award panel, stop or fight on)
-- Phase 4, step E: Field Medic in battle and the build panel
-- Demo configuration (assumed scope, see decisions.md): a settings file with a Settings screen; a Class Evolution tuning file; demo start presets
+- Phase 4: vocation change inside a run (CE-19); step E: Field Medic in battle and the build panel
 
 Role checklist. These are the 10x-Team's own passes; none has been run yet. The work listed
 under Done was carried out before the team state existed.
@@ -48,7 +47,7 @@ under Done was carried out before the team state existed.
 (none)
 
 ## Risks
-- Class Evolution is not playable yet: no screen offers it and the game opens no save file.
+- Class Evolution is playable only with a launch flag; a player cannot switch it on from inside the game yet (the Settings screen is next).
 - Balance of the Guardian and of the threat-4 fight is measured only by a simulated player; the numbers await an owner decision (Checkpoint 1 of the Phase 4 plan).
 - Pacing: reaching the last capstone needs 52 to 104 winning runs on today's content (FDD open decision 5).
 - Never launched on a physical Windows display; no human playtest yet.

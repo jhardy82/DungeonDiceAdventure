@@ -58,6 +58,13 @@ class Progression:
     def close(self) -> None:
         self.store.close()
 
+    def __del__(self) -> None:
+        # A save that was never closed by hand (a game object dropped without ``close``) is closed here,
+        # so the file is not left held open. Closing twice is harmless.
+        store = getattr(self, "store", None)
+        if store is not None:
+            store.close()
+
     # ----------------------------------------------------------------------------------------
     # The roster
     # ----------------------------------------------------------------------------------------
@@ -146,11 +153,15 @@ class Progression:
     def party_entry(self, hero_id: str, row: str) -> Json:
         return {"class_id": self.state.heroes[hero_id].active_vocation_id, "row": row, "hero": self.snapshot(hero_id)}
 
-    def run_started(self, engine: Engine) -> None:
-        """Call once ``StartRun`` was accepted. A run left unfinished in the save is closed as a defeat first."""
+    def abandon_run(self) -> None:
+        """The player left a run unfinished: the save records it as a defeat. Nothing happens when no run is open."""
         run = self.state.run
         if run is not None and run.phase not in FINISHED_PHASES:
-            self.career.end_run(run.run_id, "defeat")  # abandoned: the player left it
+            self.career.end_run(run.run_id, "defeat")
+
+    def run_started(self, engine: Engine) -> None:
+        """Call once ``StartRun`` was accepted. A run left unfinished in the save is closed as a defeat first."""
+        self.abandon_run()
         self.career.begin_run(engine.state.run_id)
         self._heroes = {member["id"]: member["hero_id"] for member in engine.state.party if "hero_id" in member}
         self._seen_events = 0
@@ -204,7 +215,7 @@ class Progression:
                 "challenge_points": award.challenge_points if award else 0,
                 "denial_reason": award.denial_reason if award else ("ALREADY_MASTERED" if before[0] >= MASTERED_RANK else None),
                 "rank_before": before[0], "rank_after": row.rank, "points_after": row.points,
-                "skills_learned": [s for s in self.state.heroes[hero_id].learned_skills if s not in before[2]],
+                "skills_learned": [str(self.catalog.skills[s]["name"]) for s in self.state.heroes[hero_id].learned_skills if s not in before[2]],
                 "duplicate": result.duplicate,
             })
         return report

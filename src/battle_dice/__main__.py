@@ -36,8 +36,13 @@ def run_smoke_test(report_path: str | None = None, features: frozenset[str] = fr
         from battle_dice.sim.policies import HeuristicPolicy
         from battle_dice.ui.app import GameApp
 
-        with tempfile.TemporaryDirectory(prefix="battle-dice-smoke-") as log_dir:
-            controller = AppController(fixed_seed=1, log_dir=log_dir, features=features)
+        with tempfile.TemporaryDirectory(prefix="battle-dice-smoke-") as folder:
+            # Logs and the save (Class Evolution) both stay inside the temporary folder: a self-check
+            # never touches the player's own files.
+            controller = AppController(fixed_seed=1, log_dir=Path(folder) / "logs", features=features, save_dir=Path(folder) / "saves")
+            evolution = controller.progression is not None
+            if features and "class_evolution_v1" in features and not evolution:
+                raise RuntimeError(f"the save could not be opened: {controller.progression_error}")
             app = GameApp(controller, headless=True)
             seen = {controller.screen}
 
@@ -56,6 +61,13 @@ def run_smoke_test(report_path: str | None = None, features: frozenset[str] = fr
                 press(key)
             if [member["class_id"] for member in controller.party] != list(SMOKE_PARTY):
                 raise RuntimeError(f"party setup by hotkeys produced {controller.party}")
+            if evolution:  # the three were recruited and saved; look at one hero's career and come back
+                press(pygame.K_c)
+                if controller.screen != Screen.CAREER:
+                    raise RuntimeError("C did not open the career screen")
+                press(pygame.K_ESCAPE)
+                if controller.screen != Screen.PARTY_SETUP:
+                    raise RuntimeError("Esc did not leave the career screen")
             press(pygame.K_RETURN)  # Begin Encounter (the default button)
             engine = controller.engine
             if engine is None:
@@ -92,6 +104,16 @@ def run_smoke_test(report_path: str | None = None, features: frozenset[str] = fr
                 raise RuntimeError(f"the battle screen was never drawn; saw {sorted(seen)}")
             if controller.log_path is None or not controller.log_path.exists():
                 raise RuntimeError(f"the event log was not written: {controller.log_error}")
+            if evolution:
+                link = controller.progression
+                if not link.path.is_file() or len(link.state.heroes) != len(SMOKE_PARTY):
+                    raise RuntimeError("the heroes were not saved")
+                if not link.last_awards or link.state.run is None or link.state.run.phase != engine.state.outcome:
+                    raise RuntimeError("the run's result did not reach the save")
+                if len(engine.state.battle_records) >= 2 and engine.state.battle_records[1]["outcome"] == "victory" \
+                        and Screen.CONTINUE not in seen:
+                    raise RuntimeError("battle 2 was won but the stop-or-fight-on screen was never drawn")
+                link.close()
             lines.append(
                 f"SMOKE TEST OK: outcome={engine.state.outcome} frames={frames} events={len(engine.events)} "
                 f"screens={sorted(seen)} sprites={sprites} rules={RULES_VERSION} content={controller.content.content_version} "
@@ -115,6 +137,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=None, help="use this root seed for every run (reproducible dice)")
     parser.add_argument("--size", default="1280x720", help="window size WIDTHxHEIGHT (minimum 960x540)")
     parser.add_argument("--log-dir", default=None, help="folder for JSONL event logs")
+    parser.add_argument("--save-dir", default=None,
+                        help="folder for the save file (only used with the class_evolution_v1 feature)")
     parser.add_argument("--no-animation", action="store_true",
                         help="start with animation turned off (reduced motion); M toggles it in battle")
     parser.add_argument("--smoke-test", action="store_true",
@@ -155,7 +179,7 @@ def main(argv: list[str] | None = None) -> int:
     from battle_dice.app.controller import AppController
     from battle_dice.ui.app import GameApp
 
-    controller = AppController(fixed_seed=args.seed, log_dir=args.log_dir, features=enabled)
+    controller = AppController(fixed_seed=args.seed, log_dir=args.log_dir, features=enabled, save_dir=args.save_dir)
     try:
         GameApp(controller, size=(width, height), animations=not args.no_animation).run()
     except Exception:  # noqa: BLE001 - a windowed build has no console: leave the reason in a file

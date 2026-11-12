@@ -37,6 +37,9 @@ class Screen:
     BATTLE = "battle"
     UPGRADE = "upgrade"  # RECOVERY_AND_UPGRADE
     OUTCOME = "outcome"  # VICTORY_SUMMARY / DEFEAT_SUMMARY
+    #: Class Evolution only: a hero's career, and the stop-or-fight-on decision after battle 2.
+    CAREER = "career"
+    CONTINUE = "continue"
     ERROR = "error"
 
 
@@ -65,6 +68,23 @@ def default_log_dir() -> Path:
     return Path.cwd() / "logs"
 
 
+def default_save_dir(log_dir: str | Path | None = None) -> Path:
+    """Where the save file goes (Class Evolution only) when no folder is given.
+
+    * ``BATTLE_DICE_SAVE_DIR``, when it is set.
+    * With the default log folder: ``saves`` beside it (``./saves`` from source; the per-user
+      application data folder for a packaged build).
+    * With a log folder the caller chose: ``saves`` **inside** it. Whoever redirects the logs, a
+      test for one, gets the save in the same place and never outside it.
+    """
+    override = os.environ.get("BATTLE_DICE_SAVE_DIR")
+    if override:
+        return Path(override)
+    if log_dir is not None:
+        return Path(log_dir) / "saves"
+    return default_log_dir().parent / "saves"
+
+
 def default_seed() -> int:
     """A fresh run seed. Chosen by the application layer, never by the rules engine."""
     return time.time_ns() & 0xFFFFFFFF
@@ -78,6 +98,7 @@ class AppController:
         log_dir: str | Path | None = None,
         fixed_seed: int | None = None,
         features: Iterable[str] = (),
+        save_dir: str | Path | None = None,
     ):
         self.content = content if content is not None else load_content()
         #: Feature gates that are on for this launch (``battle_dice.features``). None by default.
@@ -119,6 +140,23 @@ class AppController:
         self.upgrade_die: str | None = None
         self.upgrade_offer: str | None = None
         self.selected_slot = 0
+        # Class Evolution: the save and the careers of its heroes. ``None`` unless the gate is on.
+        self.progression: Any = None
+        self.progression_error: str | None = None
+        self.career_hero: str | None = None
+        self.career_vocation: str | None = None
+        self.career_return = Screen.PARTY_SETUP
+        #: Offer the optional third battle after battle 2 (owner decision D-27). A setting of the demo.
+        self.third_battle = True
+        if CLASS_EVOLUTION in self.features:
+            from battle_dice.app.progression import (
+                Progression,  # never imported while the gate is off
+            )
+
+            try:
+                self.progression = Progression(save_dir if save_dir is not None else default_save_dir(log_dir), self.content)
+            except Exception as error:  # noqa: BLE001 - a save that cannot be opened must not stop the game
+                self.progression_error = f"The save could not be opened, so heroes are not saved this session: {error}"
 
     # ----------------------------------------------------------------------------------------
     # Feedback helpers
@@ -163,6 +201,7 @@ class AppController:
         engine = self.engine
         if engine is None or not engine.started:
             return
+        self._sync_progression()
         phase = engine.state.phase
         if phase in (RunPhase.VICTORY, RunPhase.DEFEAT):
             if self.screen != Screen.OUTCOME:
@@ -173,6 +212,10 @@ class AppController:
             if self.screen != Screen.UPGRADE:
                 self._enter_upgrade()
             self.screen = Screen.UPGRADE
+        elif phase == RunPhase.CONTINUE:
+            if self.screen != Screen.CONTINUE:
+                self.info("Battle 2 won. Stop here with a victory, or fight a third, harder battle.")
+            self.screen = Screen.CONTINUE
         else:
             self.screen = Screen.BATTLE
         self._sync_draft()
@@ -207,6 +250,7 @@ class AppController:
         self.screen = Screen.CONTROLS
 
     def to_main_menu(self) -> None:
+        self._leave_run()
         self.screen = Screen.MAIN_MENU
         self.engine = None
         self.paused = self.pause_help = False
@@ -248,6 +292,9 @@ class AppController:
         return limits["min_size"], limits["max_size"]
 
     def add_hero(self, class_id: str) -> None:
+        if self.progression is not None:  # with saved heroes, adding a class recruits a hero of it
+            self.recruit(class_id)
+            return
         _, maximum = self.party_limits()
         if len(self.party) >= maximum:
             self.warn(f"A party can have at most {maximum} heroes.")
@@ -261,14 +308,14 @@ class AppController:
         if 0 <= index < len(self.party):
             removed = self.party.pop(index)
             self.selected_slot = max(0, min(self.selected_slot, len(self.party) - 1))
-            self.info(f"Removed {self.content.class_def(removed['class_id'])['name']}.")
+            self.info(f"Removed {self.member_name(removed)}.")
 
     def toggle_party_row(self, index: int) -> None:
         if 0 <= index < len(self.party):
             member = self.party[index]
             member["row"] = ROW_BACK if member["row"] == ROW_FRONT else ROW_FRONT
             self.selected_slot = index
-            self.info(f"{self.content.class_def(member['class_id'])['name']} moves to the {member['row']} row.")
+            self.info(f"{self.member_name(member)} moves to the {member['row']} row.")
 
     def begin_problem(self) -> str | None:
         minimum, maximum = self.party_limits()
@@ -289,11 +336,20 @@ class AppController:
         seed = self.fixed_seed if self.fixed_seed is not None else int(self._seed_source())
         engine = Engine(self.content, self.vocations)
         self.runs_started += 1
-        result = engine.do(cmd.START_RUN, seed=seed, party=[dict(m) for m in self.party],
-                           run_id=f"run-{seed}-{self.runs_started}")
+        params: dict[str, Any] = {"seed": seed, "party": [dict(m) for m in self.party], "run_id": f"run-{seed}-{self.runs_started}"}
+        link = self.progression
+        if link is not None:  # saved heroes: their build snapshots, a run id from the save, and the optional third battle
+            self._leave_run()
+            params["party"] = [link.party_entry(m["hero_id"], m["row"]) for m in self.party]
+            params["run_id"] = link.next_run_id(seed)
+            if self.third_battle and link.extra_encounters():
+                params["encounters"] = link.extra_encounters()
+        result = engine.do(cmd.START_RUN, **params)
         if not result.accepted:
             self.warn(result.reason or "The run could not be started.")
             return
+        if link is not None:
+            link.run_started(engine)
         self.engine = engine
         self.paused = self.pause_help = False
         self.reaction_hero = None
@@ -313,6 +369,7 @@ class AppController:
         self.begin_run()
 
     def modify_party(self) -> None:
+        self._leave_run()
         self.engine = None
         self.paused = self.pause_help = False
         self.reaction_hero = None
@@ -799,6 +856,8 @@ class AppController:
         return combat_log(self.engine, limit)
 
     def class_view(self, class_id: str) -> dict[str, Any]:
+        if class_id not in self.content.classes:
+            return self._vocation_view(class_id)
         cls = copy.deepcopy(self.content.class_def(class_id))
         return {
             "id": class_id,
@@ -807,3 +866,259 @@ class AppController:
             "dice": [die_view(self.content.die(d)) for d in cls["starting_dice"]],
             "bench": [die_view(self.content.die(d)) for d in cls["bench_dice"]],
         }
+
+    # ----------------------------------------------------------------------------------------
+    # Class Evolution: saved heroes, their careers, and the third battle (only while the gate is on)
+    # ----------------------------------------------------------------------------------------
+
+    def close(self) -> None:
+        """Release what the controller holds open: the save file, when Class Evolution is on."""
+        if self.progression is not None:
+            self.progression.close()
+            self.progression = None
+
+    def playable(self, vocation_id: str) -> bool:
+        """True when the rules can run this vocation today (a starting class, or one whose engine work is done)."""
+        if vocation_id in self.content.classes:
+            return True
+        return self.vocations is not None and vocation_id in getattr(self.vocations, "builds", {})
+
+    def _vocation_view(self, vocation_id: str) -> dict[str, Any]:
+        """``class_view`` for a vocation that is not a shipped class: from its build in the catalog."""
+        assert self.vocations is not None
+        raw = self.progression.catalog.vocations[vocation_id] if self.progression is not None else {}
+        if not self.playable(vocation_id):  # listed in the catalog, but the rules cannot run it yet: only what the catalog says
+            return {"id": vocation_id, "name": raw.get("name", vocation_id), "playable": False,
+                    **{key: raw[key] for key in ("max_hp", "start_hp", "speed", "max_mana", "start_mana", "rerolls") if key in raw}}
+        build = self.vocations.build(vocation_id)
+        return {
+            "id": vocation_id, "name": build.name, "playable": True, "max_hp": build.max_hp, "start_hp": build.start_hp, "speed": build.speed,
+            "base_initiative": build.base_initiative, "max_mana": build.max_mana, "start_mana": build.start_mana,
+            "max_corruption": build.max_corruption, "start_corruption": build.start_corruption, "rerolls": build.rerolls,
+            "suggested_row": raw.get("suggested_row", ROW_FRONT), "scheduling": copy.deepcopy(build.scheduling),
+            "passive": copy.deepcopy(build.passive), "reaction_def": copy.deepcopy(build.reaction),
+            "dice": [die_view(build.dice.get(d) or self.content.die(d)) for d in build.starting_dice],
+            "bench": [die_view(build.dice.get(d) or self.content.die(d)) for d in build.bench_dice],
+        }
+
+    def sprite_class(self, class_id: str) -> str:
+        """The class whose picture stands for a vocation: itself, or the starting class it grew from."""
+        if class_id in self.content.classes or self.vocations is None:
+            return class_id
+        try:
+            return self.vocations.build(class_id).upgrade_family
+        except Exception:  # noqa: BLE001 - a picture is never worth an error
+            return class_id
+
+    def member_name(self, member: dict[str, str]) -> str:
+        if self.progression is not None and "hero_id" in member:
+            hero = self.progression.state.heroes.get(member["hero_id"])
+            if hero is not None:
+                return str(hero.display_name or hero.hero_id)
+        return str(self.class_view(member["class_id"])["name"])
+
+    def _leave_run(self) -> None:
+        """The player drops an unfinished run: the save records it as a defeat, so the roster is free again."""
+        link = self.progression
+        if link is not None:
+            link.abandon_run()
+
+    def _sync_progression(self) -> None:
+        link, engine = self.progression, self.engine
+        if link is None or engine is None:
+            return
+        awards = link.sync(engine)
+        if awards:
+            self.info("Mastery: " + "  ".join(self.award_line(a) for a in awards))
+
+    @staticmethod
+    def award_line(award: dict[str, Any]) -> str:
+        """One hero's award for one battle, in words."""
+        points = award["base_points"] + award["challenge_points"]
+        if points:
+            bonus = " with the bonus" if award["challenge_points"] else ""
+            rank = f", now rank {award['rank_after']}" if award["rank_after"] != award["rank_before"] else ""
+            learned = f", learned {', '.join(award['skills_learned'])}" if award["skills_learned"] else ""
+            return f"{award['name']} +{points}{bonus}{rank}{learned}."
+        reasons = {"UNDER_THREAT_CAP": "this battle is too easy for its rank", "ENCOUNTER_NOT_WON": "the battle was lost",
+                   "ALREADY_MASTERED": "its vocation is mastered"}
+        return f"{award['name']} +0 ({reasons.get(award['denial_reason'], 'nothing to earn')})."
+
+    def awards_view(self, battle: int | None = None) -> list[str]:
+        """The award lines of one battle of this run (the latest by default), for the screens."""
+        link = self.progression
+        if link is None or not link.last_awards:
+            return []
+        wanted = battle if battle is not None else link.last_awards[-1]["battle"]
+        return [self.award_line(a) for a in link.last_awards if a["battle"] == wanted]
+
+    # -- roster ----------------------------------------------------------------------------------
+
+    def roster_view(self) -> list[dict[str, Any]]:
+        if self.progression is None:
+            return []
+        in_party = {member.get("hero_id") for member in self.party}
+        return [{**row, "in_party": row["hero_id"] in in_party} for row in self.progression.roster()]
+
+    def recruit(self, starting_class: str) -> None:
+        self._guard(self._recruit, starting_class)
+
+    def _recruit(self, starting_class: str) -> None:
+        link = self.progression
+        assert link is not None
+        before = set(link.state.heroes)
+        result = link.recruit(starting_class)
+        if not result.accepted:
+            limit = (result.error_details or {}).get("roster_limit", "")
+            self.warn({"ROSTER_FULL": f"The roster is full ({limit} heroes). Nobody can be recruited.",
+                       "PHASE_LOCKED": "Heroes are recruited between runs, not during one."}.get(str(result.error_code), "That hero cannot be recruited."))
+            return
+        (hero_id,) = set(link.state.heroes) - before
+        name = link.state.heroes[hero_id].display_name
+        _, maximum = self.party_limits()
+        if len(self.party) < maximum:
+            self._add_to_party(hero_id)
+            self.info(f"Recruited {name} and added it to the party.")
+        else:
+            self.info(f"Recruited {name}. The party is full, so it waits in the roster.")
+
+    def _add_to_party(self, hero_id: str) -> None:
+        hero = self.progression.state.heroes[hero_id]
+        row = self.class_view(hero.active_vocation_id)["suggested_row"]
+        self.party.append({"class_id": hero.active_vocation_id, "row": row, "hero_id": hero_id})
+        self.selected_slot = len(self.party) - 1
+
+    def add_saved_hero(self, hero_id: str) -> None:
+        _, maximum = self.party_limits()
+        if any(member.get("hero_id") == hero_id for member in self.party):
+            self.warn("That hero is already in the party.")
+        elif len(self.party) >= maximum:
+            self.warn(f"A party can have at most {maximum} heroes.")
+        else:
+            self._add_to_party(hero_id)
+            self.info(f"{self.member_name(self.party[-1])} joins the party in the {self.party[-1]['row']} row.")
+
+    def _refresh_party(self) -> None:
+        """Party entries follow their heroes: a hero that changed vocation fights as its new one."""
+        if self.progression is None:
+            return
+        heroes = self.progression.state.heroes
+        self.party = [{**m, "class_id": heroes[m["hero_id"]].active_vocation_id} for m in self.party if m.get("hero_id") in heroes]
+
+    # -- career ----------------------------------------------------------------------------------
+
+    def open_career(self, hero_id: str) -> None:
+        self.career_hero, self.career_vocation = hero_id, None
+        self.career_return = self.screen
+        self.screen = Screen.CAREER
+        self.info("A hero's career: what it has mastered, what it can become, and what is still hidden.")
+
+    def close_career(self) -> None:
+        self._refresh_party()
+        self.screen = self.career_return
+        self.career_hero = None
+
+    def select_career_vocation(self, vocation_id: str) -> None:
+        self.career_vocation = vocation_id
+
+    def career_view(self) -> dict[str, Any]:
+        """One hero's career tree with, for each listed vocation, what the hero may do with it and why not."""
+        link, hero_id = self.progression, self.career_hero
+        assert link is not None and hero_id is not None
+        hero = link.state.heroes[hero_id]
+        in_run = link.state.run is not None and link.state.run.phase not in ("victory", "defeat")
+        rows = []
+        for entry in link.tree(hero_id)["career_tree"]["entries"]:
+            if entry["kind"] != "vocation":
+                rows.append({**entry, "status": entry.get("clue") or "Not discovered yet.", "can_claim": False, "can_activate": False, "needs": ""})
+                continue
+            vocation_id = entry["vocation_id"]
+            playable = self.playable(vocation_id)
+            needs = "" if entry["unlocked"] else self._requirement_text(hero_id, vocation_id)
+            if not playable:  # the catalog lists it, the rules cannot run it yet: it can be read about, not taken
+                needs = f"Not in this version yet. {needs}".strip()
+            if entry["active"]:
+                status = "Active"
+            elif entry["unlocked"]:
+                status = "Unlocked"
+            elif not playable:
+                status = "Coming later"
+            else:
+                status = "Ready to claim" if not needs else "Locked"
+            if entry["unlocked"]:
+                mastery = hero.mastery[vocation_id]
+                top = link.catalog.thresholds(vocation_id)
+                progress = "mastered" if entry["mastered"] else f"rank {mastery.rank}, {mastery.points}/{top[mastery.rank]} to the next"
+                status = f"{status}: {progress}"
+            rows.append({**entry, "status": status, "needs": needs, "playable": playable,
+                         "can_claim": playable and not entry["unlocked"] and not needs and not in_run,
+                         "can_activate": playable and entry["unlocked"] and not entry["active"] and not in_run})
+        selected = self.career_vocation or hero.active_vocation_id
+        chosen = next(row for row in rows if row.get("vocation_id") == selected)
+        return {"hero_id": hero_id, "name": hero.display_name or hero_id, "active_vocation_id": hero.active_vocation_id,
+                "rows": rows, "selected": selected, "selected_needs": chosen["needs"], "in_run": in_run}
+
+    def _requirement_text(self, hero_id: str, vocation_id: str) -> str:
+        """What the hero still lacks for the cheapest route to a vocation; empty when it can be claimed."""
+        link = self.progression
+        hero = link.state.heroes[hero_id]
+        best: list[str] | None = None
+        for route in link.career.service.routes(hero, vocation_id):
+            lacking = []
+            for unmet in route.unmet:
+                if unmet["op"] == "MASTERY_AT_LEAST":
+                    lacking.append(f"master {link.catalog.name(unmet['vocation_id'])} (now rank {unmet['current_rank']})")
+                elif unmet["op"] == "MASTERED_COUNT_AT_LEAST":
+                    lacking.append(f"master {unmet['minimum']} {unmet['group']} vocations (now {unmet['current_count']})")
+                else:
+                    lacking.append("finish a quest")
+            for item_id, quantity, _consume in route.items:
+                held = link.state.profile.items.get(item_id, 0)
+                if held < quantity:
+                    lacking.append(f"hold {quantity} {item_id.replace('_', ' ')} (now {held})")
+            if best is None or len(lacking) < len(best):
+                best = lacking
+        return "Needs: " + "; ".join(best) + "." if best else ""
+
+    def claim_vocation(self, vocation_id: str) -> None:
+        self._guard(self._career_command, "claim", vocation_id)
+
+    def change_vocation(self, vocation_id: str) -> None:
+        self._guard(self._career_command, "change", vocation_id)
+
+    def _career_command(self, what: str, vocation_id: str) -> None:
+        link, hero_id = self.progression, self.career_hero
+        assert link is not None and hero_id is not None
+        result = link.claim(hero_id, vocation_id) if what == "claim" else link.change(hero_id, vocation_id)
+        name = link.catalog.name(vocation_id)
+        hero_name = link.state.heroes[hero_id].display_name
+        if not result.accepted:
+            reasons = {"PHASE_LOCKED": "That cannot be done during a run.", "PREREQUISITE_UNMET": f"{hero_name} does not meet what {name} needs yet.",
+                       "NOT_DISCOVERED": "That vocation has not been discovered.", "ITEM_INSUFFICIENT": "An item it needs is missing."}
+            self.warn(reasons.get(str(result.error_code), "That is not allowed right now."))
+            return
+        self._refresh_party()
+        self.career_vocation = vocation_id
+        self.info(f"{hero_name} has unlocked {name}." if what == "claim" else f"{hero_name} is now a {name}.")
+
+    # -- the third battle ------------------------------------------------------------------------
+
+    def continue_view(self) -> dict[str, Any]:
+        engine = self.engine
+        assert engine is not None
+        encounter_id = engine.offered_encounter()
+        threat = None
+        if self.progression is not None and encounter_id is not None:
+            threat = next((e["threat_rating"] for e in self.progression.catalog.raw["encounters"] if e["id"] == encounter_id), None)
+        heroes = [{"id": h.id, "name": h.name, "hp": h.hp, "max_hp": h.max_hp, "mana": h.mana, "max_mana": h.max_mana, "row": h.row}
+                  for h in engine.combat.side("hero")]
+        return {"encounter_id": encounter_id, "threat_rating": threat, "heroes": heroes, "awards": self.awards_view(),
+                "battle": engine.state.encounter_index + 1}
+
+    def fight_on(self) -> None:
+        if self.engine is not None and self._guard(self._send, cmd.CONTINUE_RUN):
+            self.info("Battle 3 begins. Losing it loses the run.")
+
+    def end_run_with_victory(self) -> None:
+        if self.engine is not None:
+            self._guard(self._send, cmd.END_RUN)
