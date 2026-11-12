@@ -1180,8 +1180,12 @@ def draw_settings(ui: UI, ctrl: AppController) -> None:
         reason = ctrl.RUN_LOCKED if ctrl.settings_in_run else "There is no profile while Class Evolution is off."
         ui.button("settings:reset", 250, y + 6, 330, 42, label, ctrl.reset_profile, enabled=evolution and not ctrl.settings_in_run, reason=reason,
                   size=15, tooltip="Delete the save and start a new profile from the start chosen under Demo and testing. Asked twice.")
-        note = f"Save file: {ctrl.progression.path}" if evolution else "Deletes every saved hero and starts a new profile. Asked twice."
-        ui.paragraph(596, y + 9, note, 656, 13, Theme.FAINT, line_height=17, max_lines=2)
+        if evolution:
+            # One line with its label: a path has no spaces to wrap at, and a long one (Windows) is cut as a whole.
+            ui.text(596, y + 19, f"Save file: {ctrl.progression.path}", 13, Theme.FAINT, max_width=656)
+        else:
+            ui.paragraph(596, y + 9, "Deletes every saved hero and starts a new profile. Asked twice.", 656, 13, Theme.FAINT, line_height=17,
+                         max_lines=2)
     elif ctrl.settings_tab == "demo":
         ui.text(24, y + 8, "These four are aids for showing and testing Class Evolution. They do not change the rules of a battle.", 14, Theme.FAINT,
                 max_width=1230)

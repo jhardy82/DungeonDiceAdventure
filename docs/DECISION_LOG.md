@@ -1743,7 +1743,7 @@ settings is built. This section is the structure; the new settings follow in the
 
 **Evidence**
 
-- 1136 tests pass (1131 before). Lint and type checks are clean.
+- 1137 tests pass (1131 before). Lint and type checks are clean.
 - The existing Settings tests were rewritten for the groups. New tests: the groups and their
   order; the help from the Settings and back; reset to defaults (asked twice, cancelled by
   anything else, the heroes kept); the Settings from the pause menu with every lock and every
@@ -1754,6 +1754,10 @@ settings is built. This section is the structure; the new settings follow in the
 - **Deliberate breaks:** 39 breaks of the new code. 38 were caught at first; the one miss was a
   test gap (choosing a group that does not exist), now closed. Run without bytecode files and
   with a control run.
+- **Found by the Windows check, fixed:** the new "Saved profile" row drew the save file's path
+  as a wrapped paragraph. A path has no spaces to wrap at, so on Windows (a long path) it stood
+  on a line of its own and was cut without its "Save file:" label. It is one labelled line
+  again. The failure was reproduced here with a long folder name before the fix; that test stays.
 
 **Not verified:** no person has used the screens; checked by tests and by screenshots made in
 this session.

@@ -1276,3 +1276,18 @@ def test_a_seed_entry_can_be_cancelled_left_or_finished_by_beginning(tmp_path):
     play.key(pygame.K_5)
     play.click("party:begin")  # a seed still being typed counts as entered
     assert play.ctrl.engine is not None and play.ctrl.engine.state.seed == 5 and play.ctrl.seed_entry is None
+
+
+def test_a_long_save_path_is_shortened_with_its_label_and_nothing_else_is(tmp_path, monkeypatch):
+    """On Windows the save sits deep in the user's folders. The path may be cut; it keeps its label, and no other text is cut."""
+    from battle_dice.settings import Settings
+
+    deep = tmp_path / ("a_very_long_folder_name_" * 4) / ("another_long_folder_name_" * 4) / "saves"
+    play = Configured(tmp_path, settings=Settings(class_evolution=True, save_dir=str(deep)))
+    drawn, shortened = record_text(monkeypatch)
+    play.ctrl.open_settings()
+    play.ctrl.select_settings_tab("evolution")
+    play.app.frame(0)
+    assert len(str(play.ctrl.progression.path)) > 220
+    assert shortened and all(text.startswith(("Saved in ", "Save file: ")) for text in shortened), shortened
+    assert any(text.startswith("Save file: ") for text in drawn)
