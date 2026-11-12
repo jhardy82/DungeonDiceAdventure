@@ -262,7 +262,7 @@ names.
   (Phase 1), 7.12 (Phase 2), 7.13 (Phase 3), 7.14 (the decisions taken before Phase 4) and
   7.15 (Phase 4: its decisions, its steps, and step A), 7.16 (step B: the third battle) and
   7.17 (step C: saved heroes in real runs, and the pacing measurement) and 7.18 (step D: the
-  screens; the first slice is playable).
+  screens; the first slice is playable) and 7.19 (the settings of the demo).
 - The first playable evolution arrives before the expensive engine work of waves 3 to 5.
 
 ## 10. Decisions put to the owner, and the answers (2026-11-11)

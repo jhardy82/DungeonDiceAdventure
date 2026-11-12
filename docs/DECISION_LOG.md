@@ -1209,6 +1209,71 @@ upgrade (CE-19).
 **Still to do for the slice:** the vocation change inside a run (CE-19), Field Medic in battle,
 the build panel (skills and family dice), and the demo's settings.
 
+### 7.19 The demo's configuration: a settings file and a Settings screen (2026-11-12)
+
+**Why.** The owner's goal of 2026-11-11 is a fully configurable and playable demo. What
+"configurable" should cover was put to the owner twice and not answered, so this follows the
+assumption recorded in `.10x/decisions.md`. It can be widened or narrowed.
+
+**What a player can change now, from Main menu, Settings**
+
+| Setting | Values | Takes effect |
+|---------|--------|--------------|
+| Class Evolution | Off (default), On | At once: the save is opened or closed and the party setup changes |
+| Third battle | Offered, Not offered | At the next run |
+| Mastery pace | Normal, Fast, Very fast | At once: heroes are re-ranked from their points, with an event in the save's log |
+| Roster size | 6, 12, 24 (1 to 50 in the file) | At once |
+| New profile starts as | Fresh; a Squire one win from mastery; a Guardian at rank 1; a mastered Guardian | When a profile is made or reset |
+| Dice seed | A new one each run, Fixed | At the next run |
+| Animation | On, Off | At once |
+| Window size | Four sizes | At once |
+
+Plus **Reset the saved profile**, which asks twice.
+
+**How it is built**
+
+- `src/battle_dice/settings.py`: one JSON file. A launch flag wins over an environment
+  variable, which wins over the file, which wins over the default. A file that cannot be read,
+  or a value that is not allowed, never stops the game: the default is used and the problem is
+  named on the main menu. Reading never creates the file; it is written when a setting changes.
+- **Class Evolution stays off by default.** Switching it on in the screen does what the launch
+  flag does. A gate forced by a launch flag cannot be switched off inside.
+- **Mastery pace** does not change points per win. The save's award rows allow 0 or 1 base
+  point and 0 or 1 bonus point and nothing else, so a faster pace asks for fewer points
+  instead: every rank's points are divided (by 2 or 4, rounded up, still rising with each
+  rank). When a save is opened, every rank is made to agree with its points under the current
+  pace; a change is one `RanksRederived` event in the log. What a hero has claimed stays claimed.
+- **Start presets** go through the career rules: heroes are recruited, mastery is handed out by
+  a trusted event `MasteryGranted` that names its reason, and the Guardian is claimed like any
+  other. So a save always says which mastery was earned and which was handed out.
+
+**Asked for in the assumption and not built, with the reason**
+
+| Not built | Why |
+|-----------|-----|
+| Points per win as a setting | The save's award rows allow 0 or 1 point. More would need a change of the approved save schema and a migration. The pace setting gives the same effect on how long mastery takes |
+| The third battle's enemies as a setting | The enemy table is part of the vocation catalog, and a run's record pins the catalog's hash so it can be replayed. A table edited by a setting would make such records unreplayable. Its numbers stay in `vocation_catalog.json`, where the validator checks them |
+| A separate tuning file | The tuning that was built lives in the one settings file, so there is one place to look |
+| Base game numbers from a folder | Left out as decided in the assumption: such runs fall outside the balance evidence and the replay pin |
+
+**Evidence**
+
+- 1038 tests pass (989 before). Lint and type checks are clean.
+- New tests: the settings file (defaults, round trip, 15 values that are not allowed, where the
+  file lives); the pace table and that a faster pace masters a Squire in fewer runs; the four
+  presets; re-ranking with its log event; the Settings screen (every setting changes, is saved
+  and takes effect; Class Evolution on and off inside the game; launch flags win; reset asks
+  twice; **no text cut off at both sizes under three fonts**; a drawing fault reaches the error
+  screen).
+- With default settings the game is the shipped game: a test compares a controller made with
+  no settings and one made with default settings and a settings path. The replay pin and the
+  six content files are unchanged.
+- **Deliberate breaks:** 26 breaks of the new code, each caught by a fitting test. Run without
+  bytecode files and with a control run.
+
+**Not verified:** no person has used the Settings screen; it was checked by tests and by
+screenshots made in this session.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

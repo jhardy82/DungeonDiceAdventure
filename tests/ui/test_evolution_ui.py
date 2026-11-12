@@ -419,3 +419,221 @@ def test_a_fault_while_drawing_a_new_screen_reaches_the_error_screen(tmp_path, m
     assert play.app.render_faults == 1 and play.ctrl.screen == Screen.ERROR and "simulated drawing fault" in play.ctrl.error_text
     play.click("error:menu")
     assert play.ctrl.screen == Screen.MAIN_MENU
+
+
+# --------------------------------------------------------------------------------------------
+# Settings: the demo's configuration
+# --------------------------------------------------------------------------------------------
+
+
+class Configured(Play):
+    """A headless game with a settings file of its own, started from the main menu."""
+
+    def __init__(self, tmp_path, settings=None, size=(1280, 720), **controller):
+        self.file = tmp_path / "settings.json"
+        self.ctrl = AppController(log_dir=tmp_path / "logs", settings=settings, settings_path=self.file, **controller)
+        OPENED.append(self.ctrl)
+        self.app = GameApp(self.ctrl, size=size, headless=True, animations=False)
+        self.app.fast = True
+        self.app.frame(0)
+
+    def saved(self) -> dict:
+        import json
+
+        return json.loads(self.file.read_text(encoding="utf-8"))
+
+
+def test_the_main_menu_opens_the_settings_and_escape_returns(tmp_path):
+    play = Configured(tmp_path)
+    play.key(pygame.K_s)
+    assert play.ctrl.screen == Screen.SETTINGS and "settings:class_evolution" in play.ui.keys()
+    assert [row["key"] for row in play.ctrl.settings_view()] == [
+        "class_evolution", "third_battle", "mastery_pace", "roster_limit", "demo_preset", "seed", "animation", "window_size"]
+    assert not play.file.exists(), "looking at the settings writes nothing"
+    play.key(pygame.K_ESCAPE)
+    assert play.ctrl.screen == Screen.MAIN_MENU
+
+
+def test_class_evolution_can_be_switched_on_and_off_from_inside_the_game(tmp_path):
+    play = Configured(tmp_path)
+    assert play.ctrl.progression is None and play.ctrl.vocations is None
+    play.key(pygame.K_s)
+    needs = "Switch Class Evolution on first."
+    assert play.ui.widget("settings:third_battle").reason == needs and play.ui.widget("settings:reset").enabled is False
+    play.click("settings:class_evolution")
+    assert play.saved()["class_evolution"] is True and play.ctrl.message == "Class Evolution: On."
+    link = play.ctrl.progression
+    assert link is not None and link.path == tmp_path / "logs" / "saves" / "profile.sqlite" and link.path.is_file()
+    assert play.ctrl.vocations is not None and play.ui.widget("settings:third_battle").enabled is True
+    play.key(pygame.K_ESCAPE)
+    play.key(pygame.K_n)
+    assert "add:squire" in play.ui.keys()
+    play.key(pygame.K_1)  # with Class Evolution on, the key recruits a saved Squire
+    assert [m["hero_id"] for m in play.ctrl.party] == ["hero_001"]
+    # Off again: the shipped game, the old party setup, and nothing of the save is held open.
+    play.ctrl.to_main_menu()
+    play.ctrl.open_settings()
+    play.app.frame(0)
+    play.click("settings:class_evolution")
+    assert play.saved()["class_evolution"] is False and play.ctrl.progression is None and play.ctrl.vocations is None
+    assert play.ctrl.party == [] and play.ctrl.features == frozenset()
+    play.ctrl.close_settings()
+    play.ctrl.new_run()
+    play.app.frame(0)
+    play.key(pygame.K_1)  # and with it off the same key adds a plain Squire, as it always did
+    assert play.ctrl.party == [{"class_id": "squire", "row": "front"}] and not [k for k in play.ui.keys() if k.startswith("roster:")]
+    assert not [k for k in play.ui.keys() if k.endswith(":career")]
+    # On once more: the hero recruited before is still in the save.
+    play.ctrl.to_main_menu()
+    play.ctrl.open_settings()
+    play.ctrl.change_setting("class_evolution")
+    assert [row["name"] for row in play.ctrl.roster_view()] == ["Squire 1"]
+
+
+def test_every_setting_moves_to_its_next_value_is_saved_and_takes_effect(tmp_path):
+    from battle_dice.settings import Settings
+
+    play = Configured(tmp_path, settings=Settings(class_evolution=True))
+    play.ctrl.open_settings()
+    play.app.frame(0)
+    play.click("settings:third_battle")
+    assert play.saved()["third_battle"] is False and play.ctrl.third_battle is False
+    play.click("settings:mastery_pace")
+    assert play.saved()["mastery_pace"] == "fast" and play.ctrl.progression.mastery_pace == "fast"
+    assert play.ctrl.progression.catalog.thresholds("squire")[-1] == 7
+    play.click("settings:roster_limit")
+    assert play.saved()["roster_limit"] == 24 and play.ctrl.progression.career.service.roster_limit == 24
+    play.click("settings:demo_preset")
+    assert play.saved()["demo_preset"] == "squire_near_mastery" and play.ctrl.roster_view() == [], "a preset is for a new profile"
+    play.click("settings:seed")
+    fixed = play.saved()["seed"]
+    assert isinstance(fixed, int) and play.ctrl.fixed_seed == fixed and f"Fixed: {fixed}" in play.ctrl.message
+    play.click("settings:seed")
+    assert play.saved()["seed"] is None and play.ctrl.fixed_seed is None
+    play.click("settings:animation")
+    play.app.frame(0)
+    assert play.saved()["animation"] is False and play.app.ui.anim.enabled is False
+    play.click("settings:animation")
+    play.app.frame(0)
+    assert play.app.ui.anim.enabled is True
+    play.click("settings:window_size")
+    play.app.frame(0)
+    assert play.saved()["window_size"] == "1600x900" and play.app.surface.get_size() == (1600, 900)
+    # The file a second game reads is the one this one wrote.
+    from battle_dice import settings as module
+
+    again, problems = module.load(play.file)
+    assert problems == [] and (again.mastery_pace, again.roster_limit, again.window_size) == ("fast", 24, "1600x900")
+
+
+def test_a_run_uses_the_settings(tmp_path):
+    from battle_dice.settings import Settings
+
+    play = Configured(tmp_path, settings=Settings(class_evolution=True, third_battle=False, seed=77, demo_preset="guardian_unlocked"))
+    assert [(row["name"], row["vocation_name"]) for row in play.ctrl.roster_view()] == [
+        ("Squire 1", "Guardian"), ("Scout 2", "Scout"), ("Apprentice 3", "Apprentice")]
+    play.ctrl.new_run()
+    play.ctrl.add_saved_hero("hero_001")
+    play.ctrl.add_saved_hero("hero_002")
+    play.ctrl.begin_run()
+    engine = play.ctrl.engine
+    assert engine is not None and engine.state.seed == 77 and engine.battle_count == 2  # the fixed seed; no third battle
+    assert engine.build("h01").vocation_id == "guardian" and engine.combat.combatants["h01"].max_hp == 18
+
+
+def test_the_save_folder_comes_from_a_flag_then_the_settings_then_the_usual_place(tmp_path):
+    from battle_dice.settings import Settings
+
+    chosen = Configured(tmp_path / "a", settings=Settings(class_evolution=True, save_dir=str(tmp_path / "my saves")))
+    assert chosen.ctrl.progression.path == tmp_path / "my saves" / "profile.sqlite" and chosen.ctrl.progression.path.is_file()
+    flagged = Configured(tmp_path / "b", settings=Settings(class_evolution=True, save_dir=str(tmp_path / "ignored")), save_dir=tmp_path / "flag")
+    assert flagged.ctrl.progression.path == tmp_path / "flag" / "profile.sqlite" and not (tmp_path / "ignored").exists()
+    usual = Configured(tmp_path / "c", settings=Settings(class_evolution=True))
+    assert usual.ctrl.progression.path == tmp_path / "c" / "logs" / "saves" / "profile.sqlite"
+
+
+def test_a_launch_flag_wins_over_the_settings_file_and_cannot_be_switched_off_inside(tmp_path):
+    from battle_dice.settings import Settings
+
+    play = Configured(tmp_path, settings=Settings(class_evolution=False, seed=5), features=[CLASS_EVOLUTION], fixed_seed=9)
+    assert play.ctrl.progression is not None and play.ctrl.fixed_seed == 9
+    rows = {row["key"]: row for row in play.ctrl.settings_view()}
+    assert rows["class_evolution"]["value"] == "On (launch flag)" and "launch flag" in rows["class_evolution"]["reason"]
+    assert rows["seed"]["value"] == "Fixed: 9" and "launch flag" in rows["seed"]["reason"]
+    play.ctrl.open_settings()
+    play.app.frame(0)
+    assert play.ui.widget("settings:class_evolution").enabled is False and play.ui.widget("settings:seed").enabled is False
+
+
+def test_resetting_the_profile_asks_twice_and_starts_again_from_the_chosen_start(tmp_path):
+    from battle_dice.settings import Settings
+
+    play = Configured(tmp_path, settings=Settings(class_evolution=True))
+    play.ctrl.recruit("scout")
+    play.ctrl.recruit("scout")
+    assert len(play.ctrl.roster_view()) == 2
+    play.ctrl.open_settings()
+    play.app.frame(0)
+    play.click("settings:reset")
+    assert play.ctrl.reset_confirm and len(play.ctrl.roster_view()) == 2 and "Press Reset again" in play.ctrl.message
+    play.click("settings:demo_preset")  # anything else cancels the question
+    assert not play.ctrl.reset_confirm and len(play.ctrl.roster_view()) == 2
+    play.click("settings:reset")
+    play.click("settings:reset")
+    assert not play.ctrl.reset_confirm and play.ctrl.message == "A new profile was made (3 heroes)."
+    assert [(row["name"], row["rank"]) for row in play.ctrl.roster_view()] == [("Squire 1", 7), ("Scout 2", 1), ("Apprentice 3", 1)]
+    assert play.ctrl.party == [] and play.ctrl.progression.path.is_file()
+
+
+def test_with_class_evolution_off_there_is_no_profile_to_reset(tmp_path):
+    play = Configured(tmp_path)
+    play.ctrl.reset_profile()
+    assert play.ctrl.message_is_error and "no profile to reset" in play.ctrl.message and not list(tmp_path.rglob("*.sqlite"))
+
+
+def test_problems_in_the_settings_file_are_shown_on_the_main_menu(tmp_path, monkeypatch):
+    from battle_dice import settings as module
+
+    file = tmp_path / "settings.json"
+    file.write_text('{"window_size": "640x480", "mastery_pace": "fast"}', encoding="utf-8")
+    loaded, problems = module.load(file)
+    ctrl = AppController(log_dir=tmp_path / "logs", settings=loaded, settings_path=file)
+    OPENED.append(ctrl)
+    ctrl.settings_problems = problems
+    app = GameApp(ctrl, headless=True, animations=False)
+    drawn, shortened = record_text(monkeypatch)
+    app.frame(0)
+    assert problems == ["settings.json: window_size must be one of 960x540, 1280x720, 1600x900, 1920x1080; the default is used."]
+    assert problems[0] in drawn and problems[0] not in shortened and loaded.mastery_pace == "fast"
+
+
+@pytest.mark.parametrize("size", SIZES)
+def test_no_text_is_cut_off_on_the_settings_screen_and_the_main_menu(tmp_path, monkeypatch, font, size):  # noqa: F811
+    from battle_dice.settings import Settings
+
+    play = Configured(tmp_path, settings=Settings(class_evolution=True), size=size)
+    drawn, shortened = record_text(monkeypatch)
+    play.app.frame(0)
+    assert "Settings  (S)" in drawn and shortened == [], shortened
+    play.ctrl.open_settings()
+    for key in ("mastery_pace", "mastery_pace", "demo_preset", "demo_preset", "demo_preset", "seed", "animation", "third_battle"):
+        play.app.frame(0)
+        play.ctrl.change_setting(key)
+    play.ctrl.reset_profile()
+    play.app.frame(0)
+    # Paths are as long as the machine makes them; everything the game itself words must fit.
+    worded = [text for text in shortened if not text.startswith(("Saved in ", "Save file: "))]
+    assert "Press again to delete every hero" in drawn and worded == [], worded
+    assert play.app.render_faults == 0
+
+
+def test_a_fault_while_drawing_the_settings_reaches_the_error_screen(tmp_path, monkeypatch):
+    play = Configured(tmp_path)
+    play.ctrl.open_settings()
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("simulated drawing fault")
+
+    monkeypatch.setattr(screens, "draw_settings", boom)
+    play.app.frame(0)
+    assert play.app.render_faults == 1 and play.ctrl.screen == Screen.ERROR

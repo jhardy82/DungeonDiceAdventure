@@ -36,6 +36,7 @@ class GameApp:
         self._timer = 0.0
         self.render_faults = 0  # frames whose drawing raised; the smoke test requires this to stay 0
         self.headless = headless
+        self._settings_seen = self.controller.settings_serial
         self.surface = self._set_mode(size)
         pygame.display.set_caption("Battle Dice")
         self.draw()
@@ -78,8 +79,20 @@ class GameApp:
 
     # -- update and draw ---------------------------------------------------------------------
 
+    def _follow_settings(self) -> None:
+        """A setting changed in the Settings screen: apply what belongs to the window."""
+        controller = self.controller
+        if controller.settings_serial == self._settings_seen:
+            return
+        self._settings_seen = controller.settings_serial
+        self.ui.anim.enabled = controller.settings.animation
+        size = controller.settings.size()
+        if size != self.surface.get_size():
+            self.surface = self._set_mode(size)
+
     def update(self, dt_ms: float) -> None:
         controller = self.controller
+        self._follow_settings()
         try:
             self._animate(dt_ms)
         except Exception:  # noqa: BLE001 - an animation fault must reach the error screen
@@ -128,6 +141,8 @@ class GameApp:
                 screens.draw_career(ui, controller)
             elif screen == Screen.CONTINUE:
                 screens.draw_continue(ui, controller)
+            elif screen == Screen.SETTINGS:
+                screens.draw_settings(ui, controller)
             else:
                 screens.draw_error(ui, controller)
         except Exception:  # noqa: BLE001 - a rendering fault must leave a usable error screen

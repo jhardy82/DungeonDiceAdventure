@@ -97,16 +97,22 @@ def draw_main_menu(ui: UI, ctrl: AppController, quit_action: Callable[[], Any]) 
     for position, archetype in enumerate(("goblin", "hex_adept", "captain")):
         ui.sprite(ui.assets.combatant_key(archetype), 826 + position * 104, 330, 96, 96)
     for position, size in enumerate((4, 6, 8)):
-        ui.sprite(ui.assets.die_key(size), 574 + position * 46, 262, 40, 40)
+        ui.sprite(ui.assets.die_key(size), 574 + position * 46, 254, 40, 40)
     ui.text(640, 150, "BATTLE DICE", 64, Theme.ACCENT, bold=True, align="center")
     ui.text(640, 232, "A turn-based tactical dice RPG. Two battles, one upgrade, every die face visible.", 18, Theme.DIM, align="center")
-    ui.button("menu:new", 490, 310, 300, 56, "New Run  (N)", ctrl.new_run, hotkeys=(pygame.K_n,), default=True, size=22,
+    ui.button("menu:new", 490, 300, 300, 52, "New Run  (N)", ctrl.new_run, hotkeys=(pygame.K_n,), default=True, size=22,
               tooltip="Configure a party of 1 to 5 heroes and start Battle 1.")
-    ui.button("menu:controls", 490, 380, 300, 56, "Controls  (C)", ctrl.show_controls, hotkeys=(pygame.K_c,), size=22,
+    ui.button("menu:controls", 490, 362, 300, 52, "Controls  (C)", ctrl.show_controls, hotkeys=(pygame.K_c,), size=22,
               tooltip="Mouse and keyboard controls, and how a turn works.")
-    ui.button("menu:quit", 490, 450, 300, 56, "Quit  (Q)", quit_action, hotkeys=(pygame.K_q,), size=22, tooltip="Close the game.")
+    ui.button("menu:settings", 490, 424, 300, 52, "Settings  (S)", ctrl.open_settings, hotkeys=(pygame.K_s,), size=22,
+              tooltip="Class Evolution, the dice seed, animation, window size and the saved profile.")
+    ui.button("menu:quit", 490, 486, 300, 52, "Quit  (Q)", quit_action, hotkeys=(pygame.K_q,), size=22, tooltip="Close the game.")
     ui.escape_action = quit_action
-    ui.text(640, 560, "Tab / arrow keys move focus.  Enter or Space activates.  Every screen works with mouse or keyboard.", 15, Theme.FAINT, align="center")
+    ui.text(640, 566, "Tab / arrow keys move focus.  Enter or Space activates.  Every screen works with mouse or keyboard.", 15, Theme.FAINT, align="center")
+    for line, problem in enumerate(ctrl.settings_problems[:2]):
+        ui.text(640, 596 + line * 20, problem, 14, Theme.WARN, align="center", max_width=1200)
+    if ctrl.progression_error:
+        ui.text(640, 640, ctrl.progression_error, 14, Theme.WARN, align="center", max_width=1200)
     versions = f"rules {RULES_VERSION}   content {ctrl.content.content_version}"
     status_bar(ui, ctrl, f"{versions}   {describe_features(ctrl.features)}".rstrip())
 
@@ -1064,6 +1070,31 @@ def draw_continue(ui: UI, ctrl: AppController) -> None:
     ui.text(640, 584, "Mastery is awarded for every won battle, so the points from Battles 1 and 2 are yours either way.", 14, Theme.FAINT,
             align="center", max_width=1200)
     ui.escape_action = None
+    status_bar(ui, ctrl)
+
+
+def draw_settings(ui: UI, ctrl: AppController) -> None:
+    """The demo's configuration: every setting, what it does, and a button that moves it to its next value."""
+    ui.text(24, 14, "Settings", 30, Theme.ACCENT, bold=True)
+    where = f"Saved in {ctrl.settings_path}" if ctrl.settings_path else "No settings file is in use: changes last for this session."
+    ui.text(170, 26, where, 14, Theme.DIM, max_width=1090)
+    y = 70.0
+    for row in ctrl.settings_view():
+        ui.panel(16, y, 1248, 54, fill=Theme.PANEL_ALT)
+        ui.text(30, y + 17, row["label"], 17, Theme.TEXT, bold=True, max_width=210)
+        ui.button(f"settings:{row['key']}", 250, y + 6, 330, 42, row["value"], partial(ctrl.change_setting, row["key"]),
+                  enabled=row["reason"] is None, reason=row["reason"], size=15, tooltip="Click to change.")
+        ui.paragraph(596, y + 9, row["help"], 656, 14, Theme.DIM, line_height=17, max_lines=2)
+        y += 60
+    evolution = ctrl.progression is not None
+    label = "Press again to delete every hero" if ctrl.reset_confirm else "Reset the saved profile"
+    ui.button("settings:reset", 250, 566, 330, 46, label, ctrl.reset_profile, enabled=evolution,
+              reason="There is no profile while Class Evolution is off.", size=15,
+              tooltip="Delete the save and start a new profile from the start chosen above. Asked twice.")
+    if evolution:
+        ui.text(596, 580, f"Save file: {ctrl.progression.path}", 13, Theme.FAINT, max_width=656)
+    ui.button("settings:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_settings, hotkeys=(pygame.K_b,), default=True)
+    ui.escape_action = ctrl.close_settings
     status_bar(ui, ctrl)
 
 

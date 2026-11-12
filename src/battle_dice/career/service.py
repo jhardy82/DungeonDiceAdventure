@@ -152,6 +152,51 @@ class CareerService:
         """Trusted event ``ApplyDiscoverySignal``: discovery only ever moves forward."""
         return self._transaction(lambda: self._discover(event["signal"]))
 
+    def grant_mastery(self, hero_id: str, vocation_id: str, points: int, reason: str) -> CareerResult:
+        """Trusted event: set a hero's mastery points of an unlocked vocation (a demo start preset does this).
+
+        It is written to the event log like every other change, with its reason, so a save always
+        says which of its mastery was earned and which was handed out.
+        """
+        def change() -> None:
+            hero = self.state.heroes[hero_id]
+            row = hero.mastery[vocation_id]
+            top = self.catalog.thresholds(vocation_id)[-1]
+            row.points = max(0, min(int(points), top))
+            row.rank = self.catalog.rank_for(vocation_id, row.points)
+            hero.revision += 1
+            self._emit("MasteryGranted", hero_id=hero_id, vocation_id=vocation_id, points_after=row.points, rank_after=row.rank, reason=reason)
+            self._learn(hero, vocation_id, row.rank)
+
+        return self._transaction(change)
+
+    def rederive_ranks(self, reason: str) -> CareerResult:
+        """Trusted event: make every rank agree with its points under the catalog's thresholds.
+
+        Needed when the thresholds changed (the demo's mastery pace). Nothing happens, and no event is
+        written, when every rank already agrees. A rank never takes a learned skill away.
+        """
+        def change() -> None:
+            changed = []
+            for hero in self.state.heroes.values():
+                for vocation_id, row in hero.mastery.items():
+                    rank = self.catalog.rank_for(vocation_id, row.points)
+                    if rank != row.rank:
+                        changed.append({"hero_id": hero.hero_id, "vocation_id": vocation_id, "from": row.rank, "to": rank})
+                        row.rank = rank
+                        hero.revision += 1
+                        self._learn(hero, vocation_id, rank)
+            if changed:
+                self._emit("RanksRederived", reason=reason, changes=changed)
+
+        return self._transaction(change)
+
+    def _learn(self, hero: HeroRecord, vocation_id: str, rank: int) -> None:
+        for skill_id in self.catalog.skills_learned_by(vocation_id, rank):
+            if skill_id not in hero.learned_skills:
+                hero.learned_skills.append(skill_id)
+                self._emit("SkillLearned", hero_id=hero.hero_id, skill_id=skill_id, vocation_id=vocation_id)
+
     def _transaction(self, change: Any, duplicate_if: bool = False) -> CareerResult:
         if duplicate_if:
             return CareerResult("accepted", duplicate=True)

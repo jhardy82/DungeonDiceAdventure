@@ -17,6 +17,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from battle_dice import settings as settings_module
 from battle_dice.content.loader import Content, load_content
 from battle_dice.core import commands as cmd
 from battle_dice.core import planning
@@ -28,6 +29,7 @@ from battle_dice.core.progression import face_from_plain
 from battle_dice.core.replay import export_run
 from battle_dice.core.view import action_forecast, combat_log, die_view, face_view, hero_turn_view, snapshot
 from battle_dice.features import CLASS_EVOLUTION
+from battle_dice.settings import Settings
 
 
 class Screen:
@@ -40,6 +42,7 @@ class Screen:
     #: Class Evolution only: a hero's career, and the stop-or-fight-on decision after battle 2.
     CAREER = "career"
     CONTINUE = "continue"
+    SETTINGS = "settings"
     ERROR = "error"
 
 
@@ -99,11 +102,23 @@ class AppController:
         fixed_seed: int | None = None,
         features: Iterable[str] = (),
         save_dir: str | Path | None = None,
+        settings: Settings | None = None,
+        settings_path: str | Path | None = None,
     ):
         self.content = content if content is not None else load_content()
-        #: Feature gates that are on for this launch (``battle_dice.features``). None by default.
-        self.features: frozenset[str] = frozenset(features)
+        #: The player's settings. Without a path a change lasts for this session only.
+        self.settings: Settings = settings if settings is not None else Settings()
+        self.settings_path: Path | None = Path(settings_path) if settings_path is not None else None
+        self.settings_problems: list[str] = []
+        self.settings_serial = 0  # bumped on every change, so the window can follow (animation, size)
+        self.reset_confirm = False
+        #: Gates switched on by a launch flag or the environment: the Settings screen cannot switch these off.
+        self.forced_features: frozenset[str] = frozenset(features)
+        #: Feature gates that are on (``battle_dice.features``). None by default.
+        self.features: frozenset[str] = self.forced_features | ({CLASS_EVOLUTION} if self.settings.class_evolution else frozenset())
         self.vocations: BuildSource | None = None
+        self._log_dir_given = log_dir
+        self._save_dir_given = save_dir
         if CLASS_EVOLUTION in self.features:
             from battle_dice.content.vocations import (
                 load_vocation_catalog,  # never imported while the gate is off
@@ -120,7 +135,8 @@ class AppController:
         # In-run menu (Esc). While it is open nothing in the run advances.
         self.paused = False
         self.pause_help = False
-        self.fixed_seed = fixed_seed
+        self.fixed_seed = fixed_seed if fixed_seed is not None else self.settings.seed
+        self._seed_from_flag = fixed_seed is not None
         self._seed_source = seed_source or default_seed
         self.log_dir = Path(log_dir) if log_dir is not None else default_log_dir()
         self.log_path: Path | None = None
@@ -147,16 +163,8 @@ class AppController:
         self.career_vocation: str | None = None
         self.career_return = Screen.PARTY_SETUP
         #: Offer the optional third battle after battle 2 (owner decision D-27). A setting of the demo.
-        self.third_battle = True
-        if CLASS_EVOLUTION in self.features:
-            from battle_dice.app.progression import (
-                Progression,  # never imported while the gate is off
-            )
-
-            try:
-                self.progression = Progression(save_dir if save_dir is not None else default_save_dir(log_dir), self.content)
-            except Exception as error:  # noqa: BLE001 - a save that cannot be opened must not stop the game
-                self.progression_error = f"The save could not be opened, so heroes are not saved this session: {error}"
+        self.third_battle = self.settings.third_battle
+        self._open_progression()
 
     # ----------------------------------------------------------------------------------------
     # Feedback helpers
@@ -1122,3 +1130,145 @@ class AppController:
     def end_run_with_victory(self) -> None:
         if self.engine is not None:
             self._guard(self._send, cmd.END_RUN)
+
+    # ----------------------------------------------------------------------------------------
+    # Settings (the demo's configuration)
+    # ----------------------------------------------------------------------------------------
+
+    def save_folder(self) -> Path:
+        """Where the save file is, or would be: a launch flag, then the settings file, then the usual place."""
+        if self._save_dir_given is not None:
+            return Path(self._save_dir_given)
+        if self.settings.save_dir:
+            return Path(self.settings.save_dir)
+        return default_save_dir(self._log_dir_given)
+
+    def _open_progression(self) -> None:
+        """Open the save when Class Evolution is on. A save that cannot be opened must not stop the game."""
+        self.progression, self.progression_error = None, None
+        if CLASS_EVOLUTION not in self.features:
+            return
+        from battle_dice.app.progression import (
+            Progression,  # never imported while the gate is off
+        )
+
+        try:
+            self.progression = Progression(self.save_folder(), self.content, mastery_pace=self.settings.mastery_pace,
+                                           roster_limit=self.settings.roster_limit, preset=self.settings.demo_preset)
+        except Exception as error:  # noqa: BLE001
+            self.progression_error = f"The save could not be opened, so heroes are not saved this session: {error}"
+
+    def open_settings(self) -> None:
+        self.screen = Screen.SETTINGS
+        self.reset_confirm = False
+        self.info("Settings are saved as you change them." if self.settings_path else "Settings last for this session (no settings file is in use).")
+
+    def close_settings(self) -> None:
+        self.reset_confirm = False
+        self.screen = Screen.MAIN_MENU
+
+    def settings_view(self) -> list[dict[str, Any]]:
+        """Every setting as the Settings screen shows it: its value in words, what it does, and whether it can be changed here."""
+        current = self.settings
+        evolution = CLASS_EVOLUTION in self.features
+        forced = CLASS_EVOLUTION in self.forced_features
+        needs = None if evolution else "Switch Class Evolution on first."
+        paces = {"normal": "Normal", "fast": "Fast (about half the points)", "very_fast": "Very fast (a rank per win at most)"}
+        presets = {"fresh": "Fresh: no heroes", "squire_near_mastery": "A Squire one win from mastery",
+                   "guardian_unlocked": "A Guardian at rank 1", "guardian_mastered": "A mastered Guardian"}
+        rows = [
+            {"key": "class_evolution", "label": "Class Evolution", "value": ("On (launch flag)" if forced else "On") if evolution else "Off",
+             "help": "Saved heroes, mastery, vocations and the third battle. Off: the game as shipped, and no save file.",
+             "reason": "Switched on by a launch flag for this session." if forced else None},
+            {"key": "third_battle", "label": "Third battle", "value": "Offered" if current.third_battle else "Not offered",
+             "help": "After Battle 2, offer a third, harder battle. A Guardian needs it for its last rank.", "reason": needs},
+            {"key": "mastery_pace", "label": "Mastery pace", "value": paces[current.mastery_pace],
+             "help": "How many points a rank needs. A faster pace re-ranks your heroes from the points they have.", "reason": needs},
+            {"key": "roster_limit", "label": "Roster size", "value": f"{current.roster_limit} heroes",
+             "help": "How many heroes a profile may hold.", "reason": needs},
+            {"key": "demo_preset", "label": "New profile starts as", "value": presets[current.demo_preset],
+             "help": "Used when a profile is made or reset. Every start but the first comes with a Scout and an Apprentice.", "reason": needs},
+            {"key": "seed", "label": "Dice seed", "value": "A new one each run" if self.fixed_seed is None else f"Fixed: {self.fixed_seed}",
+             "help": "A fixed seed gives the same dice every run with the same party and choices.",
+             "reason": "Set by a launch flag for this session." if self._seed_from_flag else None},
+            {"key": "animation", "label": "Animation", "value": "On" if current.animation else "Off (reduced motion)",
+             "help": "Movement and flashes in battle. M also toggles it during a battle.", "reason": None},
+            {"key": "window_size", "label": "Window size", "value": current.window_size.replace("x", " x "),
+             "help": "The window can also be resized by dragging its edge.", "reason": None},
+        ]
+        return rows
+
+    def change_setting(self, key: str) -> None:
+        self._guard(self._change_setting, key)
+
+    def _change_setting(self, key: str) -> None:
+        """Move one setting to its next value, save the file, and make the change take effect now."""
+        current = self.settings
+        self.reset_confirm = False
+
+        def following(options: tuple[Any, ...], value: Any) -> Any:
+            return options[(options.index(value) + 1) % len(options)] if value in options else options[0]
+
+        if key in ("class_evolution", "third_battle", "animation"):
+            setattr(current, key, not getattr(current, key))
+        elif key == "mastery_pace":
+            current.mastery_pace = following(tuple(settings_module.PACES), current.mastery_pace)
+        elif key == "roster_limit":
+            current.roster_limit = following(settings_module.ROSTER_LIMITS, current.roster_limit)
+        elif key == "demo_preset":
+            current.demo_preset = following(settings_module.PRESETS, current.demo_preset)
+        elif key == "window_size":
+            current.window_size = following(settings_module.WINDOW_SIZES, current.window_size)
+        elif key == "seed":
+            current.seed = None if current.seed is not None else int(self._seed_source())
+            self.fixed_seed = current.seed
+        else:
+            raise ValueError(f"Unknown setting '{key}'.")
+        self.settings_serial += 1
+        if self.settings_path is not None:
+            settings_module.save(current, self.settings_path)
+        self.third_battle = current.third_battle
+        if key in ("class_evolution", "mastery_pace", "roster_limit"):
+            self._reopen_progression()
+        row = next(r for r in self.settings_view() if r["key"] == key)
+        self.info(f"{row['label']}: {row['value']}.")
+        if self.progression_error:
+            self.warn(self.progression_error)
+
+    def _reopen_progression(self) -> None:
+        """Class Evolution was switched, or a setting the save depends on changed: close the save and open it again."""
+        self.close()
+        self.party, self.engine = [], None
+        self.features = self.forced_features | ({CLASS_EVOLUTION} if self.settings.class_evolution else frozenset())
+        if CLASS_EVOLUTION in self.features and self.vocations is None:
+            from battle_dice.content.vocations import load_vocation_catalog
+
+            self.vocations = load_vocation_catalog(self.content)
+        elif CLASS_EVOLUTION not in self.features:
+            self.vocations = None
+        self._open_progression()
+
+    def reset_profile(self) -> None:
+        self._guard(self._reset_profile)
+
+    def _reset_profile(self) -> None:
+        """Delete the save and start a new profile from the chosen start. Asked twice: it cannot be undone."""
+        if CLASS_EVOLUTION not in self.features:
+            self.warn("There is no profile to reset while Class Evolution is off.")
+            return
+        if not self.reset_confirm:
+            self.reset_confirm = True
+            self.warn("This deletes every saved hero. Press Reset again to do it, or change anything else to cancel.")
+            return
+        self.reset_confirm = False
+        self.close()
+        save_file = self.save_folder() / "profile.sqlite"
+        for leftover in (save_file, *save_file.parent.glob(save_file.name + "-*")):
+            if leftover.is_file():
+                leftover.unlink()
+        self.party, self.engine = [], None
+        self._open_progression()
+        if self.progression is not None:
+            self.info(f"A new profile was made ({len(self.progression.state.heroes)} heroes).")
+        else:
+            self.warn(self.progression_error or "The new profile could not be made.")
