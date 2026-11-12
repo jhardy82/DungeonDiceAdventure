@@ -144,6 +144,8 @@ class AppController:
         self.controls_return = Screen.MAIN_MENU
         #: New Run screen: the digits typed so far while a dice seed is being entered, else ``None``.
         self.seed_entry: str | None = None
+        #: The state of the run in which Pass was asked for once (play aid "Confirm before passing").
+        self._pass_asked: int | None = None
         self._seed_from_flag = fixed_seed is not None
         self._seed_source = seed_source or default_seed
         self.log_dir = Path(log_dir) if log_dir is not None else default_log_dir()
@@ -704,7 +706,21 @@ class AppController:
         self._commit(list(self.draft))
 
     def pass_turn(self) -> None:
-        self._guard(self._commit, [])
+        self._guard(self._pass_turn)
+
+    def _pass_turn(self) -> None:
+        """Pass the activation. With the play aid on, a pass that throws away a usable die is asked for once more."""
+        engine = self.engine
+        if engine is None:
+            return
+        view = self._turn_view()
+        could_act = bool(view and view["rolled"] and view["has_legal_action"])
+        if self.settings.confirm_pass and could_act and self._pass_asked != engine.revision:
+            self._pass_asked = engine.revision
+            self.warn("A die could still act. Press Pass again to pass anyway.")
+            return
+        self._pass_asked = None
+        self._commit([])
 
     def _commit(self, actions: list[dict[str, Any]]) -> None:
         if not self._send(cmd.SET_ACTION_PLAN, actions=actions):
@@ -1397,13 +1413,23 @@ class AppController:
         locked = self.RUN_LOCKED if self.settings_in_run else None
         needs = locked or (None if evolution else "Switch Class Evolution on first.")
         paces = {"normal": "Normal", "fast": "Fast (about half the points)", "very_fast": "Very fast (a rank per win at most)"}
+        speeds = {"normal": "Normal", "fast": "Fast"}
+        delays = {"instant": "None: at once", "short": "Short", "long": "Long"}
         presets = {"fresh": "Fresh: no heroes", "squire_near_mastery": "A Squire one win from mastery",
                    "guardian_unlocked": "A Guardian at rank 1", "guardian_mastered": "A Guardian with Field Medic"}
         rows = [
             {"group": "comfort", "key": "window_size", "label": "Window size", "value": current.window_size.replace("x", " x "),
              "help": "The window can also be resized by dragging its edge.", "reason": None},
+            {"group": "comfort", "key": "high_contrast", "label": "High contrast", "value": "On" if current.high_contrast else "Off",
+             "help": "White text on black, bright borders, no picture behind the battle. Status is always shown as text as well.", "reason": None},
             {"group": "comfort", "key": "animation", "label": "Motion and flashes", "value": "On" if current.animation else "Off (reduced motion)",
              "help": "Movement and flashes in battle. M also toggles it during a battle.", "reason": None},
+            {"group": "comfort", "key": "battle_speed", "label": "Battle speed at start", "value": speeds[current.battle_speed],
+             "help": "How fast a battle plays when it begins. F switches the speed during a battle.", "reason": None},
+            {"group": "aids", "key": "confirm_pass", "label": "Confirm a pass", "value": "On" if current.confirm_pass else "Off",
+             "help": "Pass asks once more when a die could still act, so a turn is not thrown away by one key.", "reason": None},
+            {"group": "aids", "key": "tooltip_delay", "label": "Help text delay", "value": delays[current.tooltip_delay],
+             "help": "How long the pointer rests on a control before its help shows below. Why a control is off shows at once.", "reason": None},
             {"group": "aids", "key": "controls", "label": "Controls", "value": "Show the controls",
              "help": "Mouse and keyboard controls, and how a turn works.", "reason": None},
             {"group": "evolution", "key": "class_evolution", "label": "Class Evolution",
@@ -1439,8 +1465,12 @@ class AppController:
         def following(options: tuple[Any, ...], value: Any) -> Any:
             return options[(options.index(value) + 1) % len(options)] if value in options else options[0]
 
-        if key in ("class_evolution", "third_battle", "animation"):
+        if key in ("class_evolution", "third_battle", "animation", "high_contrast", "confirm_pass"):
             setattr(current, key, not getattr(current, key))
+        elif key == "battle_speed":
+            current.battle_speed = following(settings_module.BATTLE_SPEEDS, current.battle_speed)
+        elif key == "tooltip_delay":
+            current.tooltip_delay = following(tuple(settings_module.TOOLTIP_DELAYS), current.tooltip_delay)
         elif key == "mastery_pace":
             current.mastery_pace = following(tuple(settings_module.PACES), current.mastery_pace)
         elif key == "roster_limit":

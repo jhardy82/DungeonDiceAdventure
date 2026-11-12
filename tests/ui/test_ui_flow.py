@@ -260,6 +260,8 @@ def test_a_click_on_a_unit_card_does_not_disable_space_or_enter(tmp_path):
     assert play.ui.focus_key is None
     play.key(pygame.K_RETURN)  # default: Roll
     assert play.combat.turn.rolled
+    play.key(pygame.K_p)  # a die could act: Pass asks once more (the play aid "Confirm a pass", on by default)
+    assert play.ctrl.waiting_for_player() and play.ctrl.message == "A die could still act. Press Pass again to pass anyway."
     play.key(pygame.K_p)  # pass; the game now resolves on its own
     assert not play.ctrl.waiting_for_player()
     play.app.fast = False
@@ -361,7 +363,8 @@ def test_escape_pauses_a_battle_and_nothing_advances_until_resume(tmp_path):
     assert "battle:menu" in play.ui.keys()
     play.to_roll_prompt()
     play.key(pygame.K_r)
-    play.key(pygame.K_p)  # passed: the game is now resolving on its own
+    play.key(pygame.K_p)
+    play.key(pygame.K_p)  # asked once, then passed: the game is now resolving on its own
     assert not play.ctrl.waiting_for_player()
     play.key(pygame.K_ESCAPE)
     assert play.ctrl.paused and {"pause:resume", "pause:controls", "pause:party", "pause:menu"} <= set(play.ui.keys())

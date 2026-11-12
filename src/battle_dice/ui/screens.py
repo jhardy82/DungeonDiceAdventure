@@ -20,14 +20,17 @@ from battle_dice.features import describe as describe_features
 from battle_dice.ui.toolkit import UI, Theme
 
 NUMBER_KEYS = (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9)
-CATEGORY_COLORS = {
-    "attack": Theme.ENEMY,
-    "defense": Theme.SHIELD,
-    "healing": Theme.GOOD,
-    "status": Theme.CORRUPT,
-    "resource": Theme.MANA,
-    "blank": Theme.FAINT,
-}
+class _CategoryColors:
+    """The colour of an action category, read from the palette in use each time it is asked for."""
+
+    NAMES = {"attack": "ENEMY", "defense": "SHIELD", "healing": "GOOD", "status": "CORRUPT", "resource": "MANA", "blank": "FAINT"}
+
+    def __getitem__(self, category: str) -> tuple[int, int, int]:
+        colour: tuple[int, int, int] = getattr(Theme, self.NAMES[category])
+        return colour
+
+
+CATEGORY_COLORS = _CategoryColors()
 PHASE_LABELS = {
     CombatPhase.ADVANCE_TIMELINE: "Timeline advancing",
     CombatPhase.ACTOR_START: "Activation start",
@@ -50,7 +53,7 @@ PHASE_LABELS = {
 
 
 def status_bar(ui: UI, ctrl: AppController, extra: str = "") -> None:
-    ui.panel(0, 694, 1280, 26, fill=(12, 13, 18), border=(12, 13, 18))
+    ui.panel(0, 694, 1280, 26, fill=Theme.BAR, border=Theme.BAR)
     text, is_error = ui.status_line(ctrl.message, ctrl.message_is_error, ctrl.message_serial)
     # The right-hand text keeps its usual 250 units; it only grows when a feature gate adds to it.
     extra_width = max(250, ui.text_width(extra, 14) + 4) if extra else 0
@@ -183,7 +186,7 @@ def draw_party_setup(ui: UI, ctrl: AppController) -> None:
             ui.button(f"slot:{index}:remove", 340, y + 8, 88, 62, "Remove", partial(ctrl.remove_hero, index),
                       tooltip="Remove this hero from the party.")
         else:
-            ui.panel(26, y, 410, 78, fill=(24, 27, 35))
+            ui.panel(26, y, 410, 78, fill=Theme.PANEL_DEEP)
             ui.text(231, y + 30, "empty slot", 15, Theme.FAINT, align="center")
 
     full = len(ctrl.party) >= maximum
@@ -302,7 +305,7 @@ def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float
     rect = ui.r(x, y, w, h)
     ui.register(key, rect, action, enabled, reason, _combatant_tooltip(c), hotkeys)
 
-    fill = Theme.PANEL_ALT if standing else (26, 26, 30)
+    fill = Theme.PANEL_ALT if standing else Theme.PANEL_DOWN
     if active:
         glow = ui.anim.pulse()  # the acting card's border breathes between accent and white
         red, green, blue = (int(a + (255 - a) * 0.55 * glow) for a in Theme.ACCENT)
@@ -399,7 +402,8 @@ def draw_inspect(ui: UI, c: dict[str, Any], view: dict[str, Any], top: float, he
     bottom = top + height - 6
     y = top + 26
 
-    def para(text: str, color: tuple[int, int, int] = Theme.DIM, bold: bool = False) -> None:
+    def para(text: str, color: tuple[int, int, int] | None = None, bold: bool = False) -> None:
+        color = color or Theme.DIM
         nonlocal y
         budget = int((bottom - y) // 15)
         if budget >= 1:
@@ -475,7 +479,7 @@ def draw_center(ui: UI, ctrl: AppController, view: dict[str, Any], inspect: dict
 def draw_header(ui: UI, ctrl: AppController, view: dict[str, Any], fast: bool) -> None:
     names = {c["id"]: c["name"] for c in view["combatants"]}
     archetypes = {c["id"]: c["archetype_id"] for c in view["combatants"]}
-    ui.panel(0, 0, 1280, 40, fill=(12, 13, 18), border=(12, 13, 18))
+    ui.panel(0, 0, 1280, 40, fill=Theme.BAR, border=Theme.BAR)
     ui.text(12, 9, f"Battle {view['battle']} of {view['battle_count']}", 20, Theme.ACCENT, bold=True)
     actor = names.get(view["active_combatant_id"] or "", "nobody")
     ui.text(200, 12, f"Tick {view['timeline_tick']}    Phase: {PHASE_LABELS.get(view['combat_phase'], view['combat_phase'])}    Acting: {actor}",
@@ -625,7 +629,7 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
     by_id = {d["die_id"]: d for d in turn["dice"]}
     shown = by_id.get(inspect or "") or (turn["dice"][0] if turn["dice"] else None)
     if shown is not None:
-        ui.panel(918, 496, 346, 190, fill=(24, 27, 35))
+        ui.panel(918, 496, 346, 190, fill=Theme.PANEL_DEEP)
         draw_die_faces(ui, 926, 502, 330, shown["die"], highlight_face=shown["face_index"])
         ctrl.inspect_die = shown["die_id"]
     return targeting
@@ -942,7 +946,7 @@ def draw_roster_setup(ui: UI, ctrl: AppController) -> None:
     for index in range(maximum):
         y: float = 90 + index * 86
         if index >= len(ctrl.party):
-            ui.panel(26, y, 540, 78, fill=(24, 27, 35))
+            ui.panel(26, y, 540, 78, fill=Theme.PANEL_DEEP)
             ui.text(296, y + 30, "empty slot", 15, Theme.FAINT, align="center")
             continue
         member = ctrl.party[index]
@@ -1019,7 +1023,7 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
     y = 104.0
     for index, row in enumerate(view["rows"]):
         if row["kind"] != "vocation":
-            ui.panel(26, y, 740, 32, fill=(24, 27, 35))
+            ui.panel(26, y, 740, 32, fill=Theme.PANEL_DEEP)
             ui.text(36, y + 7, row["label"], 16, Theme.FAINT, bold=True)
             ui.text(110, y + 8, row["status"], 14, Theme.FAINT, max_width=640)
             y += 36
@@ -1096,7 +1100,7 @@ def draw_career_skills(ui: UI, ctrl: AppController) -> None:
                            "show how far it is.", 448, 14, Theme.DIM, line_height=18, max_lines=4)
         return
     for row in view["rows"][:3]:
-        ui.panel(798, y, 456, 128, fill=(24, 27, 35))
+        ui.panel(798, y, 456, 128, fill=Theme.PANEL_DEEP)
         ui.text(808, y + 8, row["name"], 16, Theme.ACCENT, bold=True, max_width=300)
         state = "EQUIPPED" if row["equipped"] else "not equipped"
         ui.text(1244, y + 10, state, 13, Theme.GOOD if row["equipped"] else Theme.FAINT, bold=row["equipped"], align="right", max_width=130)

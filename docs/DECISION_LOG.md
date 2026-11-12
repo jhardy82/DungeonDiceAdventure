@@ -1762,6 +1762,55 @@ settings is built. This section is the structure; the new settings follow in the
 **Not verified:** no person has used the screens; checked by tests and by screenshots made in
 this session.
 
+### 7.29 The configuration as decided (D-31), part 2: four comfort and play-aid settings (2026-11-12)
+
+**Owner decision (D-31):** the small set of new settings. This section builds four of them; text
+size follows on its own, because it needs a layout check on every screen.
+
+| Setting | Group | Values | What it does |
+|---------|-------|--------|--------------|
+| High contrast | Display and comfort | Off (default), On | A second palette: white text on black, bright borders, no picture behind the battle |
+| Battle speed at start | Display and comfort | Normal (default), Fast | The speed a battle begins with. F still switches during a battle |
+| Confirm a pass | Play aids | **On (default)**, Off | Pass asks once more when a die could still act |
+| Help text delay | Play aids | None (default), Short (350 ms), Long (900 ms) | How long the pointer rests on a control before its help shows in the status bar |
+
+**How each is built**
+
+- **High contrast** is measured, not judged by eye: a test holds every text colour to at least
+  **7:1** against every surface it is drawn on, and every button label against its button (Xbox
+  Accessibility Guideline 102 asks for 7:1 in a high-contrast mode). The contrast is computed
+  by the WCAG formula. Status is shown as text as well as colour, as before.
+- The toolkit used to fix its default panel and text colours once at start. Two panels (the
+  combat log, the plan area) therefore kept the old colour in high contrast. Colours are now
+  read when something is drawn; a test samples those panels.
+- **Battle speed** is the speed a battle starts with. Changing another setting does not undo
+  what F chose during a battle.
+- **Confirm a pass** asks only when a legal action exists, once per situation: after a reroll
+  or any other change it asks again. Nothing is sent to the rules by the first press.
+- **Help text delay** delays help only. The reason a control is off, and help reached with the
+  keyboard, show at once. "None" is the default and is what the game always did.
+
+**A default that changes how the shipped game feels (my reading, easy to change)**
+
+- "Confirm a pass" is **on by default**, as the research proposed. The shipped game passed at
+  the first key press. The rules are untouched; with the aid off the game behaves as before.
+  Four older tests that passed with one key press now press twice and say why.
+
+**Evidence**
+
+- 1155 tests pass (1137 before). Lint and type checks are clean.
+- New tests: the four fields of the settings file (defaults, values that are not allowed, round
+  trip); the 7:1 measure on the whole palette; the palette switched from the Settings and at
+  start; a battle in high contrast with no picture behind it; the speed at start and after a
+  change; the pass question (asked once, asked again after a change, off, not asked when no die
+  can act); the help delay (rest, another control, reasons and keyboard at once).
+- Replay pin, content and catalog unchanged. Both self-checks pass.
+- **Deliberate breaks:** 34 breaks of the new code, each caught by a fitting test. Run without
+  bytecode files and with a control run.
+
+**Not verified:** no person has used them. High contrast was checked by measurement and by
+screenshots made in this session, not by a person who needs it.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

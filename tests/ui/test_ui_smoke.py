@@ -244,7 +244,8 @@ def test_hotkeys_drive_the_core_loop(tmp_path):
     assert len(driver.ctrl.engine.combat.turn.kept) == 1
     driver.key(pygame.K_r)  # reroll the other die
     assert driver.ctrl.engine.combat.turn.rerolls_remaining == 1
-    driver.key(pygame.K_p)  # pass
+    driver.key(pygame.K_p)  # pass: asked once while a die could act,
+    driver.key(pygame.K_p)  # then passed
     assert driver.ctrl.engine.combat.turn is None or driver.ctrl.engine.combat.turn.committed
 
 
@@ -326,7 +327,8 @@ def test_planner_stays_usable_if_a_plan_was_set_but_not_committed(tmp_path):
     driver.app.frame(0)
     assert driver.ctrl.waiting_for_player()
     assert {"plan:confirm", "plan:pass"} <= set(driver.app.ui.keys())
-    driver.press("plan:pass")
+    driver.press("plan:pass")  # a die could act: asked once (the play aid "Confirm a pass"),
+    driver.press("plan:pass")  # then passed
     assert driver.ctrl.engine.combat.turn is None or driver.ctrl.engine.combat.turn.committed
 
 

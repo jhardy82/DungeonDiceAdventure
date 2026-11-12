@@ -11,8 +11,9 @@ import os
 import pygame
 
 from battle_dice.app.controller import AppController, Screen
+from battle_dice.settings import TOOLTIP_DELAYS
 from battle_dice.ui import screens
-from battle_dice.ui.toolkit import LOGICAL_H, LOGICAL_W, MIN_H, MIN_W, UI
+from battle_dice.ui.toolkit import LOGICAL_H, LOGICAL_W, MIN_H, MIN_W, UI, apply_theme
 
 STEP_DELAY_MS = 260
 FAST_DELAY_MS = 25
@@ -32,11 +33,13 @@ class GameApp:
         self.ui.on_disabled = self.controller.warn
         self.ui.anim.enabled = animations
         self.running = True
-        self.fast = False
+        self.fast = self.controller.settings.battle_speed == "fast"
+        self._speed_seen = self.controller.settings.battle_speed
         self._timer = 0.0
         self.render_faults = 0  # frames whose drawing raised; the smoke test requires this to stay 0
         self.headless = headless
         self._settings_seen = self.controller.settings_serial
+        self._apply_comfort()
         self.surface = self._set_mode(size)
         pygame.display.set_caption("Battle Dice")
         self.draw()
@@ -97,6 +100,12 @@ class GameApp:
 
     # -- update and draw ---------------------------------------------------------------------
 
+    def _apply_comfort(self) -> None:
+        """The palette and the help-text delay of the settings in use."""
+        settings = self.controller.settings
+        apply_theme("high_contrast" if settings.high_contrast else "normal")
+        self.ui.tooltip_delay_ms = TOOLTIP_DELAYS[settings.tooltip_delay]
+
     def _follow_settings(self) -> None:
         """A setting changed in the Settings screen: apply what belongs to the window."""
         controller = self.controller
@@ -104,6 +113,10 @@ class GameApp:
             return
         self._settings_seen = controller.settings_serial
         self.ui.anim.enabled = controller.settings.animation
+        self._apply_comfort()
+        if controller.settings.battle_speed != self._speed_seen:  # the setting is the speed a battle starts with
+            self._speed_seen = controller.settings.battle_speed
+            self.fast = self._speed_seen == "fast"
         size = controller.settings.size()
         if size != self.surface.get_size():
             self.surface = self._set_mode(size)
@@ -111,6 +124,7 @@ class GameApp:
     def update(self, dt_ms: float) -> None:
         controller = self.controller
         self._follow_settings()
+        self.ui.tick(dt_ms)
         try:
             self._animate(dt_ms)
         except Exception:  # noqa: BLE001 - an animation fault must reach the error screen
