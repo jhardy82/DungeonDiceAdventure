@@ -376,7 +376,7 @@ def snapshot(engine: Engine) -> dict[str, Any]:
         "run_phase": state.phase,
         "run_outcome": state.outcome,
         "battle": state.encounter_index + 1,
-        "battle_count": engine.content.documents["encounters"]["battle_count"],
+        "battle_count": engine.battle_count,
         "combat_phase": combat.phase,
         "timeline_tick": combat.timeline_tick,
         "ready_threshold": balance["timeline"]["ready_threshold"],
@@ -389,8 +389,12 @@ def snapshot(engine: Engine) -> dict[str, Any]:
         "hero_turn": None,
         "reaction": None,
         "upgrade": None,
+        #: While the run waits for "stop or fight on": the encounter on offer. ``None`` otherwise.
+        "extra_battle": None,
         "battle_records": copy.deepcopy(state.battle_records),
     }
+    if state.phase == RunPhase.CONTINUE:
+        snap["extra_battle"] = {"battle": state.encounter_index + 2, "encounter_id": engine.offered_encounter()}
     if state.phase == RunPhase.BATTLE:
         snap["intent"] = intent_view(engine)
         snap["hero_turn"] = hero_turn_view(engine)

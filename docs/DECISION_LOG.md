@@ -955,6 +955,101 @@ to 339, so 40 runs per composition and 1,400 runs per column.
 - Whether an evolved vocation should be stronger than its starting class is a design choice.
   It is put to the owner at Checkpoint 1, with the threat-4 table.
 
+### 7.16 Class Evolution Phase 4, step B: the optional third battle (2026-11-12)
+
+**What was built**
+
+- **Encounters from the catalog** (`EncounterSource` in `src/battle_dice/core/build.py`, beside
+  the build source). The vocation catalog implements it. The rules engine takes the catalog for
+  both, so nothing new has to be passed in.
+- **The threat-4 fight `training_04` is authored in the catalog**, with its own enemies for each
+  party size, in the shape of the shipped encounter table. The validator checks it with the
+  shipped content loader, so an authored fight cannot hold anything a shipped one could not.
+  An authored encounter counts as available (CE-36, extended). Catalog version 0.3.0.
+- **The run:** `StartRun` takes an optional `encounters` list. Without it a run is the run the
+  game has always had. With `["training_04"]`:
+  - winning battle 2 no longer ends the run. The party recovers by the rule used after battle
+    1, and the run waits in a new phase, `continue`;
+  - `EndRun` ends it there with a victory; `ContinueRun` starts the third battle;
+  - a formation change is allowed while it waits. No second upgrade and no die swap;
+  - winning battle 3 is the victory; losing it is a defeat.
+- The run's start event and its exported record name the extra encounters and pin the catalog,
+  also when every hero is a starting class. A replay refuses a different catalog.
+- The simulated players know the decision: the heuristic player fights on or stops as it is
+  told; the random player picks either.
+
+**Kept unchanged, and how that is known**
+
+- The run's hashed state has no new field. The extra encounters are kept beside the hero
+  builds, outside the state, and are rebuilt from `StartRun` on replay. The only new value in
+  the state is the phase name `continue`, which a run without extra encounters never reaches.
+- The replay pin and the six content files are unchanged. With the gate off the simulator on
+  seeds 300 to 339 (2,200 runs) gives the stored reference exactly: 1,703 wins (77.4%).
+- The save keeps its five run phases. The engine's `continue` is saved as `equipment` (between
+  battles, every build fixed); the mapping is one tested function.
+
+**The threat-4 table, tuned by measurement**
+
+Target (owner, D-27): an informed player with a Guardian in the party wins 70-85%, per party
+size. Measured as: of the runs that enter the third battle, the share that win it. Parties: the
+35 shipped compositions with a Squire, one Squire replaced by a Guardian. Heuristic player that
+always fights on.
+
+| Party size | Enemies (health) | Seeds 300-339 | Seeds 400-439 | Both |
+|-----------|------------------|--------------:|--------------:|-----:|
+| 1 | Captain (18) | 78% (31/40) | 76% (29/38) | 76.9% |
+| 2 | Captain (23), Hex Adept (13) | 75% (76/101) | 78% (84/108) | 76.6% |
+| 3 | 2 Captains (13), Hex Adept (10) | 77% (149/194) | 75% (139/186) | 75.8% |
+| 4 | 2 Captains (17), Goblin (8), Hex Adept (9) | 75% (252/336) | 74% (241/324) | 74.7% |
+| 5 | 2 Captains (16), Goblin (8), 2 Hex Adepts (9) | 72% (327/452) | 78% (354/451) | 75.4% |
+
+- Captain's Strike is 4, Goblin's Slash 3 and Hex Adept's Shadow Bolt 4 at every size, as in
+  the shipped battle 2. The line-up keeps the v0.1 idea (two captains and a hex adept) from
+  party size 3 up.
+- **How it was reached:** four candidates. The first, close to the v0.1 line-up at shipped
+  health, won 21-51%. Each next one lowered health. The fourth was inside the band on the
+  first seed block; the second block put party size 3 at 68% over both, so its captains went
+  from 14 to 13 health and that size was measured again on both blocks.
+- **The same parties with the Squire kept** (seeds 300-339): 67%, 80%, 69%, 72%, 73% for sizes
+  1 to 5. So at threat 4, too, the Guardian is about as strong as the Squire.
+- **What it does not show:** parties made mostly of Squires and a Guardian almost never win
+  the third battle (a Guardian with three Squires: 2 of 29). Those are the weak parties of the
+  base game as well. One simulated player; no person has played it.
+
+**Status of the numbers.** The plan put this table and the Guardian's numbers to the owner at
+Checkpoint 1. The owner's goal changed on 2026-11-11 to a fully configurable and playable demo,
+so the table above goes in as the default without waiting, and the demo's tuning file (a later
+step) lets the owner change it without code. It stays an open owner decision.
+
+**Evidence**
+
+- 913 tests pass (878 before). Lint and type checks are clean; coverage is 97%.
+- 29 new tests for the run (`tests/integration/test_third_battle.py`): the decision and what
+  is allowed while it waits; stopping; fighting on with the right enemies for the party size;
+  winning and losing battle 3; five refused starts and one late refusal that leave nothing
+  behind; ten whole runs
+  with every invariant held; exact replay and a refused replay with another catalog; a
+  rejected command at the decision changes nothing.
+- Catalog tests: the authored fight loads for every party size; six new seeded violations
+  (no enemies, enemies on an unauthored fight, a missing party size, an unknown enemy, an
+  unknown action, an enemy that cannot act) are each rejected.
+- With the fight taken away again the validator reports exactly the old dead end (Guardian
+  rank 7), so the test of fixture CE-36 still proves its case.
+- **Deliberate breaks:** 22 breaks of the new code, one at a time (the run ending after
+  battle 2, no recovery, a second upgrade, the wrong enemies, the wrong party size's table, an
+  unknown encounter accepted, no pin, an authored fight not counted or not checked, and so
+  on). 21 were caught at first. The one miss was a gap in the tests: nothing made a start
+  fail after its encounters were noted, so the clean-up was never exercised. A test for it
+  was added; all 22 are caught now. Run without bytecode files and with a control run.
+
+**This build's own readings, open to correction**
+
+- The party recovers when battle 2 is won, before the decision, so the player decides with the
+  real numbers in front of them. (The plan said "the same recovery as after battle 1"; it did
+  not say when.)
+- Mastery is awarded per won battle (step C). Points from battles 1 and 2 are therefore kept
+  when battle 3 is lost; a lost third battle costs the run's victory and nothing else.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

@@ -12,6 +12,19 @@ from typing import Any
 
 DISCOVERY_ORDER = ("hidden", "hinted", "discovered")
 ELIGIBLE = "eligible"
+#: Run phases the save knows (``run.phase`` in ``career/schema/progression.sql``).
+SAVED_RUN_PHASES = ("battle", "upgrade", "equipment", "victory", "defeat")
+#: Engine phases the save stores under another name. ``continue`` (stop or fight on, after the shipped
+#: battles) is between battles with every build fixed, which is what ``equipment`` means to the career rules.
+SAVED_AS = {"continue": "equipment"}
+
+
+def saved_run_phase(engine_phase: str) -> str:
+    """The phase the save and the career rules use for a phase of the rules engine."""
+    phase = SAVED_AS.get(engine_phase, engine_phase)
+    if phase not in SAVED_RUN_PHASES:
+        raise ValueError(f"The save has no run phase for '{engine_phase}'.")
+    return phase
 
 
 @dataclass

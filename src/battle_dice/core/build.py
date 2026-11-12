@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from battle_dice.core.models import DieDefinition
 from battle_dice.core.schedule import Schedule
@@ -79,6 +79,40 @@ class BuildSource(Protocol):
 
     def build(self, vocation_id: str) -> HeroBuild:
         """The vocation's build. Raises :class:`BuildNotSupported` when the rules cannot run it yet."""
+        ...
+
+
+class EncounterNotPlayable(ValueError):
+    """The encounter is listed but has no enemies to fight yet (or none for this party size). The message says so."""
+
+
+@runtime_checkable
+class EncounterSource(Protocol):
+    """Where battles beyond the shipped ones come from: the vocation catalog, when its feature gate is on.
+
+    The shipped battles of a run always come from the shipped content. A run may add encounters
+    from this source after them (``StartRun``'s optional ``encounters``); the player is then asked
+    after each won battle whether to fight on.
+    """
+
+    @property
+    def version(self) -> str:
+        ...
+
+    @property
+    def sha256(self) -> str:
+        """Hash of the source; a run that uses one of its encounters records it."""
+        ...
+
+    def has_encounter(self, encounter_id: str) -> bool:
+        """True when the source lists this encounter, playable or not."""
+        ...
+
+    def encounter(self, encounter_id: str, party_size: int) -> list[dict[str, Any]]:
+        """The enemies of the encounter for this party size, in the shape of the shipped encounter table.
+
+        Raises :class:`EncounterNotPlayable` when the encounter has not been authored yet.
+        """
         ...
 
 

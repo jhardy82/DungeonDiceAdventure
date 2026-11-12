@@ -74,10 +74,12 @@ class HeuristicPolicy:
     #: Used only when ``lookahead`` is off: the version 1 rule (keep the best plan's dice if it scores this much).
     keep_threshold = 2.0
 
-    def __init__(self) -> None:
+    def __init__(self, fight_on: bool = True) -> None:
         #: Seconds spent inside engine commands, so the simulator can report engine latency without
         #: the player's own thinking time.
         self.engine_seconds = 0.0
+        #: Whether to take an extra battle when one is on offer after the shipped battles are won.
+        self.fight_on = fight_on
         self._stop_values: dict[tuple[Any, ...], tuple[float, list[dict[str, Any]]]] = {}
         self._stop_key: tuple[int, int, str] | None = None
 
@@ -93,6 +95,8 @@ class HeuristicPolicy:
             self._upgrade(engine)
         elif state.phase == RunPhase.EQUIPMENT:
             self._send(engine, cmd.ADVANCE_PHASE)
+        elif state.phase == RunPhase.CONTINUE:
+            self._send(engine, cmd.CONTINUE_RUN if self.fight_on else cmd.END_RUN)
         elif state.phase == RunPhase.BATTLE:
             phase = engine.combat.phase
             if phase == CombatPhase.HERO_ROLL:
@@ -397,6 +401,9 @@ class RandomPolicy:
             return
         if state.phase == RunPhase.EQUIPMENT:
             self._equipment(engine)
+            return
+        if state.phase == RunPhase.CONTINUE:
+            _must(engine.do(cmd.CONTINUE_RUN if self._pick(2) else cmd.END_RUN), "ContinueRun or EndRun")
             return
         combat = engine.combat
         phase = combat.phase

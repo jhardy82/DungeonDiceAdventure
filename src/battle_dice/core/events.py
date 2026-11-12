@@ -51,6 +51,8 @@ class EventType:
     DIE_SWAPPED = "die_swapped"
     FORMATION_CHANGED = "formation_changed"
     RUN_VICTORY = "run_victory"
+    #: A further encounter is on offer after a won battle (a run started with extra encounters).
+    EXTRA_BATTLE_OFFERED = "extra_battle_offered"
     RUN_DEFEAT = "run_defeat"
 
 

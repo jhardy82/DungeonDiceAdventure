@@ -22,6 +22,9 @@ SKIP_REACTION_STAGE = "SkipReactionStage"
 CHOOSE_UPGRADE = "ChooseUpgrade"
 SWAP_DIE = "SwapDie"
 ADVANCE_PHASE = "AdvancePhase"
+#: Only in a run started with extra encounters, after the shipped battles are won.
+CONTINUE_RUN = "ContinueRun"
+END_RUN = "EndRun"
 
 COMMAND_TYPES = (
     START_RUN,
@@ -36,6 +39,8 @@ COMMAND_TYPES = (
     CHOOSE_UPGRADE,
     SWAP_DIE,
     ADVANCE_PHASE,
+    CONTINUE_RUN,
+    END_RUN,
 )
 
 _STR = "str"
@@ -46,7 +51,7 @@ _PLAN = "plan"
 
 #: ``{command type: {parameter: (kind, required)}}``. Unknown parameters are rejected.
 PARAM_SPECS: dict[str, dict[str, tuple[str, bool]]] = {
-    START_RUN: {"seed": (_INT, True), "party": (_PARTY, True), "run_id": (_STR, False)},
+    START_RUN: {"seed": (_INT, True), "party": (_PARTY, True), "run_id": (_STR, False), "encounters": (_STR_LIST, False)},
     SET_FORMATION: {"hero_id": (_STR, True), "row": (_STR, True)},
     ROLL_DICE: {},
     SET_KEPT_DICE: {"die_ids": (_STR_LIST, True)},
@@ -58,6 +63,8 @@ PARAM_SPECS: dict[str, dict[str, tuple[str, bool]]] = {
     CHOOSE_UPGRADE: {"hero_id": (_STR, True), "die_id": (_STR, True), "offer_id": (_STR, True)},
     SWAP_DIE: {"hero_id": (_STR, True), "out_die_id": (_STR, True), "in_die_id": (_STR, True)},
     ADVANCE_PHASE: {},
+    CONTINUE_RUN: {},
+    END_RUN: {},
 }
 
 

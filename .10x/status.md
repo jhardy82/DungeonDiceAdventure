@@ -2,7 +2,7 @@
 
 ## Project: Battle Dice
 **Current Phase:** Implementation (the project was already under way when this file was created)
-**Last Updated:** 2026-11-11 by init-project
+**Last Updated:** 2026-11-12 by the implementing engineer (Phase 4, step B)
 **Health:** On Track
 
 **Current goal (owner, 2026-11-11):** a fully configurable and playable demo.
@@ -17,16 +17,15 @@
 - Class Evolution Phase 3: save file (SQLite profile store)
 - 39 of 40 acceptance cases decided; 35 run as tests
 - Class Evolution Phase 4, step A: the Guardian is playable by the rules (merged, pull request 19)
+- Class Evolution Phase 4, step B: encounters from the catalog and the optional third battle; the threat-4 table tuned to 75-77% per party size
 
 ### In Progress
-- Class Evolution Phase 4, step B: encounters from the catalog and the optional third battle
-  (engine changes written, not yet committed; catalog table, tests and measurement still to do)
+- Class Evolution Phase 4, step C: saved heroes in real runs
 
 ### Pending
-- Phase 4, step C: saved heroes in real runs (recruit, build snapshots, vocation change between battles, awards, career-aware simulator)
 - Phase 4, step D: screens (party setup with saved heroes, career screen, award panel, stop or fight on)
 - Phase 4, step E: Field Medic in battle and the build panel
-- Demo configuration: what "fully configurable" covers is not yet answered by the owner (see handoff)
+- Demo configuration (assumed scope, see decisions.md): a settings file with a Settings screen; a Class Evolution tuning file; demo start presets
 
 Role checklist. These are the 10x-Team's own passes; none has been run yet. The work listed
 under Done was carried out before the team state existed.

@@ -63,9 +63,13 @@ def hero_from_build(content: Content, hero_id: str, build: HeroBuild, row: str) 
     )
 
 
-def make_enemies(content: Content, party_size: int, battle: int) -> list[Combatant]:
-    """Build the scaled roster. IDs (``b1_e01`` ...) are assigned by archetype, then spawn order."""
-    entries = list(enumerate(content.encounter(party_size, battle)))
+def make_enemies(content: Content, party_size: int, battle: int, table: list[dict[str, Any]] | None = None) -> list[Combatant]:
+    """Build the scaled roster. IDs (``b1_e01`` ...) are assigned by archetype, then spawn order.
+
+    ``table`` is the enemy list of an encounter that is not a shipped battle (it comes from an
+    :class:`~battle_dice.core.build.EncounterSource`); without it the shipped battle is used.
+    """
+    entries = list(enumerate(content.encounter(party_size, battle) if table is None else table))
     entries.sort(key=lambda pair: (pair[1]["archetype"], pair[0]))
     counts: dict[str, int] = {}
     totals: dict[str, int] = {}
