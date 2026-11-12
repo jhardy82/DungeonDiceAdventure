@@ -451,7 +451,8 @@ def test_the_main_menu_opens_the_settings_and_escape_returns(tmp_path):
     assert play.ctrl.screen == Screen.SETTINGS and play.ctrl.settings_tab == "comfort" and "settings:window_size" in play.ui.keys()
     # Owner decision D-31: four groups, player settings first, the demo's aids last; the seed is not a setting any more.
     assert [(row["group"], row["key"]) for row in play.ctrl.settings_view()] == [
-        ("comfort", "window_size"), ("comfort", "high_contrast"), ("comfort", "animation"), ("comfort", "battle_speed"),
+        ("comfort", "window_size"), ("comfort", "text_size"), ("comfort", "high_contrast"), ("comfort", "animation"),
+        ("comfort", "battle_speed"),
         ("aids", "confirm_pass"), ("aids", "tooltip_delay"), ("aids", "controls"), ("evolution", "class_evolution"),
         ("demo", "mastery_pace"), ("demo", "demo_preset"), ("demo", "roster_limit"), ("demo", "third_battle")]
     assert [group for group, _title in play.ctrl.SETTINGS_GROUPS] == ["comfort", "aids", "evolution", "demo"]

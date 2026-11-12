@@ -17,12 +17,14 @@ Where things stand:
   Settings switches it on): recruit, earn mastery, master the Squire, become a Guardian (at
   party setup or inside a run after Battle 1), fight the optional third battle, equip Field
   Medic and use it in battle.
-- The demo is configured from the Settings screen (`README.md`, section Settings).
+- The demo is configured from the Settings screen (`README.md`, section Settings): four groups,
+  with the comfort settings the owner chose in D-31 (text size, high contrast, battle speed,
+  confirm a pass, help text delay) and the demo options in a group of their own.
 - **The approved Phase 4 plan is built in full** (`docs/DECISION_LOG.md`, sections 7.15 to 7.21).
 - What comes next is not decided: the open questions below, a person's playtest, or the next
   wave of vocations (FDD section 9).
 
-Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.21),
+Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.30),
 `docs/class_evolution/FDD_v0.2.md`.
 
 ### Open Questions

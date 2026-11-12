@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1155 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1194 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -347,6 +347,7 @@ at once and takes effect at once.
 | Group | Setting | Values | What it does |
 |-------|---------|--------|--------------|
 | 1. Display and comfort | Window size | 960x540, 1280x720 (default), 1600x900, 1920x1080 | The window can also be dragged to any size |
+| | Text size | Normal (default), Large | Large draws text about 15% larger wherever the whole text still fits. The layout stays as it is, so a text with no room keeps its normal size; nothing is cut off to make room |
 | | High contrast | Off (default), On | White text on black, bright borders, no picture behind the battle. Every text colour has at least 7:1 contrast |
 | | Motion and flashes | On (default), Off | Reduced motion |
 | | Battle speed at start | Normal (default), Fast | How fast a battle plays when it begins. F still switches during a battle |

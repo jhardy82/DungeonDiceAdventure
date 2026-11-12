@@ -29,6 +29,8 @@ ROSTER_LIMITS = (6, 12, 24)
 BATTLE_SPEEDS = ("normal", "fast")
 #: How long the pointer rests on a control before its help is shown, in milliseconds.
 TOOLTIP_DELAYS = {"instant": 0, "short": 350, "long": 900}
+#: How much larger text is drawn. The layout is fixed, so a text grows only where it still fits whole.
+TEXT_SIZES = {"normal": 1.0, "large": 1.15}
 MAX_SEED = 2**64 - 1
 
 
@@ -48,6 +50,7 @@ class Settings:
     mastery_pace: str = "normal"
     demo_preset: str = "fresh"
     #: Comfort and play aids (owner decision D-31). None of them changes a rule.
+    text_size: str = "normal"
     high_contrast: bool = False
     battle_speed: str = "normal"
     confirm_pass: bool = True
@@ -62,6 +65,8 @@ def _problem(name: str, value: Any) -> str | None:
     """Why ``value`` is not allowed for the setting ``name``; ``None`` when it is."""
     if name in ("class_evolution", "third_battle", "animation", "high_contrast", "confirm_pass"):
         return None if isinstance(value, bool) else "must be true or false"
+    if name == "text_size":
+        return None if value in TEXT_SIZES else f"must be one of {', '.join(TEXT_SIZES)}"
     if name == "battle_speed":
         return None if value in BATTLE_SPEEDS else f"must be one of {', '.join(BATTLE_SPEEDS)}"
     if name == "tooltip_delay":

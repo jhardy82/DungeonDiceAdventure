@@ -8,8 +8,9 @@ window, down to the minimum supported 960x540.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 from typing import Any
 
 import pygame
@@ -19,6 +20,8 @@ from battle_dice.ui.artwork import PLACEHOLDER_COLOUR, AssetStore
 
 LOGICAL_W, LOGICAL_H = 1280, 720
 MIN_W, MIN_H = 960, 540
+#: At a larger text size, two texts side by side keep this many logical units between them: about the width of a space.
+TEXT_CLEARANCE = 5
 FONT_CANDIDATES = ("segoeui", "arial", "liberationsans", "dejavusans", "helvetica", "freesans")
 KEYPAD_DIGITS = {
     pygame.K_KP1: pygame.K_1, pygame.K_KP2: pygame.K_2, pygame.K_KP3: pygame.K_3, pygame.K_KP4: pygame.K_4,
@@ -93,6 +96,44 @@ def contrast_ratio(first: tuple[int, int, int], second: tuple[int, int, int]) ->
     return (lighter + 0.05) / (darker + 0.05)
 
 
+@dataclass(frozen=True)
+class DrawnText:
+    """One text as it reached the screen."""
+
+    text: str            # as asked for
+    shown: str           # as drawn: shorter when it had to be cut
+    ink: pygame.Rect     # the pixels that carry ink, in window coordinates
+    pixels: int          # the font size it was drawn in
+    normal_pixels: int   # the font size it has at the normal text size
+
+
+def overlap_depth(first: pygame.Rect, second: pygame.Rect) -> int:
+    """How far two boxes reach into each other, in pixels: 0 when they do not overlap."""
+    shared = first.clip(second)
+    return min(shared.width, shared.height)
+
+
+@dataclass(frozen=True)
+class _Measured:
+    """A text of the frame being measured: where its ink is at the normal size, and where it would be if it grew."""
+
+    text: str
+    normal: pygame.Rect
+    large: pygame.Rect
+    normal_pixels: int
+    wanted: int          # the size it would grow to; the normal one when it cannot grow
+    group: int | None    # texts of one group grow together or not at all
+
+
+@dataclass
+class Trace:
+    """What one frame drew, for the layout check: ``UI.trace`` is ``None`` in play, so nothing is kept."""
+
+    texts: list[DrawnText] = field(default_factory=list)
+    boxes: list[pygame.Rect] = field(default_factory=list)    # panels and buttons: what a text sits in
+    sprites: list[pygame.Rect] = field(default_factory=list)  # pictures and bars: what a text must stay clear of
+
+
 @dataclass
 class Widget:
     key: str
@@ -119,6 +160,19 @@ class UI:
         self.scale = 1.0
         self.offset = (0, 0)
         self.surface: pygame.Surface | None = None
+        #: Text size: 1.0 is the size the layout was drawn for. A larger text is used only where it still fits (plan_sizes).
+        self.text_scale = 1.0
+        #: The layout check sets this and reads every text, box and picture of a frame from it.
+        self.trace: Trace | None = None
+        self._measuring = False
+        self._measured: list[_Measured] = []
+        self._boxes: list[pygame.Rect] = []
+        self._sprites: list[pygame.Rect] = []
+        self._plan: list[tuple[str, int]] | None = None
+        self._cursor = 0
+        self._group: int | None = None
+        self._group_serial = 0
+        self._inks: dict[tuple[str, int, bool], tuple[int, pygame.Rect]] = {}
         self._fonts: dict[tuple[int, bool], pygame.font.Font] = {}
         self._font_paths: dict[bool, str | None] = {}
         self.on_disabled: Callable[[str], None] | None = None
@@ -182,7 +236,19 @@ class UI:
         return self._font_paths[bold]
 
     def font(self, size: int, bold: bool = False) -> pygame.font.Font:
-        pixels = max(9, int(round(size * self.scale)))
+        """The font of a text at the normal text size. Every measurement a screen makes uses this one."""
+        return self._font_of(self._pixels(size), bold)
+
+    def _pixels(self, size: float) -> int:
+        return max(9, int(round(size * self.scale)))
+
+    def _sizes(self, size: float) -> list[int]:
+        """The font sizes a text may be drawn in, largest first; the last one is its normal size."""
+        normal = self._pixels(size)
+        largest = max(normal, int(round(size * self.scale * self.text_scale)))
+        return list(range(largest, normal - 1, -1))
+
+    def _font_of(self, pixels: int, bold: bool) -> pygame.font.Font:
         key = (pixels, bold)
         if key not in self._fonts:
             path = self._font_path(bold)
@@ -224,26 +290,177 @@ class UI:
 
     def text(
         self, x: float, y: float, text: str, size: int = 16, color: tuple[int, int, int] | None = None,
-        bold: bool = False, max_width: float | None = None, align: str = "left",
+        bold: bool = False, max_width: float | None = None, align: str = "left", grow: str = "middle",
+    ) -> None:
+        """Draw one line. ``max_width`` cuts a text that is too long.
+
+        At a larger text size the line is drawn larger only where the whole of it fits and the frame has room for it
+        (see ``plan_sizes``). It grows around its middle, or ``up`` or ``down`` when a neighbour sits right below or
+        above; ``none`` keeps the normal size.
+        """
+        normal = self._pixels(size)
+        if self.text_scale <= 1.0:
+            self._draw_text(x, y, text, size, normal, color, bold, max_width, align, grow)
+            return
+        if self._measuring:
+            # A larger text must not cost a word: the largest size at which the whole text fits, else the normal one.
+            # A text that keeps its size is measured too: its neighbours must stay clear of it.
+            sizes = self._sizes(size) if grow != "none" else [normal]
+            wanted = sizes[0]
+            if max_width is not None:
+                limit = self.px(max_width)
+                wanted = next((p for p in sizes if self._font_of(p, bold).size(text)[0] <= limit), normal)
+            self._measure(x, y, text, text, size, wanted, bold, max_width, align, grow)
+            return
+        self._draw_text(x, y, text, size, self._planned(text, normal), color, bold, max_width, align, grow)
+
+    def _ink(self, text: str, pixels: int, bold: bool) -> tuple[int, pygame.Rect]:
+        """Width of a rendered text and the part of it that carries ink. Remembered: measuring happens every frame."""
+        key = (text, pixels, bold)
+        found = self._inks.get(key)
+        if found is None:
+            if len(self._inks) > 4000:
+                self._inks.clear()
+            image = self._font_of(pixels, bold).render(text, True, (255, 255, 255))
+            found = self._inks[key] = (image.get_width(), image.get_bounding_rect())
+        return found
+
+    def _origin(self, x: float, y: float, width: int, size: float, pixels: int, bold: bool, align: str, grow: str) -> tuple[int, int]:
+        """Where a rendered line is put: by its alignment, and by the side it grows to when it is larger than normal."""
+        rect = self.r(x, y, 1, 1)
+        # A larger text grows around the middle of its line, half upwards, so stacked lines keep their distance.
+        # Where a neighbour sits right below or above, the caller lets it grow to the other side only.
+        normal_pixels = self._pixels(size)
+        top = rect.y
+        if pixels != normal_pixels:
+            growth = self._font_of(pixels, bold).get_height() - self._font_of(normal_pixels, bold).get_height()
+            top -= {"middle": growth // 2, "up": growth, "down": 0, "none": 0}[grow]
+        left = rect.x - width // 2 if align == "center" else rect.x - width if align == "right" else rect.x
+        return left, top
+
+    def _draw_text(
+        self, x: float, y: float, text: str, size: float, pixels: int, color: tuple[int, int, int] | None,
+        bold: bool, max_width: float | None, align: str = "left", grow: str = "middle",
     ) -> None:
         assert self.surface is not None
         color = color or Theme.TEXT  # read when drawn: a default written in the signature would be the palette at start
-        font = self.font(size, bold)
-        if max_width is not None:
-            text = self.fit(text, font, self.px(max_width))
-        image = font.render(text, True, color)
-        rect = self.r(x, y, 1, 1)
-        if align == "center":
-            pos = (rect.x - image.get_width() // 2, rect.y)
-        elif align == "right":
-            pos = (rect.x - image.get_width(), rect.y)
-        else:
-            pos = (rect.x, rect.y)
+        font = self._font_of(pixels, bold)
+        shown = self.fit(text, font, self.px(max_width)) if max_width is not None else text
+        image = font.render(shown, True, color)
+        pos = self._origin(x, y, image.get_width(), size, pixels, bold, align, grow)
         self.surface.blit(image, pos)
+        if self.trace is not None and shown.strip():
+            self.trace.texts.append(DrawnText(text, shown, image.get_bounding_rect().move(pos), pixels, self._pixels(size)))
+
+    # -- a larger text size: every frame is measured first -----------------------------------
+
+    def plan_sizes(self, draw: Callable[[], object]) -> None:
+        """Measure a frame before it is drawn, and decide which of its texts may be drawn larger.
+
+        The layout is fixed, so a larger text cannot push its neighbours away. ``draw`` is run once without drawing
+        any text; then every text is given the larger size only if, at that size, it stays inside the panel or button
+        it sits in, stays clear of the pictures and bars, and keeps its distance from every other text. Texts are asked in the
+        order they are drawn, so the first of two neighbours grows. A group (``group``) grows whole or not at all.
+        The caller then starts the frame again and draws it; ``text`` and ``paragraph`` follow the plan.
+        """
+        self._plan = None
+        if self.text_scale <= 1.0:
+            return
+        self._measured, self._boxes, self._sprites, self._measuring = [], [], [], True
+        try:
+            draw()
+        except Exception:  # noqa: BLE001 - a fault while measuring: nothing grows; drawing raises it again where it is handled
+            return
+        finally:
+            self._measuring = False
+        self._plan = self._solve()
+        self._cursor = 0
+
+    @contextmanager
+    def group(self) -> Iterator[None]:
+        """Texts drawn inside grow together or not at all: a row of labels never mixes two sizes."""
+        outer, self._group_serial = self._group, self._group_serial + 1
+        self._group = self._group_serial
+        try:
+            yield
+        finally:
+            self._group = outer
+
+    def _measure(
+        self, x: float, y: float, text: str, large_text: str, size: float, wanted: int, bold: bool,
+        max_width: float | None, align: str, grow: str, group: int | None = None,
+    ) -> None:
+        """Record where a text's ink is at the normal size and where it would be at the size it wants."""
+        normal_pixels = self._pixels(size)
+        rects = []
+        for words, pixels in ((text, normal_pixels), (large_text, wanted)):
+            shown = self.fit(words, self._font_of(pixels, bold), self.px(max_width)) if max_width is not None else words
+            width, ink = self._ink(shown, pixels, bold)
+            rects.append(ink.move(self._origin(x, y, width, size, pixels, bold, align, grow)))
+        self._measured.append(_Measured(text, rects[0], rects[1], normal_pixels, wanted, group if group is not None else self._group))
+
+    def _planned(self, text: str, normal: int) -> int:
+        """The size the plan gives the next text. A frame that differs from the measured one is drawn at the normal size."""
+        plan, cursor = self._plan, self._cursor
+        self._cursor += 1
+        if plan is None or cursor >= len(plan) or plan[cursor][0] != text:
+            self._plan = None
+            return normal
+        return plan[cursor][1]
+
+    def _solve(self) -> list[tuple[str, int]]:
+        assert self.surface is not None
+        items = self._measured
+        boxes = [*self._boxes, self.surface.get_rect()]
+        near = 2 * self.px(TEXT_CLEARANCE)
+        occupied = [item.normal for item in items]  # where each text is, as far as decided: normal until it grows
+        groups: dict[int, list[int]] = {}
+        for index, item in enumerate(items):
+            if item.group is not None:
+                groups.setdefault(item.group, []).append(index)
+
+        def apart(first: pygame.Rect, second: pygame.Rect, first_normal: pygame.Rect, second_normal: pygame.Rect) -> bool:
+            """Two texts keep their distance; two that were already closer do not start to overlap; and where the
+            layout lets two lines' boxes overlap (a descender above a capital), they do not overlap any deeper."""
+            if not first.inflate(near, 0).colliderect(second):
+                return True
+            if not first_normal.inflate(near, 0).colliderect(second_normal):
+                return False
+            return overlap_depth(first, second) <= overlap_depth(first_normal, second_normal)
+
+        def fits(index: int, members: list[int]) -> bool:
+            item = items[index]
+            homes = [box for box in boxes if box.contains(item.normal)]
+            if homes and not min(homes, key=lambda box: box.w * box.h).contains(item.large):
+                return False
+            if any(item.large.colliderect(sprite) and not item.normal.colliderect(sprite) for sprite in self._sprites):
+                return False
+            for other in item.large.inflate(near, 0).collidelistall(occupied):
+                if other != index and other not in members and not apart(item.large, occupied[other], item.normal, items[other].normal):
+                    return False
+            return all(apart(item.large, items[other].large, item.normal, items[other].normal) for other in members if other > index)
+
+        sizes = [item.normal_pixels for item in items]
+        decided: set[int] = set()
+        for index, item in enumerate(items):
+            if index in decided:
+                continue
+            members = groups[item.group] if item.group is not None else [index]
+            decided.update(members)
+            # A group has one size: every member grows by as much as the member with the least room for it can.
+            # (Each member was measured at the size it wanted itself, which is no smaller: that errs on the safe side.)
+            step = min(items[member].wanted - items[member].normal_pixels for member in members)
+            if step > 0 and all(fits(member, members) for member in members):
+                for member in members:
+                    occupied[member], sizes[member] = items[member].large, items[member].normal_pixels + step
+        return [(item.text, sizes[index]) for index, item in enumerate(items)]
 
     def wrap_lines(self, text: str, width: float, size: int = 16, bold: bool = False) -> list[str]:
-        font = self.font(size, bold)
-        limit = self.px(width)
+        """The lines of ``text`` at the normal text size."""
+        return self._wrap(text, self.px(width), self.font(size, bold))
+
+    @staticmethod
+    def _wrap(text: str, limit: int, font: pygame.font.Font) -> list[str]:
         lines: list[str] = []
         for paragraph in text.split("\n"):
             current = ""
@@ -262,14 +479,41 @@ class UI:
         line_height: float | None = None, max_lines: int | None = None, bold: bool = False,
     ) -> float:
         """Draw wrapped text. Returns the logical y just below the last line."""
-        color = color or Theme.TEXT
         step = line_height or size * 1.3
-        lines = self.wrap_lines(text, width, size, bold)
-        if max_lines is not None and len(lines) > max_lines:
-            lines = lines[:max_lines]
-            lines[-1] = lines[-1] + " ..."
+        limit = self.px(width)
+
+        def laid_out(pixels: int) -> tuple[list[str], bool]:
+            """The lines at one font size, and whether every one of them is whole."""
+            font = self._font_of(pixels, bold)
+            lines = self._wrap(text, limit, font)
+            if max_lines is not None and len(lines) > max_lines:
+                lines = lines[:max_lines]
+                lines[-1] = lines[-1] + " ..."
+            return lines, all(font.size(line)[0] <= limit for line in lines)
+
+        normal = self._pixels(size)
+        lines, _ = laid_out(normal)
+        pixels = normal
+        if self.text_scale > 1.0:
+            # The whole paragraph has one size: the largest that needs no more lines than the normal size and leaves
+            # every line whole. What follows a paragraph is placed for its normal height.
+            larger, wanted = lines, normal
+            for candidate in self._sizes(size)[:-1]:
+                tried, tried_whole = laid_out(candidate)
+                if len(tried) == len(lines) and tried_whole:
+                    larger, wanted = tried, candidate
+                    break
+            if self._measuring:
+                self._group_serial += 1
+                for row, (line, large_line) in enumerate(zip(lines, larger, strict=True)):
+                    self._measure(x, y + row * step, line, large_line, size, wanted, bold, width, "left", "middle", self._group_serial)
+                return y + len(lines) * step
+            # The plan has one entry for each line, all of one size; a paragraph is larger only if the plan says so.
+            sizes = [self._planned(line, normal) for line in lines]
+            if sizes and all(planned == wanted for planned in sizes):
+                lines, pixels = larger, wanted
         for line in lines:
-            self.text(x, y, line, size, color, bold, max_width=width)
+            self._draw_text(x, y, line, size, pixels, color, bold, width)
             y += step
         return y
 
@@ -282,6 +526,10 @@ class UI:
         assert self.surface is not None
         fill, border = fill or Theme.PANEL, border or Theme.BORDER
         rect = self.r(x, y, w, h)
+        if self._measuring:
+            self._boxes.append(rect)
+        elif self.trace is not None:
+            self.trace.boxes.append(rect)
         pygame.draw.rect(self.surface, fill, rect, border_radius=self.px(5))
         pygame.draw.rect(self.surface, border, rect, self.px(width), border_radius=self.px(5))
         if title:
@@ -293,6 +541,10 @@ class UI:
     ) -> None:
         assert self.surface is not None
         rect = self.r(x, y, w, h)
+        if self._measuring:
+            self._sprites.append(rect)
+        elif self.trace is not None:
+            self.trace.sprites.append(rect)
         pygame.draw.rect(self.surface, back, rect)
         if maximum > 0 and value > 0:
             fill = rect.copy()
@@ -330,7 +582,12 @@ class UI:
         if alpha < 255:
             image = image.copy()
             image.set_alpha(alpha)
-        self.surface.blit(image, image.get_rect(center=slot.center))
+        placed = image.get_rect(center=slot.center)
+        self.surface.blit(image, placed)
+        if self._measuring:
+            self._sprites.append(placed)
+        elif self.trace is not None:
+            self.trace.sprites.append(placed)
         return scale
 
     def backdrop(self, x: float, y: float, w: float, h: float, wall_rows: int = 1, dim: int = 150) -> None:
@@ -434,6 +691,10 @@ class UI:
     ) -> Widget:
         assert self.surface is not None
         rect = self.r(x, y, w, h)
+        if self._measuring:
+            self._boxes.append(rect)
+        elif self.trace is not None:
+            self.trace.boxes.append(rect)
         widget = self.register(key, rect, action, enabled, reason, tooltip, hotkeys, default)
         if not enabled:
             fill, text_color = Theme.BUTTON_DISABLED, Theme.FAINT
@@ -448,9 +709,10 @@ class UI:
         pygame.draw.rect(self.surface, border, rect, self.px(2 if selected else 1), border_radius=self.px(5))
         self.decorate(key, rect, enabled)
         if sublabel:
-            self.text(x + w / 2, y + h / 2 - size * 0.95, label, size, text_color, bold=True, max_width=w - 10, align="center")
+            self.text(x + w / 2, y + h / 2 - size * 0.95, label, size, text_color, bold=True, max_width=w - 10, align="center",
+                      grow="up")
             self.text(x + w / 2, y + h / 2 + 2, sublabel, max(13, size - 3), Theme.DIM if enabled else Theme.FAINT,
-                      max_width=w - 10, align="center")
+                      max_width=w - 10, align="center", grow="down")
         else:
             self.text(x + w / 2, y + h / 2 - size * 0.48, label, size, text_color, bold=True, max_width=w - 10, align="center")
         return widget

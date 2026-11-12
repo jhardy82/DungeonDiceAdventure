@@ -1414,12 +1414,15 @@ class AppController:
         needs = locked or (None if evolution else "Switch Class Evolution on first.")
         paces = {"normal": "Normal", "fast": "Fast (about half the points)", "very_fast": "Very fast (a rank per win at most)"}
         speeds = {"normal": "Normal", "fast": "Fast"}
+        sizes = {"normal": "Normal", "large": "Large"}
         delays = {"instant": "None: at once", "short": "Short", "long": "Long"}
         presets = {"fresh": "Fresh: no heroes", "squire_near_mastery": "A Squire one win from mastery",
                    "guardian_unlocked": "A Guardian at rank 1", "guardian_mastered": "A Guardian with Field Medic"}
         rows = [
             {"group": "comfort", "key": "window_size", "label": "Window size", "value": current.window_size.replace("x", " x "),
              "help": "The window can also be resized by dragging its edge.", "reason": None},
+            {"group": "comfort", "key": "text_size", "label": "Text size", "value": sizes[current.text_size],
+             "help": "Large draws text about a seventh larger wherever it still fits whole. Nothing is cut off to make room.", "reason": None},
             {"group": "comfort", "key": "high_contrast", "label": "High contrast", "value": "On" if current.high_contrast else "Off",
              "help": "White text on black, bright borders, no picture behind the battle. Status is always shown as text as well.", "reason": None},
             {"group": "comfort", "key": "animation", "label": "Motion and flashes", "value": "On" if current.animation else "Off (reduced motion)",
@@ -1467,6 +1470,8 @@ class AppController:
 
         if key in ("class_evolution", "third_battle", "animation", "high_contrast", "confirm_pass"):
             setattr(current, key, not getattr(current, key))
+        elif key == "text_size":
+            current.text_size = following(tuple(settings_module.TEXT_SIZES), current.text_size)
         elif key == "battle_speed":
             current.battle_speed = following(settings_module.BATTLE_SPEEDS, current.battle_speed)
         elif key == "tooltip_delay":
