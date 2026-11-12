@@ -46,6 +46,7 @@ tests, and add an entry here.
 | D-29 | Class Evolution: a second moment for a vocation change | **Owner decision, 2026-11-12:** a hero may also claim a vocation or change to one at the decision to stop or fight on after Battle 2. This goes beyond fixture CE-19, which names the upgrade only. | Section 7.24 |
 | D-30 | Class Evolution: Field Medic's numbers | **Owner decision, 2026-11-12, after the measurement:** the revival costs what the Heal costs (no extra mana) and the ally comes back at **5 HP**; still once per encounter. Measured: 316 wins of 480 against 297 without the skill. This replaces the catalog's "revive to 1 HP ... if it costs +1 mana". | Section 7.25 |
 | D-31 | The demo's configuration | **Owner decisions, 2026-11-12, after the research:** Settings is grouped (Display and comfort, Play aids, Class Evolution, Demo and testing), the four demo options sit in the last group; the dice seed is chosen on the New Run screen and can be typed; new settings: text size, high contrast, battle speed at start, confirm before passing with an unused die, tooltip delay, Settings from the pause menu, reset all settings to defaults. No audio, controller, remapping or difficulty settings. | Section 7.26 |
+| D-32 | The demo: how it is judged, and one default | **Owner decisions, 2026-11-12, after every setting of D-31 was merged:** the owner plays the demo and judges it against the goal ("a fully configurable and playable demo"); "Confirm a pass" stays **on by default**. | Sections 7.29 and 7.30 |
 
 ## 2. Content authored under delegation
 
@@ -1790,10 +1791,11 @@ size follows on its own, because it needs a layout check on every screen.
 - **Help text delay** delays help only. The reason a control is off, and help reached with the
   keyboard, show at once. "None" is the default and is what the game always did.
 
-**A default that changes how the shipped game feels (my reading, easy to change)**
+**A default that changes how the shipped game feels (confirmed by the owner, D-32)**
 
 - "Confirm a pass" is **on by default**, as the research proposed. The shipped game passed at
   the first key press. The rules are untouched; with the aid off the game behaves as before.
+  It was first my reading; the owner chose "On by default" on 2026-11-12.
   Four older tests that passed with one key press now press twice and say why.
 
 **Evidence**

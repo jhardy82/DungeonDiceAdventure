@@ -135,3 +135,14 @@ Started: 2026-11-11
   in the demo. Text size needs a layout check on every screen.
 - **Impacts:** `core/skills.py` and the vocation catalog; Settings, New Run and pause screens;
   the settings file; docs.
+
+### 2026-11-12 — Owner: how the demo is judged; "Confirm a pass" on by default (D-32)
+- **Decision:** The owner plays the demo and judges it against the goal "a fully configurable
+  and playable demo". The play aid "Confirm a pass" stays on by default.
+- **Why:** Every setting of D-31 is merged and all automated checks pass on Linux and Windows,
+  but no person has played the demo; a playtest is the one check the implementing agent cannot do.
+- **Alternatives considered:** Accept the demo on the automated evidence alone; keep building
+  first. "Confirm a pass" off by default.
+- **Trade-offs accepted:** The goal stays open until the owner has played. Pass needs two
+  presses while a die could still act, unless the player turns the aid off.
+- **Impacts:** No code. What the owner reports after playing decides the next work.
