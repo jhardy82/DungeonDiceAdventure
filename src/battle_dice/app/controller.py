@@ -923,6 +923,12 @@ class AppController:
                 self._sprite_classes[class_id] = class_id
         return self._sprite_classes[class_id]
 
+    def die_name(self, hero_id: str, die_id: str) -> str:
+        """A die's name as its hero holds it in this run. An evolved hero's dice are not in the shipped content."""
+        if self.engine is not None:
+            return self.engine.die_for(hero_id, die_id).name
+        return self.content.die(die_id).name
+
     def member_name(self, member: dict[str, str]) -> str:
         if self.progression is not None and "hero_id" in member:
             hero = self.progression.state.heroes.get(member["hero_id"])

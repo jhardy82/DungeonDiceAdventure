@@ -850,3 +850,30 @@ def test_no_text_is_cut_off_on_the_skills_panel_or_with_field_medic_in_battle(tm
     assert "Field Medic: revive for 2 mana" in added and any(text.startswith("1. Heal (Field Medic)") for text in added)
     assert not [text for text in shortened if "Field Medic" in text], shortened
     assert play.app.render_faults == 0
+
+
+def test_a_guardian_chooses_its_upgrade_and_the_screen_names_its_die(tmp_path, monkeypatch):
+    """The upgrade screen and the combat log name an evolved hero's dice, which are not in the shipped content."""
+    from battle_dice.core.view import combat_log
+
+    play = medic_game(tmp_path)
+    for hero_id in ("hero_002", "hero_001"):  # the Scout leads, so the arranged win is the Scout's
+        play.ctrl.add_saved_hero(hero_id)
+    play.ctrl.begin_run()
+    engine = play.ctrl.engine
+    assert engine is not None and engine.build("h02").vocation_id == "guardian"
+    win_battle(engine)
+    play.ctrl.refresh()
+    play.app.frame(0)
+    assert play.ctrl.screen == Screen.UPGRADE
+    drawn, _ = record_text(monkeypatch)
+    play.click("up:hero:h02")
+    play.click("up:die:guardian_d6")
+    play.click("up:offer:0")
+    play.ctrl.apply_upgrade()
+    play.app.frame(0)
+    assert engine.state.phase == "equipment" and "guardian_d6" in engine.state.die_overrides["h02"]
+    assert play.ctrl.screen == Screen.UPGRADE and play.app.render_faults == 0, play.ctrl.error_text
+    assert any("was applied to Squire 1's Guardian d6" in text for text in drawn)
+    assert play.ctrl.die_name("h02", "guardian_d4") == "Guardian d4" and play.ctrl.die_name("h01", "striker_d8") == "Striker d8"
+    assert any("Guardian d6" in line for line in combat_log(engine)) and not any("guardian_d6" in line for line in combat_log(engine))

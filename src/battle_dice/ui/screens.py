@@ -778,7 +778,7 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
     offers = ctrl.current_offers() if not chosen else []
     if chosen:
         record = upgrade["upgrades"][0]
-        ui.paragraph(336, 90, f"{record['kind'].capitalize()} was applied to {by_id[record['hero_id']]['name']}'s {ctrl.content.die(record['die_id']).name} "
+        ui.paragraph(336, 90, f"{record['kind'].capitalize()} was applied to {by_id[record['hero_id']]['name']}'s {ctrl.die_name(record['hero_id'], record['die_id'])} "
                      f"(face {record['face_index'] + 1}, version {record['from_version']} -> {record['to_version']}). "
                      "It lasts through Battle 2 and is removed when the run ends.", 580, 16, Theme.TEXT, line_height=21)
         die_entry = next((e for e in hero_view["equipped"] if e["die"]["id"] == ctrl.upgrade_die), hero_view["equipped"][0])

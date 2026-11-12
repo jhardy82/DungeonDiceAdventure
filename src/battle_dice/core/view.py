@@ -536,5 +536,7 @@ def combat_log(engine: Engine, limit: int | None = None) -> list[str]:
         if event.type == EventType.BATTLE_STARTED:
             names.update({entry["id"]: entry["name"] for entry in event.delta["roster"]})
     die_names = {die_id: entry["name"] for die_id, entry in engine.content.documents["dice"]["dice"].items()}
+    for member in engine.state.party:  # an evolved hero's dice come with its build, not with the shipped content
+        die_names.update({die_id: die.name for die_id, die in engine.build(member["id"]).dice.items()})
     lines = [line for line in (describe_event(e, names, die_names) for e in engine.events) if line]
     return lines if limit is None else lines[-limit:]

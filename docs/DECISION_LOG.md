@@ -1333,6 +1333,13 @@ screenshots made in this session.
   the class it grew from, as the party setup already did. Present since step D.
 - A long plan line was cut off under the widest font. Plan lines are now set smaller before
   they are cut.
+- **A Guardian's upgrade broke the upgrade screen.** Once the upgrade was applied to a Guardian
+  die, the screen looked the die up in the shipped content, did not find it, and the game went
+  to its error screen. So a run with a Guardian could not get past the upgrade when the
+  Guardian's die was chosen. Present since step D; no test played a Guardian through the
+  upgrade. The screen now asks the run for the die, and a test plays it.
+- The combat log named an evolved hero's dice by their ids ("guardian_d6"). It now uses their
+  names.
 
 **Not built, and why**
 
@@ -1366,7 +1373,7 @@ always fought, the same seeds with and without the skill:
 
 **Evidence**
 
-- 1070 tests pass (1038 before). Lint and type checks are clean. Core coverage 97%.
+- 1071 tests pass (1038 before). Lint and type checks are clean. Core coverage 97%.
 - New tests: the rule (12 tests: the revival, once per encounter, ready again next battle, the
   two refusal codes, faces it must not change, an unknown skill, the hashed state, replay, two
   revivals in one plan, the simulated player); the save link (the skills view, equip and take
