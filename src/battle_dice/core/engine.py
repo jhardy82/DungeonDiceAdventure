@@ -537,14 +537,18 @@ class Engine:
     def _change_vocation(self, hero_id: str, class_id: str, hero: dict[str, Any]) -> None:
         """A saved hero takes another vocation inside the run (fixture CE-19).
 
-        Allowed after a battle's recovery and before the mandatory upgrade is chosen, so the upgrade
-        is chosen for the dice the hero will fight with. Whether the hero *may* be that vocation is
-        the career rules' decision, made before this command is sent; ``hero`` is its build snapshot
-        as that vocation, and it is in the command log, so a replay needs the log and the catalog.
+        Allowed between battles at two moments: after Battle 1's recovery and before the mandatory
+        upgrade is chosen, so the upgrade is chosen for the dice the hero will fight with; and at the
+        decision to stop or fight on (owner decision of 2026-11-12), where no upgrade is dealt.
+        Whether the hero *may* be that vocation is the career rules' decision, made before this
+        command is sent; ``hero`` is its build snapshot as that vocation, and it is in the command
+        log, so a replay needs the log and the catalog.
         """
         state = self.state
-        if state.phase != RunPhase.UPGRADE:
-            raise CommandRejected("A hero can change its vocation in a run only after a battle's recovery, before the upgrade is chosen.")
+        if state.phase not in (RunPhase.UPGRADE, RunPhase.CONTINUE):
+            raise CommandRejected(
+                "A hero can change its vocation in a run only between battles: before the upgrade is chosen, or before deciding to stop or fight on."
+            )
         member = next((m for m in state.party if m["id"] == hero_id), None)
         if member is None:
             raise CommandRejected(f"Unknown hero '{hero_id}'.")
@@ -583,10 +587,11 @@ class Engine:
             state.die_overrides.pop(hero_id, None)
         member["class_id"] = build.vocation_id
         self._builds[hero_id] = build
-        # The offers drawn for the dice that left are void; the new dice get their own, from the same stream.
-        state.upgrade_offers[hero_id] = {
-            die_id: progression.offers_for_die(self, unit, self.die_for(hero_id, die_id)) for die_id in sorted(unit.equipped_dice_ids)
-        }
+        offers: dict[str, list[dict[str, Any]]] = {}
+        if state.phase == RunPhase.UPGRADE:
+            # The offers drawn for the dice that left are void; the new dice get their own, from the same stream.
+            offers = {die_id: progression.offers_for_die(self, unit, self.die_for(hero_id, die_id)) for die_id in sorted(unit.equipped_dice_ids)}
+            state.upgrade_offers[hero_id] = offers
         self.emit(
             EventType.VOCATION_CHANGED,
             actor_id=hero_id,
@@ -595,7 +600,7 @@ class Engine:
                 "hp": [before["hp"], unit.hp], "max_hp": [before["max_hp"], unit.max_hp],
                 "mana": [before["mana"], unit.mana], "max_mana": [before["max_mana"], unit.max_mana],
                 "dice": list(unit.equipped_dice_ids),
-                "offers": {die_id: [o["offer_id"] + ":" + o["kind"] for o in offers] for die_id, offers in state.upgrade_offers[hero_id].items()},
+                "offers": {die_id: [o["offer_id"] + ":" + o["kind"] for o in drawn] for die_id, drawn in offers.items()},
             },
             rng_stream="rewards",
             rng_draw_index=state.rng["rewards"].draws,
@@ -1000,7 +1005,10 @@ class Engine:
                 allowed.append(cmd.SWAP_DIE)
             return allowed
         if state.phase == RunPhase.CONTINUE:
-            return [cmd.CONTINUE_RUN, cmd.END_RUN, cmd.SET_FORMATION]
+            allowed = [cmd.CONTINUE_RUN, cmd.END_RUN, cmd.SET_FORMATION]
+            if any("hero_id" in member for member in state.party):
+                allowed.append(cmd.CHANGE_VOCATION)
+            return allowed
         if state.phase != RunPhase.BATTLE:
             return []
         phase = self.combat.phase

@@ -15,8 +15,9 @@ ELIGIBLE = "eligible"
 #: Run phases the save knows (``run.phase`` in ``career/schema/progression.sql``).
 SAVED_RUN_PHASES = ("battle", "upgrade", "equipment", "victory", "defeat")
 #: Engine phases the save stores under another name. ``continue`` (stop or fight on, after the shipped
-#: battles) is between battles with every build fixed, which is what ``equipment`` means to the career rules.
-SAVED_AS = {"continue": "equipment"}
+#: battles) is between battles with builds open to a change, which is what ``upgrade`` means to the career
+#: rules (owner decision of 2026-11-12: a hero may change vocation at that decision too).
+SAVED_AS = {"continue": "upgrade"}
 
 
 def saved_run_phase(engine_phase: str) -> str:

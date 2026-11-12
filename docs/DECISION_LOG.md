@@ -42,6 +42,10 @@ tests, and add an entry here.
 | D-25 | Class Evolution fixtures CE-18, CE-25, CE-35, CE-40 | **Owner decisions, 2026-11-11:** a vocation may equip its own dice plus its family's; run upgrades are kept as history after a run; with the gate on a run takes saved heroes with a build snapshot in its log; gate on with starting classes stays byte for byte identical to gate off. See section 7.12. | Asked before Phases 3 and 4. The dice answer differs from the fixture's first assumption (own dice only), so that fixture's notes and one rule changed. |
 | D-26 | Class Evolution fixtures CE-09, CE-29, CE-30, CE-32, CE-36 | **Owner decisions, 2026-11-11:** an undiscovered secret vocation shows in the career tree as an anonymous `???` entry (not the fixture's first assumption, which was not to show it); a refused action plan carries a machine-readable code beside its text; event hashes and the canonical encoding stay as built, with times in no hash; the available encounters are the ones the catalog marks shipped, at its ratings (threat 1 and threat 3). One fixture stays open: CE-31. Rules, content and the replay pin are unchanged. | Section 7.14 |
 | D-27 | Class Evolution Phase 4 (first playable slice) | **Owner decisions, 2026-11-11:** heroes are recruited at party setup, free, with a roster of at most 12; the threat-4 fight is an **optional third battle** after battle 2 (stop with a victory or fight on; losing it is a defeat); it is tuned so an informed player with a Guardian in the party wins 70-85% per party size; Guardian's mastery skill Field Medic works in battle in this slice, as its last step. The plan in five steps (A to E) with two checkpoints was approved the same day. | Section 7.15 |
+| D-28 | Class Evolution: Checkpoint 1 | **Owner decision, 2026-11-12:** the Guardian's numbers and the third battle's enemy table are **accepted as built** (section 7.16: Guardian a sidegrade of the Squire, 80.2% against 81.4% wins; third battle 75-77% per party size for parties with a Guardian). They can be changed later with new measurements. | Section 7.24 |
+| D-29 | Class Evolution: a second moment for a vocation change | **Owner decision, 2026-11-12:** a hero may also claim a vocation or change to one at the decision to stop or fight on after Battle 2. This goes beyond fixture CE-19, which names the upgrade only. | Section 7.24 |
+| D-30 | Class Evolution: Field Medic's numbers | **Owner decision, 2026-11-12, after the measurement:** the revival costs what the Heal costs (no extra mana) and the ally comes back at **5 HP**; still once per encounter. Measured: 316 wins of 480 against 297 without the skill. This replaces the catalog's "revive to 1 HP ... if it costs +1 mana". | Section 7.25 |
+| D-31 | The demo's configuration | **Owner decisions, 2026-11-12, after the research:** Settings is grouped (Display and comfort, Play aids, Class Evolution, Demo and testing), the four demo options sit in the last group; the dice seed is chosen on the New Run screen and can be typed; new settings: text size, high contrast, battle speed at start, confirm before passing with an unused die, tooltip delay, Settings from the pause menu, reset all settings to defaults. No audio, controller, remapping or difficulty settings. | Section 7.26 |
 
 ## 2. Content authored under delegation
 
@@ -1528,6 +1532,136 @@ never exercised in the packaged app.
   happened to upgrade another hero's die. That is why the upgrade is now chosen on purpose.
 - The gate-off self-check is unchanged.
 - Time: about 20 seconds here for the gate-on check (about 7 before).
+
+### 7.24 Four owner answers of 2026-11-12, and what followed
+
+The owner was asked four questions through the ask tool and answered all four.
+
+| Question | Answer | What followed |
+|----------|--------|---------------|
+| Is the Settings screen the "configurable" scope you meant? | "Research a more logical set of configuration options" | Researched (section 7.26); a proposal goes to the owner before anything is built |
+| May a hero change vocation at the stop-or-fight-on decision too? | Yes (D-29) | Built, below |
+| What should Field Medic's revival cost? | Measure the options first | Measured (section 7.25); nothing changed |
+| The Guardian's numbers and the third battle's table | Accepted as built (D-28) | Recorded; no change to the game |
+
+**D-29 as built: the second moment for a change**
+
+- `ChangeVocationInRun` is accepted in the run phase `continue` as well as `upgrade`.
+- At that decision **no upgrade is dealt**: no offers are drawn and the reward stream is not
+  touched. Health and mana carry over by the same rule.
+- **An upgraded die the hero gives up loses its upgrade** (the rule of the approved plan: an
+  upgrade belongs to its die). The Career screen says so before the change.
+- The career rules lock a build by the saved run phase. The save has no phase of its own for
+  this decision; it was saved as `equipment` (every build fixed) and is now saved as `upgrade`
+  (a build may change). The approved save schema is unchanged.
+- The stop-or-fight-on screen has a **Career** button for each hero and shows each hero's
+  vocation. Key C opens the first hero's career.
+- A hero that masters its class in Battle 2 can now become the next vocation before the third
+  battle, which was the limit named in section 7.21.
+
+**Evidence**
+
+- 1128 tests pass (1116 before). Lint and type checks are clean.
+- Replay pin, content and catalog unchanged. Gate-off simulator on seeds 300 to 339 identical
+  to the stored reference (1703 of 2200). Both self-checks pass.
+- New tests: the rule at the decision (what carries over, no cards dealt, the upgrade that
+  leaves, stop or fight on afterwards, a run of shipped classes is offered nothing new, replay
+  of a really played run); the save link (the save and the run agree, locked again in battle
+  3); the screen (the whole flow, a die the hero no longer holds is still named, **no text cut
+  off at both sizes under three fonts**).
+- **Deliberate breaks:** 16 breaks of the new code, each caught by a fitting test. Run without
+  bytecode files and with a control run.
+
+**Not verified:** no person has played it.
+
+### 7.25 Field Medic: what its cost and its revival health are worth (measured 2026-11-12)
+
+**Asked by the owner:** measure the options before anything changes. Nothing was changed for
+the measurement. **Owner decision afterwards (D-30, 2026-11-12): 1 mana, back at 5 HP.** It is
+built as its own change.
+
+**Method.** Guardian parties of sizes 2 to 5, one fixed composition each, seeds 500 to 619
+(120 per size, 480 runs per option), third battle always fought, informed simulated player.
+Every option was run on the same seeds, from a frozen copy of the source.
+
+| Revival | Wins of 480 | Times used | Runs won that the party without the skill lost | Runs lost that it won | Net |
+|---------|-------------|-----------|-----------------------------------------------|----------------------|-----|
+| No skill equipped | 297 | 0 | | | |
+| 2 mana, back at 1 HP (**as built**) | 295 | 25 | 2 | 4 | -2 |
+| 1 mana, 1 HP | 290 | 94 | 9 | 16 | -7 |
+| 2 mana, 3 HP | 295 | 25 | 2 | 4 | -2 |
+| 1 mana, 3 HP | 298 | 90 | 16 | 15 | +1 |
+| 2 mana, 5 HP | 302 | 25 | 8 | 3 | +5 |
+| 1 mana, 5 HP | 316 | 92 | 28 | 9 | +19 |
+| 2 mana, 9 HP | 311 | 26 | 15 | 1 | +14 |
+| 2 mana, 1 HP, and the player skips its reaction to keep 2 mana | 160 | 250 | 37 | 174 | -137 |
+| 1 mana, 1 HP, and the player skips its reaction to keep 1 mana | 236 | 275 | 35 | 96 | -61 |
+
+**What the numbers say**
+
+- **The cost is not the lever.** At 1 HP the skill does nothing for this player at either
+  cost; used more often (1 mana) it is slightly worse, because the Guardian spends its one
+  action on an ally that falls again.
+- **The health on revival is the lever.** At 5 HP the skill starts to pay; at 1 mana and 5 HP
+  it wins 19 more runs than it loses (about 4 points on 480 runs).
+- **Saving mana for it is a clear loss.** The Guardian's reaction (3 shield for 1 mana) is
+  worth much more than a revival.
+- These are whole-run rates of four fixed compositions with one simulated player. They show
+  direction, not a balance target. A change is an owner decision; the catalog says "revive to
+  1 HP once per encounter if it costs +1 mana".
+
+### 7.26 Research: a more logical set of configuration options (2026-11-12)
+
+**Asked by the owner.** The research was done by a research agent of this session with web
+access; its sources are listed here as it reported them. **Owner decisions afterwards (D-31,
+2026-11-12):** the demo options get a group of their own at the bottom of Settings; the seed
+is chosen on the New Run screen; the small set of comfort and play-aid settings is built.
+Each is built as its own change.
+
+**What the sources say (as reported, one line each)**
+
+- Xbox Accessibility Guidelines 101 and 102: scalable text and a high-contrast option.
+- XAG 107 and the Game Accessibility Guidelines (basic): remapping, text size and colour
+  options are the most-missed; adjustable game speed and saved settings are basic.
+- XAG 108: difficulty presets, changeable at any time; single-player games pausable.
+- XAG 114, 115 and 117: labelled groups with context help; confirmation for destructive
+  actions and a reset to defaults; a way to switch off motion and flashes.
+- Options-menu write-ups: reachable from the main menu and the pause menu, applied at once,
+  kept outside the save, with a reset to defaults; a dependent option sits beside its parent,
+  greyed with its reason.
+- Comparable games (Slay the Spire, Into the Breach, Slice & Dice, Celeste): comfort options
+  live in Settings; seed, difficulty and modifiers are chosen when a run is started;
+  rule-changing or debug switches sit apart and are labelled.
+- Not opened or not verified: no GDC talk; Monster Train's and Dice Legacy's menus.
+
+**Audit of today's eight rows**
+
+| Row | What it is | Proposal |
+|-----|-----------|----------|
+| Class Evolution | Game mode | Keep, in a group of its own with the profile reset |
+| Third battle | Run rule | Move to a demo group; the player already decides after Battle 2 |
+| Mastery pace | Pacing aid | Move to the demo group |
+| Roster size | Profile capacity | Move to the demo group |
+| New profile starts as | Demo preset | Move to the demo group, beside the reset that applies it |
+| Dice seed | Run option | Move to the New Run screen, with a seed that can be typed |
+| Animation | Comfort | Keep, first group, named "Motion and flashes" |
+| Window size | Display | Keep, first group |
+
+**Proposed structure (not built)**
+
+| Group | Options | State |
+|-------|---------|-------|
+| 1. Display and comfort | Window size; Motion and flashes | Exist |
+| | Text size (Normal, Large); High contrast; Battle speed at start | New, small; text size needs a layout check on every screen |
+| 2. Play aids | Confirm before passing with an unused die; Tooltip delay; Controls (the help screen) | New, small; help screen exists |
+| 3. Run options (New Run screen) | Dice seed, random or typed | Toggle exists; typed entry new |
+| | Difficulty presets | Large: needs balance work; not proposed for the demo |
+| 4. Class Evolution | On or off; Reset the saved profile | Exist |
+| 5. Demo and testing | Mastery pace; New profile starts as; Roster size; Third battle | Exist; greyed with the reason while Class Evolution is off |
+| Whole screen | Open Settings from the pause menu; Reset all settings to defaults | New, small |
+
+Guidance also recommends audio controls, subtitles, key remapping and controller support. The
+game has no audio and no controller support; remapping is not small. None is proposed.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 

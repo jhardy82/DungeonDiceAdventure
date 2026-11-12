@@ -153,7 +153,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1116 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1128 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -283,11 +283,15 @@ What changes with the gate on:
   1 more mana. The die says so when it can ("Field Medic: revive for 2 mana"), and the downed
   ally becomes a target. A skill the rules of battle do not know yet is listed and cannot be
   equipped.
-- **Changing vocation inside a run.** After Battle 1, before you choose the upgrade, the upgrade
-  screen's **Career (C)** button lets the selected hero claim a vocation or change to one it has
-  unlocked. It fights on with the new vocation's dice, its health and mana carry over in
-  proportion, and the upgrade cards are dealt anew for the new dice. During a battle and after
-  the upgrade nothing can be changed.
+- **Changing vocation inside a run.** There are two moments, both between battles:
+  - After Battle 1, before you choose the upgrade: the upgrade screen's **Career (C)** button
+    lets the selected hero claim a vocation or change to one it has unlocked. The upgrade cards
+    are dealt anew for its new dice.
+  - After Battle 2, before you stop or fight on: each hero has a **Career** button. No upgrade
+    is dealt there, and an upgraded die the hero gives up loses its upgrade.
+
+  Either way the hero fights on with the new vocation's dice, and its health and mana carry
+  over in proportion. During a battle, and after the upgrade is chosen, nothing can be changed.
 - **After Battle 2** you may end the run with a victory or fight a third battle. Losing it
   loses the run; mastery already earned is kept.
 - **The save file** is `saves/profile.sqlite` beside the `logs` folder (the per-user application

@@ -925,9 +925,12 @@ class AppController:
 
     def die_name(self, hero_id: str, die_id: str) -> str:
         """A die's name as its hero holds it in this run. An evolved hero's dice are not in the shipped content."""
-        if self.engine is not None:
-            return self.engine.die_for(hero_id, die_id).name
-        return self.content.die(die_id).name
+        try:
+            if self.engine is not None:
+                return self.engine.die_for(hero_id, die_id).name
+            return self.content.die(die_id).name
+        except KeyError:  # a die the hero gave up with a vocation it no longer is: named from its id
+            return die_id.replace("_", " ").capitalize()
 
     def member_name(self, member: dict[str, str]) -> str:
         if self.progression is not None and "hero_id" in member:
@@ -1118,14 +1121,15 @@ class AppController:
         chosen = next(row for row in rows if row.get("vocation_id") == selected)
         return {"hero_id": hero_id, "name": hero.display_name or hero_id, "active_vocation_id": hero.active_vocation_id,
                 "rows": rows, "selected": selected, "selected_needs": chosen["needs"], "in_run": in_run,
-                "open_now": open_now, "locked": locked, "fighting": in_run and link.run_hero(hero_id) is not None}
+                "open_now": open_now, "locked": locked, "fighting": in_run and link.run_hero(hero_id) is not None,
+                "deciding": self.engine is not None and self.engine.state.phase == RunPhase.CONTINUE}
 
     #: Why a hero cannot claim or change right now, inside a run.
-    CHANGE_LOCKED = "Inside a run a hero can change only right after a battle, before the upgrade is chosen."
+    CHANGE_LOCKED = "Inside a run a hero can change only between battles: before the upgrade is chosen, or before you stop or fight on."
 
     def change_window_open(self) -> bool:
-        """True inside a run at the one moment a hero may take another vocation: recovery done, upgrade not chosen."""
-        return self.engine is not None and not self.engine.finished() and self.engine.state.phase == RunPhase.UPGRADE
+        """True inside a run at a moment a hero may take another vocation: before the upgrade is chosen, or at the stop-or-fight-on decision."""
+        return self.engine is not None and not self.engine.finished() and self.engine.state.phase in (RunPhase.UPGRADE, RunPhase.CONTINUE)
 
     def saved_hero_of(self, run_hero_id: str) -> str | None:
         """The saved hero behind a hero of the current run, when there is one."""
@@ -1191,7 +1195,10 @@ class AppController:
             assert run_hero is not None and self.engine is not None
             self.upgrade_hero, self.upgrade_offer = run_hero, None
             self.upgrade_die = self.engine.combat.combatants[run_hero].equipped_dice_ids[0]
-            self.info(f"{hero_name} is now a {name} and fights on as one. Its health and mana were carried over; choose the upgrade for its new dice.")
+            if self.engine.state.phase == RunPhase.UPGRADE:
+                self.info(f"{hero_name} is now a {name} and fights on as one. Its health and mana were carried over; choose the upgrade for its new dice.")
+            else:
+                self.info(f"{hero_name} is now a {name} and fights on as one. Its health and mana were carried over.")
             return
         self.info(f"{hero_name} has unlocked {name}." if what == "claim" else f"{hero_name} is now a {name}.")
 
@@ -1204,7 +1211,8 @@ class AppController:
         threat = None
         if self.progression is not None and encounter_id is not None:
             threat = next((e["threat_rating"] for e in self.progression.catalog.raw["encounters"] if e["id"] == encounter_id), None)
-        heroes = [{"id": h.id, "name": h.name, "hp": h.hp, "max_hp": h.max_hp, "mana": h.mana, "max_mana": h.max_mana, "row": h.row}
+        heroes = [{"id": h.id, "name": h.name, "hp": h.hp, "max_hp": h.max_hp, "mana": h.mana, "max_mana": h.max_mana, "row": h.row,
+                   "saved_hero_id": self.saved_hero_of(h.id), "vocation_name": engine.build(h.id).name}
                   for h in engine.combat.side("hero")]
         return {"encounter_id": encounter_id, "threat_rating": threat, "heroes": heroes, "awards": self.awards_view(),
                 "battle": engine.state.encounter_index + 1}

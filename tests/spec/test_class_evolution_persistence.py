@@ -303,8 +303,9 @@ def test_run_phases_are_the_engine_phases(loaded):
     """Defect 9: v0.1 used party_setup / preparation / combat / outcome, which the engine does not have."""
     engine_phases = sorted(value for name, value in vars(RunPhase).items() if name.isupper())
     assert engine_phases == ["battle", "continue", "defeat", "equipment", "upgrade", "victory"]
-    # 'continue' (Phase 4: stop or fight on) is saved as 'equipment': between battles, every build fixed.
-    assert career_model.SAVED_AS == {"continue": "equipment"}
+    # 'continue' (Phase 4: stop or fight on) is saved as 'upgrade': between battles, a build may change
+    # (owner decision of 2026-11-12). Before that decision it was saved as 'equipment', every build fixed.
+    assert career_model.SAVED_AS == {"continue": "upgrade"}
     saved_phases = sorted({career_model.saved_run_phase(phase) for phase in engine_phases})
     assert saved_phases == sorted(career_model.SAVED_RUN_PHASES) == ["battle", "defeat", "equipment", "upgrade", "victory"]
     with pytest.raises(ValueError, match="no run phase"):

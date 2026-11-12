@@ -1010,3 +1010,72 @@ def test_no_text_is_cut_off_around_a_change_inside_a_run(tmp_path, monkeypatch, 
     play.app.frame(0)
     assert "Career  (C)" in drawn and play.ctrl.CHANGE_LOCKED in drawn
     assert shortened == [] and play.app.render_faults == 0, shortened
+
+
+# --------------------------------------------------------------------------------------------
+# The second moment for a change: the decision to stop or fight on (owner decision of 2026-11-12)
+# --------------------------------------------------------------------------------------------
+
+
+def at_the_decision_with_a_squire_who_may_be_a_guardian(tmp_path, size=(1280, 720)) -> Configured:
+    play = after_battle_one_with_a_squire_who_may_be_a_guardian(tmp_path, size=size)
+    engine = play.ctrl.engine
+    assert engine is not None
+    play.click("up:offer:0")
+    play.ctrl.apply_upgrade()
+    play.ctrl.start_next_battle()
+    win_battle(engine)
+    play.ctrl.refresh()
+    play.app.frame(0)
+    assert play.ctrl.screen == Screen.CONTINUE and "iron_d6" in engine.state.die_overrides["h01"]
+    return play
+
+
+def test_before_stopping_or_fighting_on_a_hero_becomes_a_guardian(tmp_path, monkeypatch):
+    play = at_the_decision_with_a_squire_who_may_be_a_guardian(tmp_path)
+    engine = play.ctrl.engine
+    drawn, shortened = record_text(monkeypatch)
+    play.app.frame(0)
+    view = play.ctrl.continue_view()
+    assert [(h["id"], h["saved_hero_id"], h["vocation_name"]) for h in view["heroes"]] == [("h01", "hero_001", "Squire"), ("h02", "hero_002", "Scout")]
+    assert play.ctrl.change_window_open() and play.ui.widget("continue:career:h02") is not None
+    play.click("continue:career:h02")
+    assert play.ctrl.career_hero == "hero_002"
+    play.key(pygame.K_ESCAPE)
+    play.key(pygame.K_c)  # the first hero's career
+    assert play.ctrl.screen == Screen.CAREER and play.ctrl.career_hero == "hero_001"
+    career = play.ctrl.career_view()
+    assert (career["open_now"], career["fighting"], career["deciding"]) == (True, True, True)
+    assert any(text.startswith("Before you stop or fight on this hero may take another vocation.") for text in drawn)
+    hp = engine.combat.combatants["h01"].hp
+    play.click("career:guardian:activate")
+    fighter = engine.combat.combatants["h01"]
+    assert (fighter.archetype_id, fighter.max_hp, fighter.equipped_dice_ids) == ("guardian", 18, ["guardian_d6", "guardian_d4"])
+    assert fighter.hp == -((-hp * 18) // 15) and "h01" not in engine.state.die_overrides
+    assert play.ctrl.message == "Squire 1 is now a Guardian and fights on as one. Its health and mana were carried over."
+    play.key(pygame.K_ESCAPE)
+    assert play.ctrl.screen == Screen.CONTINUE and play.ctrl.continue_view()["heroes"][0]["vocation_name"] == "Guardian"
+    assert "Guardian" in drawn and play.app.render_faults == 0 and shortened == [], shortened
+    # The upgrade of Battle 1 was on a die the hero no longer holds: it is still named, not looked up in vain.
+    assert play.ctrl.die_name("h01", "iron_d6") == "Iron d6" and play.ctrl.die_name("h01", "no_such_die") == "No such die"
+    play.key(pygame.K_f)
+    assert play.ctrl.screen == Screen.BATTLE and engine.state.encounter_index == 2
+    assert engine.combat.combatants["h01"].archetype_id == "guardian" and play.app.render_faults == 0
+    play.ctrl.open_career("hero_001")
+    play.app.frame(0)
+    assert play.ui.widget("career:squire:activate").reason == play.ctrl.CHANGE_LOCKED
+
+
+@pytest.mark.parametrize("size", SIZES)
+def test_no_text_is_cut_off_at_the_decision_with_its_career_buttons(tmp_path, monkeypatch, font, size):  # noqa: F811
+    play = at_the_decision_with_a_squire_who_may_be_a_guardian(tmp_path, size=size)
+    drawn, shortened = record_text(monkeypatch)
+    play.app.frame(0)
+    play.ctrl.open_career("hero_001")
+    play.app.frame(0)
+    play.ctrl.change_vocation("guardian")
+    play.app.frame(0)
+    play.ctrl.close_career()
+    play.app.frame(0)
+    assert "Career" in drawn and "Guardian" in drawn and shortened == [], shortened
+    assert play.app.render_faults == 0

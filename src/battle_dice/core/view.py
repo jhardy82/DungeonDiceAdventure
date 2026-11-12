@@ -530,7 +530,8 @@ def describe_event(event: CombatEvent, names: dict[str, str], die_names: dict[st
     if kind == EventType.VOCATION_CHANGED:
         vocation = d["to"].replace("_", " ").title()
         return (f"{name(d['id'])} is now a {vocation}: HP {d['hp'][0]}/{d['max_hp'][0]} -> {d['hp'][1]}/{d['max_hp'][1]}, "
-                f"mana {d['mana'][0]}/{d['max_mana'][0]} -> {d['mana'][1]}/{d['max_mana'][1]}, new dice and new upgrade offers.")
+                f"mana {d['mana'][0]}/{d['max_mana'][0]} -> {d['mana'][1]}/{d['max_mana'][1]}, "
+                + ("new dice and new upgrade offers." if d["offers"] else "new dice."))
     return None
 
 
