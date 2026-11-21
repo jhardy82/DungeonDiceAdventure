@@ -1172,7 +1172,7 @@ def draw_roster_setup(ui: UI, ctrl: AppController) -> None:
         name = ctrl.class_view(class_id)["name"]
         ui.button(f"add:{class_id}", 600 + position * 220, 606, 212, 50, f"Recruit {name} ({position + 1})",
                   partial(ctrl.add_hero, class_id), enabled=not roster_full,
-                  reason=f"The roster is full ({limit} heroes).", hotkeys=(NUMBER_KEYS[position],),
+                  reason=f"The roster is full ({limit} heroes). {ctrl.ROSTER_FULL_HINT}", hotkeys=(NUMBER_KEYS[position],),
                   tooltip=f"Recruit a new {name}. It joins the party if there is room. Recruiting is free.")
     draw_seed_pad(ui, ctrl)
     status_bar(ui, ctrl)
@@ -1225,6 +1225,10 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
     skills_tab = ctrl.career_tab == "skills"
     ui.button("career:tab", 248, 630, 220, 44, "Vocation  (K)" if skills_tab else "Skills  (K)", ctrl.toggle_career_skills,
               hotkeys=(pygame.K_k,), tooltip="Show the vocation's details." if skills_tab else "Show the skills this hero has learned and equip them.")
+    asking = ctrl.asked(f"dismiss:{view['hero_id']}")
+    ui.button("career:dismiss", 480, 630, 220, 44, "Press again: dismiss" if asking else "Dismiss this hero", ctrl.dismiss_hero,
+              enabled=view["dismiss_problem"] is None, reason=view["dismiss_problem"], selected=asking,
+              tooltip="Remove this hero from the roster for good. Everything it has mastered is lost. You are asked once more.")
     if skills_tab:
         draw_career_skills(ui, ctrl)
         ui.button("career:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_career, hotkeys=(pygame.K_b,), default=True)
@@ -1248,6 +1252,8 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
     y += 24
     if view["change_preview"]:
         y = ui.paragraph(x, y, view["change_preview"], 448, 13, Theme.WARN, line_height=16, max_lines=4) + 5
+    if view["selected_note"]:
+        y = ui.paragraph(x, y, view["selected_note"], 448, 13, Theme.WARN, line_height=16, max_lines=4) + 5
     if view["selected_needs"]:
         ui.text(x, y, "To claim", 14, Theme.WARN, bold=True)
         y = ui.paragraph(x + 76, y, view["selected_needs"], 372, 14, Theme.TEXT, line_height=17, max_lines=5) + 5

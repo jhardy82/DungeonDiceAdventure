@@ -1246,7 +1246,7 @@ class AppController:
         result = link.recruit(starting_class)
         if not result.accepted:
             limit = (result.error_details or {}).get("roster_limit", "")
-            self.warn({"ROSTER_FULL": f"The roster is full ({limit} heroes). Nobody can be recruited.",
+            self.warn({"ROSTER_FULL": f"The roster is full ({limit} heroes). {self.ROSTER_FULL_HINT}",
                        "PHASE_LOCKED": "Heroes are recruited between runs, not during one."}.get(str(result.error_code), "That hero cannot be recruited."))
             return
         (hero_id,) = set(link.state.heroes) - before
@@ -1257,6 +1257,42 @@ class AppController:
             self.info(f"Recruited {name} and added it to the party.")
         else:
             self.info(f"Recruited {name}. The party is full, so it waits in the roster.")
+
+    #: What a player can do about a full roster (owner decision D-35).
+    ROSTER_FULL_HINT = "To make room, dismiss a hero on its Career screen."
+
+    def dismiss_problem(self, hero_id: str) -> str | None:
+        """Why this hero cannot be dismissed right now, or None."""
+        link = self.progression
+        assert link is not None
+        name = link.state.heroes[hero_id].display_name or hero_id
+        if not link.career.service.between_runs():
+            return "Heroes are dismissed between runs, not during one."
+        if any(member.get("hero_id") == hero_id for member in self.party):
+            return f"{name} is in the party. Remove it from the party first."
+        return None
+
+    def dismiss_hero(self) -> None:
+        """Dismiss the hero whose career is open. It cannot be undone, so it is asked once more."""
+        self._guard(self._dismiss_hero)
+
+    def _dismiss_hero(self) -> None:
+        link, hero_id = self.progression, self.career_hero
+        assert link is not None and hero_id is not None
+        problem = self.dismiss_problem(hero_id)
+        if problem:
+            self.warn(problem)
+            return
+        name = link.state.heroes[hero_id].display_name or hero_id
+        if not self._ask_once(f"dismiss:{hero_id}", f"Press again to dismiss {name} for good. Everything it has mastered is lost."):
+            return
+        result = link.dismiss(hero_id)
+        if not result.accepted:
+            self.warn({"PHASE_LOCKED": "Heroes are dismissed between runs, not during one."}.get(str(result.error_code), f"{name} cannot be dismissed."))
+            return
+        self.close_career()
+        limit = link.career.service.roster_limit
+        self.info(f"{name} was dismissed. The roster has {len(link.state.heroes)} of {limit} heroes.")
 
     def _add_to_party(self, hero_id: str) -> None:
         hero = self.progression.state.heroes[hero_id]
@@ -1368,7 +1404,13 @@ class AppController:
                 top = link.catalog.thresholds(vocation_id)
                 progress = "mastered" if entry["mastered"] else f"rank {mastery.rank}, {mastery.points}/{top[mastery.rank]} to the next"
                 status = f"{status}: {progress}"
+            # A requirement can stop being met after the claim: a slower Mastery pace lowers ranks. What a hero has
+            # opened stays open (owner decision D-35), and the screen says so.
+            # (A starting class has no requirement, so no routes, and never carries the note.)
+            earlier = bool(entry["unlocked"] and link.catalog.routes.get(vocation_id)
+                           and all(route.unmet for route in link.career.service.routes(hero, vocation_id)))
             rows.append({**entry, "status": status, "needs": needs, "playable": playable,
+                         "note": self.OPENED_EARLIER if earlier else "",
                          "can_claim": playable and not entry["unlocked"] and not needs and open_now,
                          "can_activate": playable and entry["unlocked"] and not entry["active"] and open_now})
         selected = self.career_vocation or hero.active_vocation_id
@@ -1386,10 +1428,13 @@ class AppController:
                       f"It fights on with the dice below. Bench die: {', '.join(bench) if bench else 'none'}.")
         return {"hero_id": hero_id, "name": hero.display_name or hero_id, "active_vocation_id": hero.active_vocation_id,
                 "own_stats": own, "stat_bonus": {stat: amount for stat, amount in bonus.items() if amount}, "change_preview": change,
-                "rows": rows, "selected": selected, "selected_needs": chosen["needs"], "in_run": in_run,
+                "rows": rows, "selected": selected, "selected_needs": chosen["needs"], "selected_note": chosen.get("note", ""), "in_run": in_run,
+                "dismiss_problem": self.dismiss_problem(hero_id),
                 "open_now": open_now, "locked": locked, "fighting": in_run and link.run_hero(hero_id) is not None,
                 "deciding": self.engine is not None and self.engine.state.phase == RunPhase.CONTINUE}
 
+    #: Said of a vocation a hero holds although its requirement is not met now (a slower Mastery pace lowered a rank).
+    OPENED_EARLIER = "Opened at an earlier Mastery pace. Its requirement is not met at the present pace, and it stays open: what a hero has opened is never taken away."
     #: Why a hero cannot claim or change right now, inside a run.
     CHANGE_LOCKED = "Inside a run a hero can change only between battles: before the upgrade is chosen, or before you stop or fight on."
 

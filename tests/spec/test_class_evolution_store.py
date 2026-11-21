@@ -286,7 +286,7 @@ def test_the_clues_already_counted_are_remembered_across_a_reopen(catalog: Caree
 def test_a_new_file_gets_the_schema_and_the_catalog_and_a_second_open_changes_nothing(catalog: CareerCatalog, tmp_path: Path) -> None:
     path = tmp_path / "nested" / "save.sqlite"
     with open_store(path, catalog) as first:
-        assert first.schema_version() == store_module.BASELINE_VERSION == 2 and first.backup_path is None
+        assert first.schema_version() == store_module.target_version() == 3 and store_module.BASELINE_VERSION == 2 and first.backup_path is None
         assert first.conn.execute("PRAGMA foreign_keys").fetchone() == (1,)
         assert first.conn.execute("SELECT COUNT(*) FROM vocation_def").fetchone() == (14,)
         assert first.conn.execute("SELECT COUNT(*) FROM skill_def").fetchone() == (14,)
@@ -317,23 +317,46 @@ def test_an_older_save_is_backed_up_then_migrated_and_a_newer_one_is_refused(cat
     store.close()
 
     # A later build with one more schema version.
-    monkeypatch.setitem(store_module.MIGRATIONS, 3, "CREATE TABLE profile_note (profile_id TEXT PRIMARY KEY, note TEXT NOT NULL) STRICT")
+    monkeypatch.setitem(store_module.MIGRATIONS, 4, "CREATE TABLE profile_note (profile_id TEXT PRIMARY KEY, note TEXT NOT NULL) STRICT")
     with open_store(path, catalog) as migrated:
-        assert migrated.schema_version() == 3 and migrated.backup_path == Path(f"{path}.v2.bak")
-        assert migrated.conn.execute("SELECT MAX(version) FROM schema_migration").fetchone() == (3,)
+        assert migrated.schema_version() == 4 and migrated.backup_path == Path(f"{path}.v3.bak")
+        assert migrated.conn.execute("SELECT MAX(version) FROM schema_migration").fetchone() == (4,)
         assert migrated.conn.execute("SELECT COUNT(*) FROM profile_note").fetchone() == (0,)
         assert saved_view(StoredCareerService(migrated, PROFILE).service) == before, "the migration kept every row"
     with open_store(path, catalog) as again:
         assert again.backup_path is None, "already migrated: no second backup"
     with open_store(tmp_path / "fresh.sqlite", catalog) as fresh:
-        assert fresh.schema_version() == 3 and fresh.backup_path is None, "a new file has nothing to back up"
+        assert fresh.schema_version() == 4 and fresh.backup_path is None, "a new file has nothing to back up"
 
     # The backup is the save as it was, readable by the build that wrote it.
-    monkeypatch.delitem(store_module.MIGRATIONS, 3)
-    with open_store(f"{path}.v2.bak", catalog) as backup:
-        assert backup.schema_version() == 2 and saved_view(StoredCareerService(backup, PROFILE).service) == before
+    monkeypatch.delitem(store_module.MIGRATIONS, 4)
+    with open_store(f"{path}.v3.bak", catalog) as backup:
+        assert backup.schema_version() == 3 and saved_view(StoredCareerService(backup, PROFILE).service) == before
     with pytest.raises(SaveError, match="written by a newer build"):
         open_store(path, catalog)
+
+
+def test_a_save_of_schema_two_gains_the_dismissal_column_and_keeps_every_hero(catalog: CareerCatalog, tmp_path: Path) -> None:
+    """The first real migration (owner decision D-35): a save written before heroes could be dismissed."""
+    path = tmp_path / "save.sqlite"
+    store, stored, _ = seeded(CASES["CE-03"], catalog, path)
+    assert apply(stored, CASES["CE-03"]["when"]).accepted
+    before = saved_view(stored.service)
+    store.close()
+    # The file as the build before D-35 left it: schema 2, no such column, no record of a third version.
+    older = sqlite3.connect(path, isolation_level=None)
+    older.execute("ALTER TABLE hero DROP COLUMN dismissed_at")
+    older.execute("DELETE FROM schema_migration WHERE version = 3")
+    older.execute("PRAGMA user_version = 2")
+    assert "dismissed_at" not in [row[1] for row in older.execute("PRAGMA table_info(hero)")]
+    older.close()
+    with open_store(path, catalog) as migrated:
+        assert migrated.schema_version() == 3 and migrated.backup_path == Path(f"{path}.v2.bak")
+        assert "dismissed_at" in [row[1] for row in migrated.conn.execute("PRAGMA table_info(hero)")]
+        assert migrated.conn.execute("SELECT COUNT(*) FROM hero WHERE dismissed_at IS NOT NULL").fetchone() == (0,)
+        again = StoredCareerService(migrated, PROFILE)
+        assert saved_view(again.service) == before and again.state.dismissed == [], "every hero is still on the roster"
+        assert migrated.verify_event_chain(PROFILE) >= 1
 
 
 def test_a_failed_migration_leaves_the_save_at_its_old_version(catalog: CareerCatalog, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -341,12 +364,12 @@ def test_a_failed_migration_leaves_the_save_at_its_old_version(catalog: CareerCa
     store, _, _ = seeded(CASES["CE-03"], catalog, path)
     before = dump(store)
     store.close()
-    monkeypatch.setitem(store_module.MIGRATIONS, 3, "CREATE TABLE profile_note (id INTEGER PRIMARY KEY) STRICT; INSERT INTO no_such_table VALUES (1)")
+    monkeypatch.setitem(store_module.MIGRATIONS, 4, "CREATE TABLE profile_note (id INTEGER PRIMARY KEY) STRICT; INSERT INTO no_such_table VALUES (1)")
     with pytest.raises(sqlite3.OperationalError):
         open_store(path, catalog)
-    monkeypatch.delitem(store_module.MIGRATIONS, 3)
+    monkeypatch.delitem(store_module.MIGRATIONS, 4)
     with open_store(path, catalog) as intact:
-        assert intact.schema_version() == 2 and dump(intact) == before
+        assert intact.schema_version() == 3 and dump(intact) == before
 
 
 def test_a_file_that_is_not_a_save_is_refused(catalog: CareerCatalog, tmp_path: Path) -> None:

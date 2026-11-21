@@ -170,7 +170,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1356 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
+python -m pytest                 # 1382 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -302,14 +302,20 @@ menu's status bar shows that the gate is on.
 What changes with the gate on:
 
 - **Party setup** shows your saved heroes. Recruit a Squire, an Apprentice or a Scout (keys 1,
-  2, 3); recruiting is free and a roster holds 12 heroes.
+  2, 3); recruiting is free and a roster holds 12 heroes. A recruit is named "Recruit 1", "Recruit 2"
+  and so on, with its class beside the name: every hero can take any of the three starting
+  classes, so the name does not say one.
+- **Dismiss this hero** on a hero's Career screen removes it from the roster for good, with
+  everything it has mastered. You are asked once more. It works between runs, and for a hero
+  that is not in the party. This is how a full roster gets room again.
 - **Every won battle earns mastery** for each hero in the party. The upgrade screen (under its
   heading), the outcome screen and the status line say what was earned, or why nothing was.
 - **Career** (the button on a party slot or a roster row) lists what a hero has mastered and
   what it can become. Vocations that are not discovered show as `???`. A vocation the rules
   cannot run yet is marked "Coming later". The numbers on the right are the hero's own as that
   vocation; where its mastery adds something, the vocation's own number is named too
-  ("HP 18 (17 +1 mastery)").
+  ("HP 18 (17 +1 mastery)"). A vocation a hero has opened stays open; if a slower Mastery pace
+  later takes the rank it needed, the screen says "Opened at an earlier Mastery pace".
 - **Skills** (key K on the Career screen) lists the skills a hero has learned and lets you equip
   them between runs. A mastered vocation teaches one. The first that works in battle is the
   Guardian's **Field Medic**: once per battle its Heal may bring a downed ally back at 5 HP, for
@@ -356,8 +362,8 @@ right, so the profile is made with that start. Esc returns to the main menu; **N
 
 **Run 1: Field Medic and the third battle** (start: *A Guardian with Field Medic*)
 
-1. In the roster on the right, click a hero to put it into the party. Take "Squire 1" (the
-   Guardian), the Scout and the Apprentice.
+1. In the roster on the right, click a hero to put it into the party. Take "Recruit 1" (the
+   Guardian), the Scout and the Apprentice. The roster names each hero's class beside its name.
 2. Click **Career** on the Guardian's slot, then press **K**: Field Medic is equipped. Esc.
 3. **Begin Encounter (B)**. When an ally is down and the Guardian rolls its Heal, the die says
    "Field Medic: revive at 5 HP". Use the die and pick the downed ally. It needs
@@ -366,7 +372,7 @@ right, so the profile is made with that start. Esc returns to the main menu; **N
 
 **Run 2: becoming a Guardian inside a run** (start: *A Guardian at rank 1*)
 
-1. In the party setup, add "Squire 1" and click **Career** on its slot. Select **Squire** and
+1. In the party setup, add "Recruit 1" (the Guardian) and click **Career** on its slot. Select **Squire** and
    press **Make active**: the hero is a Squire again and keeps the Guardian unlocked. Esc.
 2. Add the Scout and begin. Win Battle 1.
 3. On the upgrade screen press **Career (C)** and select **Guardian**. The panel on the right

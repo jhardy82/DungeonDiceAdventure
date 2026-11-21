@@ -46,7 +46,11 @@ SCHEMA_PATH = Path(__file__).resolve().parent / "schema" / "progression.sql"
 #: The schema version of ``progression.sql``. Later versions are reached through ``MIGRATIONS``.
 BASELINE_VERSION = 2
 #: version -> SQL that takes a file from the version before it to this one (it must not touch ``user_version``).
-MIGRATIONS: dict[int, str] = {}
+MIGRATIONS: dict[int, str] = {
+    # Owner decision D-35: a hero can be dismissed. Its row stays, so everything that points at it (awards,
+    # item history, the event log) stays whole; the time of the dismissal marks it as gone from the roster.
+    3: "ALTER TABLE hero ADD COLUMN dismissed_at TEXT",
+}
 #: Oldest SQLite the schema runs on: STRICT tables (3.37.0) and built-in ``json_valid`` (3.38.0).
 MIN_SQLITE_VERSION = (3, 38, 0)
 ZERO_HASH = "0" * 64
@@ -236,7 +240,9 @@ class SqliteProfileStore:
         state = CareerState(profile)
         heroes = conn.execute(
             "SELECT hero_id, active_vocation_id, eligibility_state, revision, origin_vocation_id, display_name FROM hero "
-            "WHERE profile_id = ? ORDER BY rowid", (profile_id,)).fetchall()
+            "WHERE profile_id = ? AND dismissed_at IS NULL ORDER BY rowid", (profile_id,)).fetchall()
+        state.dismissed = [row[0] for row in conn.execute(
+            "SELECT hero_id FROM hero WHERE profile_id = ? AND dismissed_at IS NOT NULL ORDER BY rowid", (profile_id,))]
         for hero_id, active, eligibility, revision, origin, name in heroes:
             hero = HeroRecord(hero_id, active, eligibility, revision, origin_vocation_id=origin, display_name=name)
             for vocation_id, route_id in conn.execute(
@@ -389,6 +395,9 @@ class SqliteProfileStore:
                          hero.eligibility_state, hero.revision, now))
                     earlier = HeroRecord(hero_id, hero.active_vocation_id, hero.eligibility_state, hero.revision)
                 self._write_hero(conn, earlier, hero, now, claimed)
+            for hero_id in before.heroes:
+                if hero_id not in after.heroes:  # dismissed by this change: the row stays, marked
+                    conn.execute("UPDATE hero SET dismissed_at = ? WHERE hero_id = ? AND profile_id = ?", (now, hero_id, profile_id))
             self._fault("unlock_insert")
             self._write_profile_rows(conn, before, after, now)
             conn.execute("UPDATE player_profile SET revision = revision + 1 WHERE profile_id = ?", (profile_id,))

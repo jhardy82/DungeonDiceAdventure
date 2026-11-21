@@ -29,8 +29,8 @@ Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.36),
 
 ### Open Questions
 - **Playtest findings (2026-11-21):** fixed in five batches (D-34; decision log sections 7.32 to
-  7.36; rules 1.1.2). Still for the owner: dismissing a hero (R3), starting classes (R4), what a
-  slower mastery pace does to a vocation already opened (R5), and the seven findings left as
+  7.36; rules 1.1.2). R3, R4 and R5 were decided and built on 2026-11-21 (D-35, section 7.38).
+  Still for the owner: the seven findings left as
   they are and three fixed in part (section 7.36 gives the reason for each).
 - **Android (D-33):** phase 0 of `docs/android/PLAN.md`, the walking skeleton, is built and was
   built and started on GitHub. Four of the seven go or no-go checks hold. Open: the owner

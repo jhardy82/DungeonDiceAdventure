@@ -206,7 +206,7 @@ section 7.32.
 | 4. Rules | R1 (Imbue), R2 and D2 (free heal) | Fixed (rules 1.1.2) |
 | 5. Other information and layout | M3, M5, M6, M7 (the seed line), M9, M11 (five wordings), L4, L7, A3, S4 | Fixed |
 | Not changed, with the reason for each | M4, M7 (the totals), M11 ("one targeted ally"), L1, L2, L3, L5, L6, A4, S3 (Abandon, then Quit) | Decision log, section 7.36 |
-| Not decided by the owner | R3 (dismiss a hero), R4 (starting classes), R5 (mastery pace) | Waiting |
+| 6. Decided by the owner on 2026-11-21 (D-35) | R3 (a hero can be dismissed), R4 (a recruit's name says no class), R5 (a vocation opened at a faster pace stays open, and the screen says so) | Fixed (decision log, section 7.38) |
 
-Of the 57 findings with an ID, 44 are fixed, 3 are fixed in part (S3, M7, M11), 7 are left as
-they are with a reason, and 3 wait for the owner.
+Of the 57 findings with an ID, 47 are fixed, 3 are fixed in part (S3, M7, M11), and 7 are left
+as they are with a reason. None waits for a decision.
