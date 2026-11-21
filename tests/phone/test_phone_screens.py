@@ -268,7 +268,11 @@ case "$*" in
     if [ "$(cat "$state/turned")" = 1 ]; then printf '\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\x0c\x30\0\0\x05\xa0'
     else printf '\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\x05\xa0\0\0\x0c\x30'; fi ;;
   "shell settings put system user_rotation "*) echo "$*" >> "$state/settings"; [ -f "$state/stuck" ] || echo "$6" > "$state/turned" ;;
+  "emu sensor set acceleration 9.81:0:0") echo "$*" >> "$state/settings"; [ -f "$state/stuck" ] || echo 1 > "$state/turned" ;;
+  "emu sensor set acceleration 0:9.81:0") echo "$*" >> "$state/settings"; echo 0 > "$state/turned" ;;
   "shell settings put "*|"shell cmd window user-rotation lock "*) echo "$*" >> "$state/settings" ;;
+  "shell settings get system "*) echo 0 ;;
+  "shell dumpsys window displays") printf '  mDisplayRotation=ROTATION_0\n  size of the display\n  mLastOrientation=-1\n' ;;
   *) echo "the stand-in for adb does not know: $*" >&2; exit 9 ;;
 esac
 """
@@ -328,10 +332,14 @@ def test_the_emulator_check_passes_when_every_start_passes_and_the_layout_follow
     assert report[5] == "3_sideways: BATTLE DICE SCREEN: layout=sideways width=891 height=411 (expected sideways; the screenshot is 3120x1440)"
     assert report[7] == "4_started_sideways: BATTLE DICE SCREEN: layout=sideways width=891 height=411 (expected sideways; the screenshot is 3120x1440)"
     assert all((out / f"{name}.png").stat().st_size == 24 and (out / f"{name}_logcat.txt").is_file() for name in STARTS)
-    # The larger font is set for the second start only. The screen is turned in the third and fourth, and turned back.
+    # The larger font is set for the second start only. The screen is turned in the third start and turned back;
+    # for the fourth the device is held sideways with its screen free to turn, and put back upright and locked.
     turn = lambda way: ["shell settings put system accelerometer_rotation 0", f"shell settings put system user_rotation {way}", f"shell cmd window user-rotation lock {way}"]  # noqa: E731
+    free = "shell settings put system accelerometer_rotation 1"
     assert (state / "settings").read_text(encoding="utf-8").splitlines() == [
-        "shell settings put system font_scale 1.3", "shell settings put system font_scale 1.0", *turn(1), *turn(0), *turn(1), *turn(0)]
+        "shell settings put system font_scale 1.3", "shell settings put system font_scale 1.0", *turn(1), *turn(0),
+        free, "emu sensor set acceleration 9.81:0:0", free, "emu sensor set acceleration 0:9.81:0", "shell settings put system accelerometer_rotation 0"]
+    assert "auto-rotate" not in done.stdout, "the device's rotation facts are printed only when a layout is wrong"
     assert (state / "turned").read_text(encoding="utf-8").strip() == "0"
 
 
@@ -376,6 +384,9 @@ def test_the_report_shows_when_it_was_the_screen_that_did_not_turn(tmp_path):
     done, _, _ = emulator_check(tmp_path, [PASSED, PASSED, PASSED], stuck=True)
     assert done.returncode == 1
     assert "3_sideways: BATTLE DICE SCREEN: layout=upright width=411 height=891 (expected sideways; the screenshot is 1440x3120)" in done.stdout
+    # What the device says about its rotation follows each wrong layout, in the job's log and in the report.
+    facts = "    auto-rotate: 0, user rotation: 0\n    mDisplayRotation=ROTATION_0\n    mLastOrientation=-1\n"
+    assert done.stdout.count(facts) == 2 and "size of the display" not in done.stdout
 
 
 @needs_bash
