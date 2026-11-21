@@ -177,6 +177,7 @@ def test_full_victory_run_through_every_screen(tmp_path, size, keyboard):
 
     locked = driver.app.ui.widget("up:swap:h01:iron_d6")
     assert not locked.enabled and "locked" in (locked.reason or "")
+    driver.press("up:swap:h01:oath_d4")  # asked once more
     driver.press("up:swap:h01:oath_d4")
     assert driver.ctrl.engine.combat.combatants["h01"].equipped_dice_ids == ["iron_d6", "vanguard_d4"]
     driver.press("up:row:h03")

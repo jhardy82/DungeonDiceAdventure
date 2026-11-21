@@ -978,16 +978,28 @@ class AppController:
     def swap_die(self, hero_id: str, out_die_id: str, in_die_id: str) -> None:
         engine = self.engine
         request = (hero_id, out_die_id, in_die_id)
-        if engine is not None and self.swap_gives_up_a_larger_die(*request) and self.swap_confirm != request:
+        if engine is not None and self.swap_confirm != request:
+            # A swap cannot be taken back and a hero has one: it is asked for once more (playtest S4).
             self.swap_confirm = request
             leaving, arriving = engine.die_for(hero_id, out_die_id), engine.die_for(hero_id, in_die_id)
-            self.warn(f"{leaving.name} has {leaving.size} faces and {arriving.name} only {arriving.size}: "
-                      "this swap gives up the larger die. Press the same swap again to confirm.")
+            if self.swap_gives_up_a_larger_die(*request):
+                self.warn(f"{leaving.name} has {leaving.size} faces and {arriving.name} only {arriving.size}: "
+                          "this swap gives up the larger die. Press the same swap again to confirm.")
+            else:
+                self.warn(f"{arriving.name} takes the place of {leaving.name}. A swap cannot be undone. Press the same swap again to confirm.")
             return
         self.swap_confirm = None
         if self._guard(self._send, cmd.SWAP_DIE, hero_id=hero_id, out_die_id=out_die_id, in_die_id=in_die_id):
             self.upgrade_die = in_die_id if self.upgrade_hero == hero_id else self.upgrade_die
             self.info("Die swapped.")
+
+    def recovery_view(self) -> dict[str, tuple[int, int]]:
+        """Each hero's health before and after the latest recovery of this run: ``{hero_id: (before, after)}``."""
+        engine = self.engine
+        if engine is None:
+            return {}
+        latest = next((e for e in reversed(engine.events) if e.type == EventType.RECOVERY_APPLIED), None)
+        return {h["id"]: (h["hp_before"], h["hp_after"]) for h in latest.delta["heroes"]} if latest is not None else {}
 
     def toggle_formation(self, hero_id: str) -> None:
         engine = self.engine

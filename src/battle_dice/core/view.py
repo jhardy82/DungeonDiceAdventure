@@ -53,8 +53,11 @@ SCOPE_LABELS = {
 # --------------------------------------------------------------------------------------------
 
 
-def describe_face(face: FaceDefinition) -> str:
-    """One-line rules text generated from the face data, so text can never drift from behaviour."""
+def describe_face(face: FaceDefinition, by_enemy: bool = False) -> str:
+    """One-line rules text generated from the face data, so text can never drift from behaviour.
+
+    ``by_enemy``: the face is an enemy's ability. Its enemies are the heroes, and the text says so.
+    """
     if face.is_blank:
         return "No action"
     parts: list[str] = []
@@ -64,7 +67,7 @@ def describe_face(face: FaceDefinition) -> str:
         kind = effect["type"]
         if kind == "damage":
             reach = face.range_type if face.range_type in ("melee", "ranged") else ""
-            area = " to all enemies" if face.target_scope == "all_enemies" else ""
+            area = f" to all {'heroes' if by_enemy else 'enemies'}" if face.target_scope == "all_enemies" else ""
             parts.append(f"{amount} {reach} damage{area}".replace("  ", " "))
         elif kind == "shield":
             parts.append(f"+{amount} shield")
@@ -166,7 +169,7 @@ def action_forecast(
     return {"damage": damage, "shield": shield, "weaken": weaken, "note": "; ".join(notes)}
 
 
-def face_view(face: FaceDefinition) -> dict[str, Any]:
+def face_view(face: FaceDefinition, by_enemy: bool = False) -> dict[str, Any]:
     return {
         "id": face.id,
         "name": face.name,
@@ -180,7 +183,7 @@ def face_view(face: FaceDefinition) -> dict[str, Any]:
         "mana_cost": face.mana_cost,
         "can_revive": face.can_revive,
         "tags": list(face.tags),
-        "text": describe_face(face),
+        "text": describe_face(face, by_enemy),
     }
 
 
@@ -273,7 +276,7 @@ def combatant_view(engine: Engine, c: Combatant) -> dict[str, Any]:
                                    "damage": balance["corruption"]["backlash_damage"]}
     else:
         view["actions"] = [
-            {**face_view(engine.enemy_action(c, action_id)), "weight": engine.enemy_action(c, action_id).weight}
+            {**face_view(engine.enemy_action(c, action_id), by_enemy=True), "weight": engine.enemy_action(c, action_id).weight}
             for action_id in sorted(engine.content.enemy_actions[c.archetype_id])
         ]
     return view
@@ -294,7 +297,7 @@ def intent_view(engine: Engine) -> dict[str, Any] | None:
         "category": intent.category,
         "glyph": CATEGORY_GLYPHS[intent.category],
         "power": intent.power,
-        "text": describe_face(face),
+        "text": describe_face(face, by_enemy=not combat.combatants[intent.actor_id].is_hero),
         "target_ids": list(intent.committed_target_ids),
         "target_names": names,
         "costs": dict(intent.costs),
@@ -440,6 +443,10 @@ def snapshot(engine: Engine) -> dict[str, Any]:
                 "stage": combat.reaction_stage,
                 "stage_number": combat.stage_index + 1,
                 "options": reactions.stage_options(engine, combat.reaction_stage),
+                # The stages of this enemy action that were passed over because no hero could react in them.
+                "passed": [e.delta["stage"] for e in engine.events
+                           if e.type == EventType.REACTION_STAGE_SKIPPED and combat.committed_intent is not None
+                           and e.intent_id == combat.committed_intent.id and e.delta["reason"] == "no eligible reaction"],
                 "used": [
                     {"hero_id": r.reacting_hero_id, "reaction": r.effect, "stage": r.reaction_stage,
                      "name": engine.build(r.reacting_hero_id).reaction["name"]}
@@ -559,7 +566,8 @@ def describe_event(event: CombatEvent, names: dict[str, str], die_names: dict[st
     if kind == EventType.INTENT_CANCELLED:
         return f"{d['name']} is interrupted by {name(d['by'])}."
     if kind == EventType.INTENT_WEAKENED:
-        return f"{d['name']} resists the interrupt but is weakened (-{d['damage_reduction']} damage, -{d['magnitude_reduction']} magnitude)."
+        less = [f"-{d[key]} {word}" for key, word in (("damage_reduction", "damage"), ("magnitude_reduction", "magnitude")) if d[key]]
+        return f"{d['name']} resists the interrupt but is weakened ({', '.join(less) or 'no change'})."
     if kind == EventType.CORRUPTION_BACKLASH:
         return f"{actor} suffers {d['hp_damage']} corruption backlash (corruption {d['corruption']})."
     if kind == EventType.STATUS_EXPIRED:
@@ -569,7 +577,8 @@ def describe_event(event: CombatEvent, names: dict[str, str], die_names: dict[st
     if kind == EventType.BATTLE_LOST:
         return f"*** Battle {d['battle']} lost: no hero is standing ***"
     if kind == EventType.RECOVERY_APPLIED:
-        return "Recovery: HP partly restored, mana refilled, shields and statuses cleared. Corruption persists."
+        healed = ", ".join(f"{name(h['id'])} {h['hp_before']} -> {h['hp_after']} HP" + (" (was down)" if h["was_downed"] else "") for h in d["heroes"])
+        return f"Recovery: {healed}. Mana refilled, shields and statuses cleared. Corruption persists."
     if kind == EventType.UPGRADE_APPLIED:
         return f"Upgrade: {d['kind'].capitalize()} on {name(d['hero_id'])}'s {die(d['die_id'])} face {d['face_index'] + 1}: {d['before']['name']} -> {d['after']['name']}."
     if kind == EventType.DIE_SWAPPED:
@@ -597,7 +606,20 @@ def combat_log(engine: Engine, limit: int | None = None) -> list[str]:
     passive_names = {member["id"]: str(engine.build(member["id"]).passive["name"]) for member in engine.state.party}
     changed = {e.delta["id"]: position for position, e in enumerate(engine.events) if e.type == EventType.VOCATION_CHANGED}
     lines = []
+    passed: list[str] = []  # reaction stages of the enemy action under way in which no hero could react
     for position, event in enumerate(engine.events):
+        if event.type == EventType.REACTION_STAGE_SKIPPED and event.delta["reason"] != "skipped by player":
+            if event.delta["stage"] == "all":
+                lines.append("No reaction: this enemy action cannot be reacted to.")
+            else:
+                passed.append(event.delta["stage"].capitalize())
+            continue
+        if passed:
+            if len(passed) >= len(CombatPhase.STAGE_BY_WINDOW):  # every stage: the plain sentence
+                lines.append("No hero could react to this enemy action.")
+            else:
+                lines.append(f"No hero could react in the {' and '.join(passed)} stage{'s' if len(passed) > 1 else ''}.")
+            passed = []
         known = passive_names if changed.get(event.actor_id or "", -1) < position else {}
         line = describe_event(event, names, die_names, known)
         if line:

@@ -2178,6 +2178,64 @@ the rules it was written against, from 0.5.0 to 0.5.1. Content stays 1.3.1.
 - **Not verified:** play by a person. A save file made by an earlier build was not opened by
   hand with this one; the store's tests cover a change of catalog version.
 
+### 7.36 Playtest fixes, batch 5: remaining information and small layout faults (D-34, 2026-11-21)
+
+No rule is changed; the replay pin and the simulator results are unchanged.
+
+| Finding | What was wrong | What it is now |
+|---------|----------------|----------------|
+| M3 | An enemy action resolved with no reaction prompt, or the prompt began at "stage 2 of 3", without a reason | The log says why in one line ("No hero could react to this enemy action.", "No hero could react in the Guard stage.", "No reaction: this enemy action cannot be reacted to."). A prompt that begins later says so in its heading: "stage 2 of 3: Resource (Guard: no hero could react)" |
+| M5 | Party setup did not say what party size or rows change | Both party screens: "More heroes meet more and tougher enemies. A melee attack must hit the front row while anyone stands there; the back row is safe until then." |
+| M6 | Shorthand without explanation: "speed" on a face, Initiative, Tick, v1, React 1 | Explained in the Controls help, under "Reading the board" |
+| M7 | The outcome screen named a launch option ("use --seed") | "Seed 11. To play the same dice again: New Run, Dice seed (D), type 11." |
+| M9 | "HP partly recovered" gave no amount | The log gives each hero's health before and after ("Scout 2 3 -> 6 HP", "(was down)" where it applies); the hero's help on the upgrade screen gives it too |
+| M11 | Wordings: "Add a Apprentice"; "Asked twice" for what is asked once more; "Click to change." for a keyboard user; "-0 magnitude"; "to all enemies" on an enemy's own ability | Corrected. An enemy's area attack reads "to all heroes" |
+| L4 | At Large the title of the upgrade screen touched the picture beside it | The picture stands further right |
+| L7 | A long path was cut off at its end, where the file's name is | A long path gives way at its start: "Save file: ...\\saves\\profile.sqlite" |
+| A3 | A class sheet could not be read by keyboard before a hero of that class was added | The sheet follows the add button that is pointed at or has the focus ring |
+| S4 | A bench swap was final on one click (only a swap that gave up a larger die asked) | Every swap is asked for once more |
+
+**Not changed, and why**
+
+| Finding | Why it stays |
+|---------|--------------|
+| M4: the first decision of a run can be a reaction prompt | The order of activations is the rules'. The first prompt carries a one-time explanation. Changing who acts first is a design decision |
+| M7, other half: eleven raw totals and no word on how the player did | A judgement of play needs a measure to judge by. That is a design decision for the owner |
+| M11, one item: "one targeted ally" in the reactions' texts | The texts are shipped content. A change needs a new content version and new pins; it belongs with the next content change |
+| L1: a unit card's status line has three notations | The line is fitted by measuring, shortest form last. One notation for all widths would mean the shortest everywhere |
+| L2: at Large, lines of one block can differ in size; long paragraphs stay as they are | The rule of the text size: a text grows only where it stays whole and its paragraph keeps its lines (section 7.30) |
+| L3, L5, L6: shortened enemy names beside a mark; small Order and Clear at 960 x 540; the inspect panel in the log's place | Layout of the battle screen. Each needs room taken from something else; left for a design pass |
+| A4: some working keys are not shown, some functions have other keys on other screens | A table of every key per screen is in the README; one scheme for all screens is a design decision |
+| S3, other half: after abandoning, "Quit" can lie under the resting pointer | Quit loses nothing: an abandoned run is already gone and settings are saved as they change |
+| R3, R4, R5 | Rule and content questions the owner has not decided |
+
+- **Evidence:**
+  - 27 new tests (1,328 in all, warnings as errors, coverage of the rules 97.54%). Five existing
+    tests were changed on purpose (a swap on one press, the old tooltip, a path cut at its end).
+  - 29 deliberate breaks of the new code, with a control run: all 29 make a test fail. Three
+    survived the first run (the wording of a hero's own area attack, stages of an earlier enemy
+    action, a stage the player skipped); each got a test.
+  - After the failure of batch 3 on the build machine, every new test file of the five batches
+    was run under eleven fonts before this push: all pass.
+  - Replay pin and content unchanged. Simulator on seeds 300 to 339 identical to the stored
+    reference. Both self-checks pass (rules 1.1.2); both Class Evolution checkers print OK.
+  - Screenshots of both party screens, the reaction prompt and the outcome screen were looked
+    at, at 1280 x 720 and at 960 x 540 with Large text.
+- **Not verified:** a person's reading of the new texts.
+
+**Where the playtest findings stand after the five batches**
+
+The report lists 57 findings by ID (D1 to D19, R1 to R5, K1 to K6, S1 to S4, M1 to M12, A1 to A4,
+L1 to L7).
+
+| | Count | Findings |
+|---|------:|----------|
+| Fixed | 44 | D1 to D19; R1, R2; K1 to K6; S1, S2, S4; M1, M2, M3, M5, M6, M8, M9, M10, M12; A1, A2, A3; L4, L7 |
+| Fixed in part | 3 | S3 (a second reaction is asked for once more; "Abandon", then "Quit" is as it was); M7 (the seed line; the totals are as they were); M11 (five wordings; "one targeted ally" is content) |
+| Not changed, reason given above | 7 | M4, A4, L1, L2, L3, L5, L6 |
+| Waiting for the owner | 3 | R3 (dismiss a hero), R4 (starting classes), R5 (mastery pace) |
+
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

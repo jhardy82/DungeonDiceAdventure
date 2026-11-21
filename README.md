@@ -95,6 +95,8 @@ To build it yourself: `python -m pip install ".[package]"`, then
 ## How to play
 
 1. **New Run**, add 1 to 5 heroes (any mix, duplicates allowed), set each hero's row, **Begin**.
+   More heroes meet more and tougher enemies. A melee attack must hit the front row while anyone
+   stands there. A class's sheet shows while its add button is pointed at or has the focus ring.
 2. Combatants act when their gauge reaches 100; speed fills it each tick. The **Next** row
    forecasts the order.
 3. On a hero's activation: **Roll**, mark dice to **Keep**, **Reroll** the rest (2 rerolls),
@@ -131,8 +133,8 @@ Every screen works with the mouse or with the keyboard alone.
   the ring away.
 - **Esc** goes back or cancels. During a run it opens a menu: resume, controls, settings, or
   abandon the run.
-- **What cannot be undone is asked for once more:** abandoning a run and Retry after a run need a
-  second press. Deleting the saved profile is confirmed by a separate button.
+- **What cannot be undone is asked for once more:** abandoning a run, Retry after a run and a
+  bench swap need a second press. Deleting the saved profile is confirmed by a separate button.
 - **A number key plans a die and never takes it out of the plan.** Removing is the die's Remove
   button, or `C`. A single legal enemy is aimed at without asking, and the status line says so.
   An ally's number key is its place in the party ("Scout 2" is `2`).
@@ -168,7 +170,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1301 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1328 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -395,7 +397,8 @@ at once and takes effect at once.
 
 - **Demo and testing** holds aids for showing and testing Class Evolution. They need Class
   Evolution on, and say so while it is off. They do not change the rules of a battle.
-- **Reset all settings to defaults** (bottom right) asks twice. Your saved heroes are kept.
+- **Reset all settings to defaults** (bottom right) asks once more: press it again. Your saved
+  heroes are kept.
 - **From the pause menu** the run waits. Groups 1 and 2 apply at once; groups 3 and 4 and both
   resets are locked until the run is over, because they would close the save.
 - **The dice seed is chosen when you start a run**, not here: on the party setup, **Dice seed
