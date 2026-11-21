@@ -146,3 +146,17 @@ Started: 2026-11-11
 - **Trade-offs accepted:** The goal stays open until the owner has played. Pass needs two
   presses while a die could still act, unless the player turns the aid off.
 - **Impacts:** No code. What the owner reports after playing decides the next work.
+
+### 2026-11-21 — Owner: an Android app with new phone screens, built with Flet (D-33)
+- **Decision:** Build a real Android app. Keep rules, content, save and controller; build new
+  phone screens with Flet, starting with a walking skeleton and a go or no-go check. The app
+  works upright and sideways from the start. What the app is for is not decided.
+- **Why:** On a Galaxy S25 Ultra the desktop screens would show text 1.4 mm high and 97% of
+  controls under 7 mm, and no supported way exists to package a pygame-ce game for Android. A
+  spike showed the controller runs under Flet without pygame and can be checked at phone size.
+- **Alternatives considered:** A browser build as a trial; a phone layout inside the pygame
+  screens; a native Android UI in Kotlin with Chaquopy (kept as the fallback); Kivy.
+- **Trade-offs accepted:** Flet is young (1.0 in September 2026) and its Play Store compliance
+  is not confirmed; Android runs Python 3.14, not 3.15; two arrangements for every screen.
+- **Impacts:** A new app folder and a new Android workflow; the pygame-free layer gains screen
+  data for the phone; `docs/android/PLAN.md`; later the Python floor and the wording of messages.

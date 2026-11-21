@@ -33,7 +33,8 @@
 - The demo's configuration (D-31), part 2b: text size (Normal, Large). Each frame is measured and a text grows only where it has room; a layout check walks 39 states under three fonts and two window sizes
 
 ### In Progress
-- Nothing is being built. Every setting the owner chose in D-31 is in
+- Android app (D-33): phase 0, the walking skeleton with Flet (`docs/android/PLAN.md`)
+- Every setting the owner chose in D-31 is in
 - Waiting for the owner's playtest of the demo (D-32); "Confirm a pass" on by default is confirmed
 
 ### Pending

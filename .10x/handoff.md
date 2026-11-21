@@ -28,6 +28,8 @@ Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.30),
 `docs/class_evolution/FDD_v0.2.md`.
 
 ### Open Questions
+- **Android (D-33):** phase 0 of `docs/android/PLAN.md`, the walking skeleton, is next. Its go or
+  no-go check decides whether the phone screens are built with Flet.
 - **The owner's playtest (D-32):** the owner plays the demo and reports what is wrong or missing.
   That report decides the next work.
 - Checkpoint 2: pacing (runs needed to master a vocation).
