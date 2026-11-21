@@ -170,7 +170,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1328 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1356 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -262,11 +262,14 @@ src/battle_dice/
     view.py             read-only snapshots and generated rules text
     replay.py           export and verify deterministic replays
   app/controller.py   application state machine (menus, drafts, pause menu, feedback), no pygame
+  app/selfcheck.py    a self-check without a screen: a whole run and the save, through the controller
+  phone/              the phone app's screens as plain data (no toolkit): menu, party, one battle
   replay_cli.py       battle-dice-replay: verify finished-run logs
   sim/                heuristic and random policies, seed-matrix runner
   ui/                 pygame-ce presentation: toolkit, screens, app shell
   ui/assets/          16x16 pixel-art sprites, manifest.json, CREDITS.md
 tools/                build_sprites.py: rebuilds the sprite set from Kenney's Tiny Dungeon pack
+android/              the Android app in the making (Flet): see "Android" below
                       update_replay_pin.py: regenerates the pinned-run hashes after an intended change
 scripts/              Start-BattleDice.ps1 launcher (Windows)
 packaging/            PyInstaller entry point and spec for the standalone app
@@ -413,6 +416,24 @@ at once and takes effect at once.
   over the file for that launch. A value the game does not allow is replaced by its default and
   named on the main menu; the game always starts.
 - Nothing here changes the rules of a battle, the shipped content or the numbers of a class.
+
+## Android (in the making)
+
+An Android app with phone screens of its own is being built in phases (`docs/android/PLAN.md`).
+The rules, the content, the save and the controller are the same as on the desktop; only the
+screens are new. What exists is **phase 0, a walking skeleton**: a menu, the party setup and
+one battle, upright and sideways, with a self-check that plays a whole run on the phone.
+
+- The app is in `android/`; its screens are plain data in `src/battle_dice/phone/`.
+- It is built on GitHub (workflow "Android (walking skeleton)"), which also starts it on an
+  emulator four times (upright, with a larger system font, turned sideways while it runs,
+  started while held sideways) and requires a passed self-check and the fitting layout each
+  time. The APK is an artifact of that workflow's run (`battle-dice-android-apk`;
+  about 108 MB, for phones and for the emulator).
+- To try it on a phone: download that artifact, unpack it, copy `battle-dice-android.apk` to the
+  phone and open it there. Android asks once to allow installs from that source.
+- Nothing here is finished or meant for a store yet. Whether the approach is kept is decided
+  after phase 0 (the plan lists the checks).
 
 ## Scope
 

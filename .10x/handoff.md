@@ -32,8 +32,10 @@ Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.36),
   7.36; rules 1.1.2). Still for the owner: dismissing a hero (R3), starting classes (R4), what a
   slower mastery pace does to a vocation already opened (R5), and the seven findings left as
   they are and three fixed in part (section 7.36 gives the reason for each).
-- **Android (D-33):** phase 0 of `docs/android/PLAN.md`, the walking skeleton, is next. Its go or
-  no-go check decides whether the phone screens are built with Flet.
+- **Android (D-33):** phase 0 of `docs/android/PLAN.md`, the walking skeleton, is built and was
+  built and started on GitHub. Four of the seven go or no-go checks hold. Open: the owner
+  installs the APK on the phone and reports; somebody looks at the emulator screenshots (font
+  size); then the owner decides whether the phone screens are built with Flet.
 - **The owner's playtest (D-32):** the owner plays the demo and reports what is wrong or missing.
   That report decides the next work.
 - Checkpoint 2: pacing (runs needed to master a vocation).

@@ -2236,6 +2236,98 @@ L1 to L7).
 | Waiting for the owner | 3 | R3 (dismiss a hero), R4 (starting classes), R5 (mastery pace) |
 
 
+### 7.37 Android, phase 0: the walking skeleton as built (D-33, 2026-11-21)
+
+Phase 0 of `docs/android/PLAN.md`. Nothing of the desktop game is changed; the replay pin and
+the simulator results are unchanged.
+
+- **A self-check without a screen** (`src/battle_dice/app/selfcheck.py`). The game's own
+  self-check draws every screen with pygame, which a phone has not. This one plays a whole run
+  with saved heroes through the real controller, closes the save and reads it again.
+- **The phone screens as data** (`src/battle_dice/phone/screens.py`): menu, party and one battle,
+  and what each tap does. No toolkit is imported; the plan's rule "screens are data first".
+- **The app** (`android/`): Flet draws that data, upright and sideways, and shows the
+  self-check's line on its menu.
+- **The build** (`.github/workflows/android.yml`): builds the APK, reads its size, processor
+  types and 16 KB alignment, starts it on an emulator, reads the self-check from the device log
+  and keeps screenshots (upright, larger system font, sideways). It runs only when the phone app
+  changes or when started by hand, so the other pull requests are not slowed.
+
+**My readings, stated so they can be corrected**
+
+- The build copies the game's package into the app instead of installing it: the package asks
+  for Python 3.15 and the phone's Python is 3.14. Allowing 3.14 beside 3.15 is phase 1.
+- The emulator step uses the public action `reactivecircus/android-emulator-runner` (version
+  tag `v2`), as Flet's own build does. It runs in the repository's build with read-only access.
+- The APK check measures and reports; it does not fail the build. Whether the numbers pass is
+  the go or no-go decision after phase 0, not a build rule.
+
+**Checked here:** the tests below; the app tapped through in a browser at 384 x 832 and
+832 x 384 (menu, party, start of a battle). The Android build itself cannot run in the
+development container, so it ran on GitHub with this pull request.
+
+**Measured on GitHub (two runs; the numbers are in `docs/android/PLAN.md`, "Phase 0, measured")**
+
+- The APK built at the first attempt: 107.6 MB for two processor types, target API 36, minimum
+  24, all 128 native libraries aligned for 16 KB pages, Python 3.14.10 inside.
+- The app started on an emulator (Android 15) and its self-check passed: the same run as on the
+  desktop (3 battles, 1,424 events), three heroes saved and read back, pygame not loaded.
+
+**A fault found by the first run, and a check that could not fail**
+
+- The first run was green, but its log showed the app's **second** start reporting a failed
+  self-check. The check kept its save between starts and then found the earlier heroes beside
+  its own. On a phone every start after the first would have shown a failure.
+- The emulator script had judged the first start only, so the green result said less than it
+  seemed to. I found the line by reading the log, not through the check.
+- Fixed: the self-check starts from nothing each time. It removes what an earlier check left
+  (also one cut short by closing the app), but only in a folder that carries its own marker; a
+  folder with a save or logs and no marker is refused and left untouched, so a player's save can
+  never be taken for the check's. The emulator script requires a passed self-check at all three
+  starts and names the ones that failed.
+- The second run then passed all three self-checks, and showed the next check that did not
+  test what its name said: the app's own log line (added with the fix) reported the start named
+  "sideways" as `layout=upright width=411 height=891`. The script now names the layout each
+  start must report, and writes the screenshot's size beside the app's line, so a screen that
+  did not turn can be told from an app that did not follow. There are four starts: upright;
+  with a larger font; turned sideways while the app runs; started while the device is held
+  sideways. The built APK's manifest fixes no orientation (read in the build).
+- With the check strict, the fifth run failed at a start on a screen **locked** sideways, and
+  the report showed the cause at once: the screenshot was upright (1440 x 3120), so the
+  emulator's display had not turned, and the app had laid out for the screen it was given.
+  The second run's case was the same. Why that emulator keeps the display upright there is not
+  known. The fourth start now does what a hand does: the screen is free to turn and the motion
+  sensor is told the device is sideways, then the app starts. The sixth run passed all four
+  starts (sideways: 891 x 411 dp, screenshot 3120 x 1440).
+- Not shown, and said so in the plan: an app started on a screen locked sideways.
+- Tests added (28 for the phone in all, 1,356 in the suite; the last pushes changed tests, not
+  their number): the self-check twice in one folder,
+  after a cut-short check, and on a folder that is not its own; the emulator script against a
+  stand-in for the device tool (the good case; a failed self-check at each start; no report; the
+  app staying upright on a turned screen; an app that follows a turn but comes up upright on a
+  turned screen; a screen that does not turn; an upright start laid out sideways; the app not
+  installed). Each new part was broken on purpose once; the tests
+  noticed each time.
+
+**A build that failed without a change (the fourth run)**
+
+- Gradle failed in the task that downloads Python for `x86_64`: "Unable to determine the current
+  character ... '\\0'". Nothing that goes into the APK had changed since three passing builds.
+- Cause, read from the build plugin's source (serious_python_android 6.1.3): four download tasks
+  run side by side and share one file of download marks; one read it while another wrote it.
+- The workflow now lets Gradle run one worker at a time. I did not simply run the job again: a
+  second attempt would most likely have passed and left the race in place.
+- Limits: this cannot be reproduced in the development container, and a passing build does not
+  prove a race gone. If it shows again, it is a fault to report to the build tool's makers.
+
+**Still open after phase 0**
+
+- Nobody has looked at the emulator screenshots: the development container cannot download the
+  run's artifacts. So "the app follows the system font size" is not shown yet.
+- The app on the real phone: only the owner can install it. Start-up time on a phone is unknown.
+- The self-check runs at every start of the app. That is right for a skeleton whose purpose is
+  that check; the real app will not do it.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

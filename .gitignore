@@ -25,3 +25,7 @@ sim_results/
 Thumbs.db
 .vscode/
 .idea/
+
+# The Android build copies the game's package into the app and builds there (see .github/workflows/android.yml).
+android/src/battle_dice/
+android/build/
