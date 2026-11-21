@@ -210,3 +210,79 @@ section 7.32.
 
 Of the 57 findings with an ID, 47 are fixed, 3 are fixed in part (S3, M7, M11), and 7 are left
 as they are with a reason. None waits for a decision.
+
+## 7. Second round: the build after the fixes (2026-11-21)
+
+Under the owner's standing rule of that day (always fix what is found broken; leave things better
+than found), four AI playtesters played `main` after pull request 44: the build with all the fixes
+above, hero dismissal and the new recruit names.
+
+### 7.1 Method and coverage
+
+| Role | What it played | Driver commands |
+|------|----------------|-----------------|
+| Roster auditor | Dismissing heroes, "Recruit N" names, the Mastery pace note, the README's second tour run | about 80 |
+| Keyboard only | Menus, all four Settings groups, the pause menu, the Career screen, the seed, part of a battle, keys only | 83 |
+| Breaker | Every "press again" safeguard, the seed entry, parties of one and five, 1280 x 720 and 960 x 540 | about 85 |
+| Strategist | 24 checks of a predicted number against what then happened, over three party sizes | 80 |
+
+- **No error screen, no drawing fault, no text cut off by the game's own check, no state without
+  a way out**, at either window size.
+- **Numbers:** 22 of 24 predictions matched exactly. Both misses were one gap (ST-1 below).
+- **Earlier findings:** every one of the 57 that was re-checked was confirmed fixed or was one of
+  those left with a reason, apart from K2 and D14, which were fixed in part (KB-3 and ST-1 below
+  finish them).
+- **Not covered by this round:** none of the four finished a battle inside its budget. The
+  upgrade screen, the die swap, Battle 2, the outcome screen and the mastery lines after a battle
+  were not played. The automated tour (`tests/ui/test_demo_tour.py`) plays them; a player did
+  not.
+
+### 7.2 Findings and what was done
+
+IDs: RA roster auditor, KB keyboard only, BR breaker, ST strategist. All were Medium or Low.
+
+| ID | Finding | State |
+|----|---------|-------|
+| RA-1, BR-1, BR-2, BR-3 | **A "press again" question stayed open while the player did something else.** An armed Dismiss survived selecting another vocation; the Retry question survived ten seconds, Tab and other keys; the defaults question stayed open beside the profile question; a second reaction asked by key but not by a click on its ally | **Fixed, in one place.** Every key press and click now tells the controller which control took it. A question ends when anything but its own control is used, when a key reaches no control, when eight seconds pass, or when the player leaves the place. Its text then leaves the status bar. The reset to defaults, the profile reset and the die swap, which had flags of their own, end the same way |
+| BR-7 | An armed Abandon button no longer said where it leads | Fixed: "Press again: abandon, main menu" |
+| KB-1 | B was an unlabelled Back on the Career screen and "Begin Encounter" on the screen behind it: C, B, B started a run | Fixed: B is not Back on the Career screen |
+| KB-2 | The focus ring vanished after "Remove", so each removal began again from the top | Fixed: on the same screen the ring moves to the nearest control before the one that went away |
+| KB-3 | During a target choice the other die still read "Use (2)" while 2 picked a target | Fixed |
+| KB-5 | Mouse words for a keyboard player: "Remove (click)", "Party (click a hero to inspect)" | Fixed |
+| KB-7 | Controls had a key on the main menu and none in the pause menu | Fixed: C in both. S is still Skip in a battle and Settings in the pause menu: two screens, not changed |
+| KB-8 | "Motion off (M)" in a battle while Settings said "On"; "Rolling ..." beside controls that were on (in three reports) | **The driver's fault, not the game's**, fixed in the driver: its motion setting now says what it does, and it lets dice settle before it prints |
+| ST-1 | Cleanse printed "-2 corruption (self)" with no "Now" line and removed 1, or nothing | Fixed: "Now -1 corruption (Apprentice 2 has 1 corruption)" |
+| ST-4 | The die card cut off a long "Now" line: "... Squire 1 has 9 of at ..." | Fixed: it takes two lines |
+| ST-5 | "Poison x1, 2 activations left" during an activation whose damage had landed | Fixed: for the acting unit, "this activation and 1 more" |
+| ST-6 | A reaction's log line gave no amounts | Fixed: "... reacts with Grounding on Squire 1: Squire 1 loses 1 corruption; Apprentice 2 gains 1 mana." |
+| ST-7, BR-5 | "Next stage:" while the stage was the same; "the only ally it could help" for one it could not | Fixed: "Another reaction is possible: ..."; "the only ally it can be used on" |
+| ST-8 | "More heroes meet more and tougher enemies": measured, each enemy of a larger party has less health | Fixed: "More heroes meet more enemies." |
+| RA-2, RA-7 | After a slower Mastery pace the Skills tab kept skills without a word, and the setting's help named only the faster direction | Fixed: the help says both directions and what stays; the Skills tab says "A skill learned at an earlier Mastery pace stays learned." |
+| RA-3, RA-4 | Battle cards and the Career title named a recruit without its class | Fixed: "Recruit 1, Squire" on the card where there is room, and in the title |
+| RA-5 | "is now a Apprentice", "as a Apprentice" | Fixed |
+| RA-6 | 12 heroes, roster size 6: "The roster is full (6 heroes). ... dismiss a hero" | Fixed: it says how many must go, or to raise the size |
+| RA-8 | The party was emptied by a visit to Settings | Fixed for a change of pace or roster size (the heroes are the same). Switching Class Evolution still empties it |
+| RA-9 | The hero's picture touched a line of text on the Career screen | Fixed |
+| BR-4 | A die with one legal ally still asked for its target; a reaction with one did not | Fixed: picked and named, as one legal enemy is |
+| BR-6 | Seed entry dropped digits after the 20th without a word; a number too large closed the entry | Fixed: it says why, and stays open for a correction |
+
+### 7.3 Not changed, with the reason for each
+
+| ID | Finding | Why it stands |
+|----|---------|---------------|
+| ST-2 | "No hero could react to this enemy action." while a hero shows "React 1", with no reason | The reason (here: Grounding would have changed nothing) is not in the event the log is written from. Recording it changes the event format, which is a rules version. Proposed for the next one |
+| ST-3 | Enemies re-apply Weaken and Poison as soon as they end and almost never attack (one battle, impression) | The enemies' rule of choice is content and balance. It needs the simulator and an owner decision |
+| ST-9 | With five heroes one enemy action can open three reaction prompts | Pacing, an impression; belongs with the pacing question still open (Checkpoint 2) |
+| KB-4 | Reaction rows are numbered from 1 in each stage, not by the hero's place | A second reaction on one enemy action is asked for once more, which guards the costly slip. Renumbering is a change of keys for the owner to decide |
+| KB-6 | Dismiss, Retry and Abandon are confirmed by a second press of the same control | Owner decision D-34 ("ask once more"). The question now ends when anything else is done |
+| BR-8 | "Order (O)" and "Clear (C)" are small at 960 x 540 | L5 of the first round, left with its reason in the decision log, section 7.36 |
+| RA-2 (part) | The health a mastery rank adds goes when a slower pace lowers the rank | It follows the rank by rule. The setting's help now says so before the click |
+| L1, L3 | Two statuses replace the gauge number; a long enemy name is shortened beside "TARGET 1" | As in section 7.36 |
+
+**For the owner:** ST-3 (should enemies attack more?), ST-2 (reasons in the event log, with the
+next rules version) and KB-4 (reaction keys by the hero's place).
+
+**Tally of this round:** 34 findings (roster auditor 9, keyboard 8, breaker 8, strategist 9; no
+Blocker, no High). 28 are fixed, one of them in part (KB-7). 6 are left with a reason (ST-2,
+ST-3, ST-9, KB-4, KB-6, BR-8).
+

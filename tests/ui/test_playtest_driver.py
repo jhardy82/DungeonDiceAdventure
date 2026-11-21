@@ -135,3 +135,18 @@ def test_a_feature_flag_and_a_window_size_are_part_of_the_session(driver, capsys
 def test_without_a_session_the_driver_says_how_to_begin(driver, tmp_path):
     with pytest.raises(SystemExit, match="Begin one with"):
         driver.main(["--session", str(tmp_path / "none"), "look"])
+
+
+def test_motion_is_one_fact_and_the_dice_have_settled_before_a_screen_is_printed(driver, capsys, tmp_path):
+    """The second playtest (2026-11-21): the battle said "Motion off (M)" while Settings said "On", and with
+    motion switched on the players read "Rolling ..." beside controls that were already enabled. Both were the
+    driver's doing, not the game's: three reports carried them as impressions."""
+    folder = tmp_path / "s"
+    run(driver, capsys, folder, "start")
+    code, out = run(driver, capsys, folder, "do", "--full", "key:s")
+    assert code == 0 and "settings:animation" in out and "label: 'Off (reduced motion)'" in out
+    code, out = run(driver, capsys, folder, "do", "--full", "key:escape", "key:n", "click:add:squire", "key:b")
+    assert code == 0 and "label: 'Motion off (M)'" in out, "the battle and the setting say the same"
+    code, out = run(driver, capsys, folder, "do", "--full", "key:m", "key:r")
+    assert code == 0 and "label: 'Motion on (M)'" in out and "Rolling ..." not in out
+    assert "Die 1: Iron d6" in out and "die:iron_d6:use" in out, "the faces are printed, not a tumbling die"

@@ -141,7 +141,7 @@ def test_a_second_reaction_on_the_same_enemy_action_is_asked_for_once_more(tmp_p
     assert len(combat.reactions_used) == 0
     play.key(pygame.K_1)  # the first reaction on this enemy action: used at once
     assert len(combat.reactions_used) == 1
-    assert play.ctrl.message.startswith(f"Interpose used on {target}, the only ally it could help. Next stage: ")
+    assert play.ctrl.message.startswith(f"Interpose used on {target}, the only ally it can be used on. Another reaction is possible: ")
     assert play.ui.widget("react:h02") is not None and play.ui.widget("react:h02").enabled, "the Resource stage is open"
     play.key(pygame.K_1)  # "row, then ally" out of habit, or a second click on the same spot
     assert len(combat.reactions_used) == 1, "the press did not spend another reaction"
@@ -208,7 +208,7 @@ def test_abandoning_a_run_is_asked_once_more_and_the_other_button_does_not_answe
     assert play.ctrl.paused and play.ctrl.engine is not None and play.ctrl.asked("abandon:party")
     drawn, _ = record_text(monkeypatch)
     play.app.frame(0)
-    assert drawn.count("Press again to abandon the run") == 1 and "Abandon Run: Main Menu" in drawn
+    assert drawn.count("Press again: abandon, change party") == 1 and "Abandon Run: Main Menu" in drawn, "the armed button still says where it leads"
     play.click("pause:menu")  # the other way of abandoning is its own question
     assert play.ctrl.paused and play.ctrl.engine is not None and play.ctrl.asked("abandon:menu") and not play.ctrl.asked("abandon:party")
     play.click("pause:resume")

@@ -178,6 +178,7 @@ def act(controller: AppController, action_id: str) -> None:
 
     An id the current screen does not offer is refused with a message; nothing else happens.
     """
+    controller.noticed_input(action_id)  # a question that waits for a second tap ends when anything else is tapped
     offered = {action["id"]: action for action in _all_actions(screen(controller))}
     chosen = offered.get(action_id)
     if chosen is None:

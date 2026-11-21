@@ -28,7 +28,15 @@ from battle_dice.core.events import EventType, summarize, write_jsonl
 from battle_dice.core.models import ROW_BACK, ROW_FRONT, CombatPhase, RunPhase
 from battle_dice.core.progression import face_from_plain
 from battle_dice.core.replay import export_run
-from battle_dice.core.view import action_forecast, combat_log, die_view, face_view, hero_turn_view, snapshot
+from battle_dice.core.view import (
+    action_forecast,
+    combat_log,
+    die_view,
+    face_view,
+    hero_turn_view,
+    snapshot,
+    with_article,
+)
 from battle_dice.features import CLASS_EVOLUTION
 from battle_dice.settings import Settings
 
@@ -140,6 +148,11 @@ class AppController:
         self._message_seen = 0
         #: What was asked for once and is done only when asked for again at once ("press again").
         self._asked: str | None = None
+        #: The control the player is using now (a front end names it), and what an open question waits for.
+        self._input_source: str | None = None
+        self._question_sources: tuple[str | None, ...] = (None,)
+        self._question_serial = -1
+        self._question_ms = 0.0
         #: The enemy action a reaction was already used on: a further reaction then needs a second press.
         self._reacted_to: str | None = None
         self.error_text = ""
@@ -207,21 +220,63 @@ class AppController:
         self.message_serial += 1
         self._asked = None
 
+    #: How long a question waits for its second press. After that the next press asks again.
+    QUESTION_MS = 8000.0
+
     def _ask_once(self, what: str, question: str) -> bool:
         """A safeguard for what cannot be undone: the first request only asks, the next one in a row does it.
 
-        Returns True when ``what`` may be done now. Anything else the game says in between ends the question.
+        Returns True when ``what`` may be done now. The question ends, and the next request asks again, when
+        the player does anything else: uses another control, presses a key that is not this control's, lets
+        the time in ``QUESTION_MS`` pass, or leaves the place (playtest of 2026-11-21: a question that stayed
+        open let one later press dismiss a hero or throw a result away).
         """
         if self._asked == what:
             self._asked = None
             return True
         self.warn(question)
         self._asked = what
+        self._question_opened()
         return False
 
     def asked(self, what: str) -> bool:
         """Whether ``what`` waits for its second press (a button then says so)."""
         return self._asked == what
+
+    def _question_opened(self, *also: str) -> None:
+        """A question now waits for a second press of the control in use (or of one of ``also``)."""
+        self._question_sources = (self._input_source, *also)
+        self._question_serial = self.message_serial
+        self._question_ms = 0.0
+
+    def question_open(self) -> bool:
+        return self._asked is not None or self.defaults_confirm or self.reset_confirm or self.swap_confirm is not None
+
+    def _end_question(self) -> None:
+        """Whatever waits for a second press waits no longer; its text leaves the status bar if it is still there."""
+        if not self.question_open():
+            return
+        if self.message_serial == self._question_serial:
+            self.message, self.message_is_error = "", False
+        self._asked = None
+        self.defaults_confirm = self.reset_confirm = False
+        self.swap_confirm = None
+
+    def noticed_input(self, source: str | None) -> None:
+        """The player pressed a key or clicked. ``source`` names the control that takes it; None when none does.
+
+        A front end calls this before the control acts. Using anything but the asking control ends a question.
+        """
+        if self.question_open() and source not in self._question_sources:
+            self._end_question()
+        self._input_source = source
+
+    def pass_time(self, ms: float) -> None:
+        """Time went by (a front end says how much): a question is not left open for ever."""
+        if self.question_open():
+            self._question_ms += ms
+            if self._question_ms >= self.QUESTION_MS:
+                self._end_question()
 
     def expire_message(self) -> None:
         """Once a frame: a message belongs to the place it was given in.
@@ -232,7 +287,7 @@ class AppController:
         place = (self.screen, self.paused, self.pause_help, self.settings_tab)
         if place != self._message_place and self.message_serial == self._message_seen:
             self.message, self.message_is_error = "", False
-            self._asked = None
+            self._end_question()
         self._message_place = place
         self._message_seen = self.message_serial
 
@@ -370,8 +425,13 @@ class AppController:
             self.confirm_seed()
         elif key == "backspace":
             self.seed_entry = self.seed_entry[:-1]
-        elif len(key) == 1 and key.isdigit() and len(self.seed_entry) < self.SEED_DIGITS:
-            self.seed_entry += key
+        elif len(key) == 1 and key.isdigit():
+            if len(self.seed_entry) < self.SEED_DIGITS:
+                self.seed_entry += key
+            else:
+                self.warn(f"A seed has at most {self.SEED_DIGITS} digits. Enter sets it, Esc cancels.")
+        else:
+            self.warn("A seed is made of digits. Enter sets it, Esc cancels.")
 
     def confirm_seed(self) -> None:
         """Take the typed digits as the seed of every run until it is changed. Nothing typed: a random seed."""
@@ -382,7 +442,8 @@ class AppController:
             return
         seed = int(typed)
         if seed > settings_module.MAX_SEED:
-            self.warn(f"A seed is a whole number from 0 to {settings_module.MAX_SEED}.")
+            self.seed_entry = typed  # still being typed: the number can be corrected
+            self.warn(f"A seed is a whole number from 0 to {settings_module.MAX_SEED}. Shorten it, or press Esc.")
             return
         self._set_seed(seed)
         self.info(f"Dice seed: {seed}. Every run uses it until you change it.")
@@ -570,7 +631,7 @@ class AppController:
             self.hints_shown.add("reaction")
             self.info(before + "An enemy action is revealed. A hero may react before it lands: pick a reaction, or Skip Stage (S).")
         elif before:
-            self.info(before + "Next stage: pick a reaction, Skip Stage (S), or Skip All (A).")
+            self.info(before + "Another reaction is possible: pick one, Skip Stage (S), or Skip All (A).")
         else:
             self.info("Reaction decision: pick a reaction, Skip Stage (S), or Skip All (A).")
 
@@ -649,11 +710,12 @@ class AppController:
             return
         scope = option["face"]["target_scope"]
         if scope in ("single_enemy", "single_ally"):
-            if len(option["eligible_target_ids"]) == 1 and scope == "single_enemy":
+            if len(option["eligible_target_ids"]) == 1:
                 self.draft.append({"die_id": die_id, "target_ids": list(option["eligible_target_ids"])})
                 self.targeting_die = None
                 target = self.engine.combat.combatants[option["eligible_target_ids"][0]].name if self.engine else "it"
-                self._report_draft(f"{option['face']['name']} aims at {target}, the only legal target. ")
+                skill = f" {option['skill_note']} (once per battle)." if option.get("skill_note") else ""
+                self._report_draft(f"{option['face']['name']} aims at {target}, the only legal target.{skill} ")
             else:
                 self.targeting_die = die_id
                 skill = f" {option['skill_note']} (once per battle)." if option.get("skill_note") else ""
@@ -850,7 +912,7 @@ class AppController:
         name = engine.build(hero_id).reaction["name"]
         on = f" on {engine.combat.combatants[target_id].name}" if target_id in engine.combat.combatants else ""
         if only and on:
-            on += ", the only ally it could help"
+            on += ", the only ally it can be used on"
         if self._guard(self._send, cmd.USE_REACTION, hero_id=hero_id, target_id=target_id):
             self._reacted_to = intent_id
             said = f"{name} used{on}."
@@ -880,6 +942,19 @@ class AppController:
         else:
             self.reaction_hero = hero_id
             self.info("Choose which ally receives the reaction: press its number or click it (Esc cancels).")
+
+    def choose_reaction_target(self, hero_id: str, target_id: str) -> None:
+        """A reaction's ally button. Chosen after its row it is the second of two presses and acts at once; pressed
+        on its own right after another reaction on the same enemy action it is asked for once more, as a row is."""
+        engine = self.engine
+        intent = engine.combat.committed_intent if engine is not None else None
+        if engine is not None and intent is not None and self.reaction_hero != hero_id and self._reacted_to == intent.id:
+            name = engine.build(hero_id).reaction["name"]
+            ally = engine.combat.combatants[target_id].name if target_id in engine.combat.combatants else "that ally"
+            if not self._ask_once(f"react:{hero_id}:{target_id}",
+                                  f"A reaction was just used on this enemy action. Press again to use {name} on {ally} as well."):
+                return
+        self.use_reaction(hero_id, target_id)
 
     def cancel_reaction_pick(self) -> None:
         if self.reaction_hero is not None:
@@ -989,6 +1064,7 @@ class AppController:
         if engine is not None and self.swap_confirm != request:
             # A swap cannot be taken back and a hero has one: it is asked for once more (playtest S4).
             self.swap_confirm = request
+            self._question_opened()
             leaving, arriving = engine.die_for(hero_id, out_die_id), engine.die_for(hero_id, in_die_id)
             if self.swap_gives_up_a_larger_die(*request):
                 self.warn(f"{leaving.name} has {leaving.size} faces and {arriving.name} only {arriving.size}: "
@@ -1253,8 +1329,7 @@ class AppController:
         before = set(link.state.heroes)
         result = link.recruit(starting_class)
         if not result.accepted:
-            limit = (result.error_details or {}).get("roster_limit", "")
-            self.warn({"ROSTER_FULL": f"The roster is full ({limit} heroes). {self.ROSTER_FULL_HINT}",
+            self.warn({"ROSTER_FULL": self.roster_full_text(),
                        "PHASE_LOCKED": "Heroes are recruited between runs, not during one."}.get(str(result.error_code), "That hero cannot be recruited."))
             return
         (hero_id,) = set(link.state.heroes) - before
@@ -1268,6 +1343,16 @@ class AppController:
 
     #: What a player can do about a full roster (owner decision D-35).
     ROSTER_FULL_HINT = "To make room, dismiss a hero on its Career screen."
+
+    def roster_full_text(self) -> str:
+        """Why nobody can be recruited, and how many heroes must go before somebody can."""
+        link = self.progression
+        assert link is not None
+        limit, heroes = link.career.service.roster_limit, len(link.state.heroes)
+        if heroes > limit:  # the roster size was lowered in Settings: one dismissal does not make room
+            return (f"The roster has {heroes} heroes and its size is now {limit}. "
+                    f"To recruit, dismiss {heroes - limit + 1} heroes on their Career screens, or raise the roster size in Settings.")
+        return f"The roster is full ({limit} heroes). {self.ROSTER_FULL_HINT}"
 
     def dismiss_problem(self, hero_id: str) -> str | None:
         """Why this hero cannot be dismissed right now, or None."""
@@ -1518,14 +1603,14 @@ class AppController:
             dice = ", ".join(self.dice_as_listed(run_hero))
             bench = ", ".join(self.die_name(run_hero, die_id) for die_id in self.engine.state.inventory.get(run_hero, [])) or "none"
             # What the change did, in numbers: nothing about the hero changes silently (playtest M8).
-            now = (f"{hero_name} is now a {name} and fights on as one: HP {unit.hp}/{unit.max_hp}, mana {unit.mana}/{unit.max_mana}, "
+            now = (f"{hero_name} is now {with_article(name)} and fights on as one: HP {unit.hp}/{unit.max_hp}, mana {unit.mana}/{unit.max_mana}, "
                    f"dice {dice}, bench die {bench}.")
             if self.engine.state.phase == RunPhase.UPGRADE:
                 self.info(f"{now} Choose the upgrade for its new dice.")
             else:
                 self.info(now)
             return
-        self.info(f"{hero_name} has unlocked {name}." if what == "claim" else f"{hero_name} is now a {name}.")
+        self.info(f"{hero_name} has unlocked {name}." if what == "claim" else f"{hero_name} is now {with_article(name)}.")
 
     # -- the third battle ------------------------------------------------------------------------
 
@@ -1614,8 +1699,10 @@ class AppController:
             self.warn(self.RUN_LOCKED)
             return
         if not self.defaults_confirm:
-            self.defaults_confirm = True
+            self.reset_confirm = False  # one question at a time
             self.warn("Press again: every setting returns to its default (Class Evolution off). Your saved heroes are kept.")
+            self.defaults_confirm = True
+            self._question_opened()
             return
         self.defaults_confirm = False
         fresh = settings_module.Settings(save_dir=self.settings.save_dir)
@@ -1667,7 +1754,7 @@ class AppController:
              "help": "Saved heroes, mastery, vocations and the third battle. Off: the game as shipped, and no save file.",
              "reason": locked or ("Switched on by a launch flag for this session." if forced else None)},
             {"group": "demo", "key": "mastery_pace", "label": "Mastery pace", "value": paces[current.mastery_pace],
-             "help": "How many points a rank needs. A faster pace re-ranks your heroes from the points they have.", "reason": needs},
+             "help": "Points a rank needs. Faster raises ranks, slower lowers them; opened vocations and skills stay.", "reason": needs},
             {"group": "demo", "key": "demo_preset", "label": "New profile starts as", "value": presets[current.demo_preset],
              "help": "Used when a profile is made or reset. Every start but the first comes with a Scout and an Apprentice.", "reason": needs},
             {"group": "demo", "key": "roster_limit", "label": "Roster size", "value": f"{current.roster_limit} heroes",
@@ -1727,6 +1814,10 @@ class AppController:
     def _reopen_progression(self) -> None:
         """Class Evolution was switched, or a setting the save depends on changed: close the save and open it again."""
         self.close()
+        # A party of saved heroes is kept when the save is only opened again (another pace, another roster size):
+        # the heroes are the same. Switching Class Evolution on or off changes what a party is made of: nobody of
+        # the old party is a hero of the save that is then open (or none is open), so nobody is kept.
+        kept = [dict(member) for member in self.party]
         self.party, self.engine = [], None
         self.features = self.forced_features | ({CLASS_EVOLUTION} if self.settings.class_evolution else frozenset())
         if CLASS_EVOLUTION in self.features and self.vocations is None:
@@ -1736,6 +1827,10 @@ class AppController:
         elif CLASS_EVOLUTION not in self.features:
             self.vocations = None
         self._open_progression()
+        if self.progression is not None and kept:
+            self.party = kept
+            self._refresh_party()  # drops anyone who is not in the save any more
+            self.selected_slot = max(0, min(self.selected_slot, len(self.party) - 1))
 
     def reset_profile(self) -> None:
         self._guard(self._reset_profile)
@@ -1749,12 +1844,17 @@ class AppController:
             self.warn("There is no profile to reset while Class Evolution is off.")
             return
         if not self.reset_confirm:
-            self.reset_confirm = True
+            self.defaults_confirm = False  # one question at a time
             self.warn("This deletes every saved hero. Confirm with the button on the right, or press this one again to keep them.")
+            self.reset_confirm = True
+            self._question_opened(self.RESET_CONFIRM_CONTROL)
             return
         # The same button again keeps the heroes: a double-click must not delete them (owner decision D-34).
         self.reset_confirm = False
         self.info("Nothing was deleted. Your saved heroes are kept.")
+
+    #: The separate button that confirms the profile reset: using it does not end the question it answers.
+    RESET_CONFIRM_CONTROL = "settings:reset:confirm"
 
     def confirm_reset_profile(self) -> None:
         self._guard(self._confirm_reset_profile)

@@ -16,6 +16,7 @@ import pygame
 from battle_dice import RULES_VERSION
 from battle_dice.app.controller import AppController
 from battle_dice.core.models import CombatPhase
+from battle_dice.core.view import with_article
 from battle_dice.features import describe as describe_features
 from battle_dice.ui.toolkit import UI, Theme
 
@@ -147,7 +148,7 @@ def draw_seed_control(ui: UI, ctrl: AppController) -> None:
 
 
 #: What the size of the party and the two rows change (playtest M5: nothing on the screen said it).
-PARTY_NOTE = "More heroes meet more and tougher enemies.  A melee attack must hit the front row while anyone stands there; the back row is safe until then."
+PARTY_NOTE = "More heroes meet more enemies.  A melee attack must hit the front row while anyone stands there; the back row is safe until then."
 
 
 def draw_party_note(ui: UI) -> None:
@@ -222,7 +223,7 @@ def draw_party_setup(ui: UI, ctrl: AppController) -> None:
     draw_party_note(ui)
     draw_seed_control(ui, ctrl)
 
-    ui.panel(16, 60, 430, 470, "Party (click a hero to inspect)")
+    ui.panel(16, 60, 430, 470, "Party (choose a hero to inspect)")
     for index in range(maximum):
         y: float = 90 + index * 86
         if index < len(ctrl.party):
@@ -407,7 +408,11 @@ def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float
     elif intended:
         tag = "TARGETED"
     name_room = w - 12 - (ui.text_width(tag, 14, True) + 8 if tag else 0)
-    ui.text(x + 6, y + 3, ui.fit_name(c["name"], 15, True, name_room), 15, Theme.TEXT if standing else Theme.FAINT, bold=True, grow="up")
+    # A name that does not say the class ("Recruit 2") is followed by it, where there is room beside the tag.
+    vocation = c.get("class_name", "")
+    with_class = f"{c['name']}, {vocation}" if vocation and vocation not in c["name"] else c["name"]
+    shown_name = with_class if ui.text_width(with_class, 15, True) <= name_room else c["name"]
+    ui.text(x + 6, y + 3, ui.fit_name(shown_name, 15, True, name_room), 15, Theme.TEXT if standing else Theme.FAINT, bold=True, grow="up")
     if tag:
         ui.text(x + w - 6, y + 3, tag, 14, Theme.ACCENT if tag.startswith(("TARGET", "ACTING")) else Theme.BAD, bold=True, align="right")
 
@@ -515,9 +520,14 @@ def draw_inspect(ui: UI, c: dict[str, Any], view: dict[str, Any], top: float, he
         if c["corruption"]:
             para(corruption_text(c), Theme.BAD if c["corruption_backlash"] else Theme.DIM)
     if c["statuses"]:
+        acting = view["active_combatant_id"] == c["id"]
         for status in c["statuses"]:
-            plural = "" if status["remaining"] == 1 else "s"
-            para(f"{status['label']} x{status['stacks']}, {status['remaining']} activation{plural} left: {status['effect']}.", Theme.WARN)
+            left = status["remaining"]
+            if acting:  # the count includes the activation under way, whose start-of-activation effect has happened
+                time = "this activation only" if left <= 1 else f"this activation and {left - 1} more"
+            else:
+                time = f"{left} activation{'' if left == 1 else 's'} left"
+            para(f"{status['label']} x{status['stacks']}, {time}: {status['effect']}.", Theme.WARN)
     else:
         para("No status effects.", Theme.FAINT)
     y += 4
@@ -663,12 +673,18 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
             styles = ((13, True), (12, True), (11, True), (11, False), (10, False))
             note_size, note_bold = next((style for style in styles if ui.text_width(note, *style) <= 232), styles[-1])
             one_line = ui.text_width(face["text"], 14, False) <= 232
+            long_note = bool(note) and ui.text_width(note, *styles[-1]) > 232  # too long for one line at any size
             if note and one_line:
                 ui.text(x + 8, 567, face["text"], 14, Theme.TEXT, max_width=232)
-                ui.text(x + 8, 582, note, note_size, Theme.WARN, bold=note_bold, max_width=232)
+                if long_note:  # it takes the line of the face details as well
+                    ui.paragraph(x + 8, 582, note, 232, 11, Theme.WARN, line_height=14, max_lines=2)
+                else:
+                    ui.text(x + 8, 582, note, note_size, Theme.WARN, bold=note_bold, max_width=232)
             else:
                 ui.paragraph(x + 8, 567, face["text"], 232, 14, Theme.TEXT, line_height=15, max_lines=2)
-            if note and not one_line:
+            if note and one_line and long_note:
+                pass
+            elif note and not one_line:
                 # Two lines of rules text leave no free line: the forecast takes the place of the face details.
                 ui.text(x + 8, 598, note, note_size, Theme.WARN, bold=note_bold, max_width=232)
             else:
@@ -692,12 +708,14 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
         use_hotkeys = () if ctrl.targeting_die is not None else (NUMBER_KEYS[index],)
         # The number key plans the die and never removes it; removing is this button's click, or Clear (C).
         # While a target is being chosen the numbers belong to the targets, so the way out is Esc.
-        use_help = (f"Take {face['name']} out of the plan (click). The number key never removes." if in_plan
+        use_help = (f"Take {face['name']} out of the plan (a click, or Enter on this button). The number key never removes." if in_plan
                     else "Stop choosing a target." if awaiting else f"Plan {face['name']}: {face['text']}." if die["selectable"] else None)
         ui.button(f"die:{die['die_id']}:use", x + 128, 628, 112, 48, "Remove" if in_plan else "Cancel" if awaiting else "Use",
                   partial(ctrl.use_die, die["die_id"]) if not awaiting else ctrl.cancel_targeting,
                   enabled=die["selectable"] or in_plan, reason=die["reason"], selected=in_plan or awaiting,
-                  hotkeys=use_hotkeys, sublabel="(click)" if in_plan else "(Esc)" if awaiting else f"({index + 1})",
+                  hotkeys=use_hotkeys,
+                  # While a target is being chosen the number keys are the targets', so no die button names one.
+                  sublabel="from the plan" if in_plan else "(Esc)" if awaiting else "" if ctrl.targeting_die is not None else f"({index + 1})",
                   tooltip=use_help, key_action=partial(ctrl.use_die_key, die["die_id"]))
 
     # Plan column
@@ -812,7 +830,7 @@ def draw_reactions(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
                 target_hotkeys = (NUMBER_KEYS[number - 1],) if selected and number <= len(NUMBER_KEYS) else ()
                 label = f"{number}. {names[target_id]}" if selected else names[target_id]
                 ui.button(target_key, 366 + (position - 1) * 134, y, 130, 28, label,
-                          partial(ctrl.use_reaction, hero_id, target_id), hotkeys=target_hotkeys, size=13,
+                          partial(ctrl.choose_reaction_target, hero_id, target_id), hotkeys=target_hotkeys, size=13,
                           tooltip=f"{option['name']} on {names[target_id]}. {option['expected']} Cost: {option['mana_cost']} mana, 1 charge.")
                 hot = hot or ui.is_hot(target_key)
         else:
@@ -885,15 +903,14 @@ def draw_pause(ui: UI, ctrl: AppController) -> None:
     ui.text(640, 204, "The run is waiting exactly where you left it. Nothing advances while this menu is open.", 17, Theme.DIM, align="center")
     ui.button("pause:resume", 470, 250, 340, 52, "Resume  (Esc)", ctrl.resume, default=True, size=20,
               tooltip="Return to the run.")
-    ui.button("pause:controls", 470, 312, 340, 52, "Controls", ctrl.toggle_pause_help, size=20,
+    ui.button("pause:controls", 470, 312, 340, 52, "Controls  (C)", ctrl.toggle_pause_help, hotkeys=(pygame.K_c,), size=20,
               tooltip="Mouse and keyboard controls, and how a turn works.")
     ui.button("pause:settings", 470, 374, 340, 52, "Settings  (S)", ctrl.open_settings, hotkeys=(pygame.K_s,), size=20,
               tooltip="Display, comfort and play aids. The run waits; what would end it cannot be changed from here.")
-    again = "Press again to abandon the run"
-    ui.button("pause:party", 470, 436, 340, 52, again if ctrl.asked("abandon:party") else "Abandon Run: Change Party", ctrl.abandon_to_party,
+    ui.button("pause:party", 470, 436, 340, 52, "Press again: abandon, change party" if ctrl.asked("abandon:party") else "Abandon Run: Change Party", ctrl.abandon_to_party,
               size=18, selected=ctrl.asked("abandon:party"),
               tooltip="Give up this run and return to party setup. The run is not saved and writes no event log. Asked once more.")
-    ui.button("pause:menu", 470, 498, 340, 52, again if ctrl.asked("abandon:menu") else "Abandon Run: Main Menu", ctrl.abandon_to_menu,
+    ui.button("pause:menu", 470, 498, 340, 52, "Press again: abandon, main menu" if ctrl.asked("abandon:menu") else "Abandon Run: Main Menu", ctrl.abandon_to_menu,
               size=18, selected=ctrl.asked("abandon:menu"),
               tooltip="Give up this run and return to the main menu. The run is not saved and writes no event log. Asked once more.")
     ui.escape_action = ctrl.resume
@@ -1172,7 +1189,7 @@ def draw_roster_setup(ui: UI, ctrl: AppController) -> None:
         name = ctrl.class_view(class_id)["name"]
         ui.button(f"add:{class_id}", 600 + position * 220, 606, 212, 50, f"Recruit {name} ({position + 1})",
                   partial(ctrl.add_hero, class_id), enabled=not roster_full,
-                  reason=f"The roster is full ({limit} heroes). {ctrl.ROSTER_FULL_HINT}", hotkeys=(NUMBER_KEYS[position],),
+                  reason=ctrl.roster_full_text(), hotkeys=(NUMBER_KEYS[position],),
                   tooltip=f"Recruit a new {name}. It joins the party if there is room. Recruiting is free.")
     draw_seed_pad(ui, ctrl)
     status_bar(ui, ctrl)
@@ -1181,7 +1198,9 @@ def draw_roster_setup(ui: UI, ctrl: AppController) -> None:
 def draw_career(ui: UI, ctrl: AppController) -> None:
     """One hero's career: every vocation it knows of, what it may claim or become, and what is still hidden."""
     view = ctrl.career_view()
-    ui.text(24, 14, f"Career: {ui.fit_name(view['name'], 30, True, 520)}", 30, Theme.ACCENT, bold=True)
+    title_class = ctrl.class_view(view["active_vocation_id"])["name"]
+    title = f"{view['name']}, {title_class}" if title_class not in view["name"] else view["name"]
+    ui.text(24, 14, f"Career: {ui.fit_name(title, 30, True, 620)}", 30, Theme.ACCENT, bold=True)
     if not view["in_run"]:
         note = "Master a vocation (rank 8) to open the ones that build on it. A hero fights as its active vocation."
     elif not view["open_now"]:
@@ -1231,13 +1250,13 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
               tooltip="Remove this hero from the roster for good. Everything it has mastered is lost. You are asked once more.")
     if skills_tab:
         draw_career_skills(ui, ctrl)
-        ui.button("career:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_career, hotkeys=(pygame.K_b,), default=True)
+        ui.button("career:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_career, default=True)
         ui.escape_action = ctrl.close_career
         status_bar(ui, ctrl)
         return
     info = ctrl.class_view(view["selected"])
     ui.panel(788, 78, 476, 540, info["name"])
-    ui.sprite(ui.assets.combatant_key(ctrl.sprite_class(view["selected"])), 1206, 82, 50, 50)
+    ui.sprite(ui.assets.combatant_key(ctrl.sprite_class(view["selected"])), 1212, 80, 44, 44)  # clear of the first Schedule line
     x, y = 802.0, 106.0
     own, bonus = view["own_stats"], view["stat_bonus"]
     if own:
@@ -1260,7 +1279,7 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
     if not info.get("playable", True):
         ui.paragraph(x, y + 6, "This vocation is part of the design but cannot be played in this version: the rules it needs are "
                                "not built yet. Its dice and abilities will be shown here when they are.", 448, 14, Theme.DIM, line_height=18)
-        ui.button("career:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_career, hotkeys=(pygame.K_b,), default=True)
+        ui.button("career:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_career, default=True)
         ui.escape_action = ctrl.close_career
         status_bar(ui, ctrl)
         return
@@ -1274,7 +1293,7 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
             y = ui.paragraph(x + 76, y, body, 372, 14, Theme.DIM, line_height=17, max_lines=4) + 5
     for die in info["dice"]:
         y = draw_die_faces(ui, x, y + 2, 448, die, max_rows=6) + 4
-    ui.button("career:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_career, hotkeys=(pygame.K_b,), default=True)
+    ui.button("career:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_career, default=True)
     ui.escape_action = ctrl.close_career
     status_bar(ui, ctrl)
 
@@ -1284,9 +1303,10 @@ def draw_career_skills(ui: UI, ctrl: AppController) -> None:
     view = ctrl.skills_view()
     ui.panel(788, 78, 476, 540, "Skills")
     x, y = 802.0, 106.0
-    ui.text(x, y, f"Capacity used: {view['used']} of {view['capacity']} as a {view['vocation_name']}", 15, Theme.TEXT, bold=True, max_width=448)
+    ui.text(x, y, f"Capacity used: {view['used']} of {view['capacity']} as {with_article(view['vocation_name'])}", 15, Theme.TEXT, bold=True, max_width=448)
+    kept = " A skill learned at an earlier Mastery pace stays learned." if any(row.get("earlier_pace") for row in view["rows"]) else ""
     y = ui.paragraph(x, y + 22, "A mastered vocation teaches a skill. It is free while that vocation is active; "
-                                "with another vocation it takes capacity.", 448, 13, Theme.DIM, line_height=16, max_lines=3) + 8
+                                f"with another vocation it takes capacity.{kept}", 448, 13, Theme.DIM, line_height=16, max_lines=4) + 8
     if not view["rows"]:
         ui.paragraph(x, y, "This hero has learned no skill yet. Skills come with mastery ranks; the vocation's rows on the left "
                            "show how far it is.", 448, 14, Theme.DIM, line_height=18, max_lines=4)

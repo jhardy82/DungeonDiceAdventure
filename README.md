@@ -95,7 +95,7 @@ To build it yourself: `python -m pip install ".[package]"`, then
 ## How to play
 
 1. **New Run**, add 1 to 5 heroes (any mix, duplicates allowed), set each hero's row, **Begin**.
-   More heroes meet more and tougher enemies. A melee attack must hit the front row while anyone
+   More heroes meet more enemies. A melee attack must hit the front row while anyone
    stands there. A class's sheet shows while its add button is pointed at or has the focus ring.
 2. Combatants act when their gauge reaches 100; speed fills it each tick. The **Next** row
    forecasts the order.
@@ -170,7 +170,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1406 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
+python -m pytest                 # 1451 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -308,6 +308,8 @@ What changes with the gate on:
 - **Dismiss this hero** on a hero's Career screen removes it from the roster for good, with
   everything it has mastered. You are asked once more. It works between runs, and for a hero
   that is not in the party. This is how a full roster gets room again.
+- **"Press again" questions** (Dismiss, Retry, Abandon, the resets, a die swap) end when you do
+  anything else or let eight seconds pass. The next press then asks again.
 - **Every won battle earns mastery** for each hero in the party. The upgrade screen (under its
   heading), the outcome screen and the status line say what was earned, or why nothing was.
 - **Career** (the button on a party slot or a roster row) lists what a hero has mastered and

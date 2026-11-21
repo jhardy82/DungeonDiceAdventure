@@ -175,10 +175,10 @@ def test_enter_confirms_the_plan_after_planning_with_a_hotkey(tmp_path):
 
 
 def test_enter_confirms_after_clicking_use_and_a_target(tmp_path):
-    play = Play(tmp_path, ["scout"])
+    play = Play(tmp_path, ["scout", "scout"])
     play.begin()
     play.to_roll_prompt()
-    play.roll_faces(striker_d8=8, tools_d4=3)  # Blank and Cover (an ally face always asks for its target)
+    play.roll_faces(striker_d8=8, tools_d4=3)  # Blank and Cover (an ally face with two possible allies asks for its target)
     play.click("die:tools_d4:use")
     assert play.ctrl.targeting_die == "tools_d4"
     target = next(k for k in play.ui.keys("unit:") if play.ui.widget(k).action is not None)
@@ -385,7 +385,7 @@ def test_escape_pauses_a_battle_and_nothing_advances_until_resume(tmp_path):
 
 
 def test_escape_cancels_targeting_before_it_opens_the_menu(tmp_path):
-    play = Play(tmp_path, ["scout"])
+    play = Play(tmp_path, ["scout", "scout"])
     play.begin()
     play.to_roll_prompt()
     play.roll_faces(striker_d8=8, tools_d4=3)  # Blank and Cover

@@ -183,6 +183,8 @@ def test_the_new_button_and_the_note_are_not_cut_off(tmp_path, monkeypatch, font
     play = at_very_fast_pace_a_squire_became_a_guardian(tmp_path, size=size)
     slow_the_pace(play)
     drawn, shortened = record_text(monkeypatch)
+    assert [member["hero_id"] for member in play.ctrl.party] == ["hero_001"], "a change of pace keeps the party"
+    play.click("slot:0:remove")
     play.click("roster:hero_001:career")
     for vocation_id in ("guardian", "squire"):
         play.click(f"career:{vocation_id}:select")

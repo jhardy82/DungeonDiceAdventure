@@ -154,5 +154,7 @@ what to watch for.
 
 - An AI reading a text view is more patient and more literal than a person. It finds missing
   and wrong information. It does not get bored, frustrated or delighted.
-- Animation is off in the driver, so timing and motion are not seen.
+- Motion starts switched off in the driver, and the Settings screen says so. Switched on (M in a
+  battle, or Settings), the driver lets the dice finish rolling before it prints a screen. Timing
+  and motion themselves are still not seen.
 - It does not replace a person playing on a real display.

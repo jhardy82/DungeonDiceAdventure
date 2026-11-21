@@ -2423,6 +2423,56 @@ against them; every one made a test fail.
   word "click" alone, and the phone layer's own wording of a desktop controller's message); a
   test was added for each, and both are noticed now.
 
+### 7.40 The second playtest round and its fixes (2026-11-21)
+
+The owner's standing rule of this day: always fix what is found broken, and leave things better
+than they were found. The demo had not been played by anyone since 47 findings were fixed and
+the D-35 features went in, so four AI playtesters played `main` after pull request 44. Their
+findings, what was done about each, and what was left with its reason are in
+`docs/PLAYTEST_TEAM_2026-11-21.md`, section 7. No rule of a battle changed; the replay pin and
+the content are untouched.
+
+**What the round showed**
+
+- No error screen, no drawing fault, no way to get stuck, at either window size.
+- 22 of 24 predicted numbers matched what happened. Both misses were one gap (Cleanse).
+- Every earlier finding that was re-checked was confirmed fixed, or was one left with a reason.
+- **No player finished a battle inside its budget.** The upgrade screen, Battle 2 and the outcome
+  screen were not played in this round.
+
+**The one systematic fault: a question that did not end**
+
+- Three reports found it independently: an armed Dismiss, Retry or reset stayed armed while the
+  player did something else, and one later press then did the thing. Two of those questions I
+  had built that same day.
+- The old rule was "a question ends when the game says something else". Many actions say
+  nothing (selecting a vocation, Tab, a key nothing answers to).
+- The new rule is in one place. The toolkit tells the controller which control takes each key
+  press and click. A question ends when anything but its own control is used, when eight seconds
+  pass, or when the player leaves the place; its text then leaves the status bar. The three
+  questions that kept flags of their own (defaults, profile reset, die swap) end the same way.
+- **My reading:** eight seconds. Long enough to read the question, short enough that a press a
+  while later is a new decision.
+
+**Two changes of behaviour, made on purpose**
+
+- A die with exactly one legal ally is now planned at once and named, as one with one legal
+  enemy has been since D-34. A lone hero no longer answers "which ally?" with the only one.
+- A party of saved heroes is kept when only the pace or the roster size changes.
+
+**Three findings were the playtest tool's, not the game's.** The driver started with motion off
+while the setting said on, and it printed tumbling dice. Three reports carried that as an
+impression of the game. The driver is fixed, and a test holds it.
+
+**Left for the owner:** whether enemies should attack more (they re-apply statuses as soon as
+they end); reasons in the event log for "no hero could react" (an event-format change, so a
+rules version); reaction keys by the hero's place.
+
+**Checked:** 1,451 tests (45 new), coverage 97.56%, lint and both type checks clean. Forty-one
+deliberate breaks of the new code: 36 were noticed at once. Of the five that were not, four got
+a test of their own and are noticed now; the fifth showed a condition of mine that changed
+nothing, and the condition was removed.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one
