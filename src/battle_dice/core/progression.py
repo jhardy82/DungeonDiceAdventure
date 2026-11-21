@@ -209,7 +209,9 @@ def offers_for_die(ctx: Engine, hero: Combatant, die: DieDefinition) -> list[dic
         _offer("imbue", index, die.faces[index], face)
         for index in rotate(list(range(die.size)))
         for face in imbue_faces
-        if die.faces[index].signature() != face.signature()
+        # A card that would change nothing but the name of the face is not a card (rules 1.1.2, owner decision
+        # D-34): "Strike: 3 melee damage" to "Heavy Blow: 3 melee damage". The next valid card takes its place.
+        if die.faces[index].mechanics() != face.mechanics()
     ]
 
     pools = [sharpen_pool, reforge_pool, imbue_pool]

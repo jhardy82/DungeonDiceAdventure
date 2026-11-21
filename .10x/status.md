@@ -10,7 +10,7 @@
 ## Progress
 
 ### Done
-- Battle Dice MVP (BD-PRD-MVP-001): single-player dice RPG, rules 1.1.1, content 1.3.1; Windows launcher and standalone build
+- Battle Dice MVP (BD-PRD-MVP-001): single-player dice RPG, rules 1.1.2 (two rule fixes of D-34), content 1.3.1; Windows launcher and standalone build
 - Class Evolution specification v0.2, approved 2026-11-11 (`docs/class_evolution/FDD_v0.2.md`)
 - Class Evolution Phase 1: hero build seam, slot schedules, vocation catalog, feature gate `class_evolution_v1` (off by default)
 - Class Evolution Phase 2: progression rules in memory
@@ -34,7 +34,7 @@
 
 ### In Progress
 - Android app (D-33): phase 0, the walking skeleton with Flet (`docs/android/PLAN.md`); starts after the playtest fixes
-- Fixes after the playtest by eight AI playtesters (D-34): batches 1 to 3 of 5 done (predictions and the battle screen; keys, safeguards and mouse reach; what the Class Evolution screens say); the state of each finding is in section 6 of `docs/PLAYTEST_TEAM_2026-11-21.md`
+- Fixes after the playtest by eight AI playtesters (D-34): batches 1 to 4 of 5 done (predictions and the battle screen; keys, safeguards and mouse reach; what the Class Evolution screens say; the two rule fixes, rules 1.1.2 and catalog 0.5.1); the state of each finding is in section 6 of `docs/PLAYTEST_TEAM_2026-11-21.md`
 - Every setting the owner chose in D-31 is in
 - Waiting for the owner's playtest of the demo (D-32); "Confirm a pass" on by default is confirmed
 

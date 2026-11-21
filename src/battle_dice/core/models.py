@@ -136,6 +136,13 @@ class FaceDefinition:
     def has_effect(self, effect_type: str) -> bool:
         return any(e["type"] == effect_type for e in self.effects)
 
+    def mechanics(self) -> tuple:
+        """What the face does, whatever it is called: two faces with equal mechanics play exactly the same.
+
+        The tags count: rules read them (a spell, a schedule slot that asks for a tag).
+        """
+        return (*self.signature()[1:], tuple(sorted(self.tags)))
+
     def signature(self) -> tuple:
         """Identity used to group equal faces when showing frequencies and probabilities."""
         return (
@@ -343,6 +350,10 @@ class RunState:
     swaps_used: dict[str, int] = field(default_factory=dict)
     combat: CombatState | None = None
     battle_records: list[dict[str, Any]] = field(default_factory=list)
+    #: hero_id -> the health and mana a hero had when it first changed vocation in the window that is
+    #: open now (before the upgrade, or before stopping or fighting on). Every change in that window is
+    #: converted from these, so changing back and forth gains nothing. Empty outside such a window.
+    change_base: dict[str, dict[str, int]] = field(default_factory=dict, metadata={"omit_when_empty": True})
 
 
 @dataclass
