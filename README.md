@@ -111,6 +111,14 @@ To build it yourself: `python -m pip install ".[package]"`, then
 | Apprentice | Channel and Cast: Resource, then one other action | Arcane Resonance: +1 spell damage at corruption 3+ | Grounding (Resource): ally -1 corruption, self +1 mana |
 | Scout | Exploit Combo: Status, then Attack | Exploit Opening: +1 damage to the combo Attack | Disrupt (Interrupt): cancel a basic action, weaken an elite one |
 
+- A yellow **Now ...** line under a die face or a planned action gives the amount that will
+  really happen where something changes the printed one: Weaken, a class bonus, or a maximum.
+- **Corruption (CR):** from CR 5 on, a hero loses 1 HP at the end of each of its own
+  activations (shields do not help). The plan says so before you confirm, and a "!" marks it on
+  the hero's card.
+- **Enemies** first take an ability that would bring a hero down, then one that puts a status
+  on a hero who does not have it. Among the rest, a higher weight is chosen more often.
+
 ### Controls
 
 Every screen works with the mouse or with the keyboard alone.
@@ -153,7 +161,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1204 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1236 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```

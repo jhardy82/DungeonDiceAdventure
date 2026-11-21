@@ -10,7 +10,7 @@ from battle_dice.core import commands as cmd
 from battle_dice.core.engine import Engine
 from battle_dice.core.events import EventType
 from battle_dice.core.models import CombatPhase
-from battle_dice.core.view import action_forecast, hero_turn_view, intent_view
+from battle_dice.core.view import action_forecast, combat_log, describe_event, hero_turn_view, intent_view
 from tests.conftest import (
     action,
     add_status,
@@ -23,6 +23,7 @@ from tests.conftest import (
     finish_activation,
     force_slash,
     ok,
+    packaged_content,
     skip_reactions,
     start,
     unit,
@@ -141,3 +142,154 @@ def test_a_resisted_disrupt_is_forecast_on_the_enemy_intent():
     skip_reactions(engine)
     finish_activation(engine)
     assert resolved(engine, "damage")[-1]["effective"] == after["damage"]
+
+
+# --------------------------------------------------------------------------------------------
+# Playtest of 2026-11-21 (D1, D14): modifiers that cancel out, and amounts cut by a maximum
+# --------------------------------------------------------------------------------------------
+
+
+def planned(engine: Engine, *actions: dict) -> list[dict]:
+    """The forecast of each action of a plan, in the order it resolves, as the plan panel computes it."""
+    intents, problem = engine.preview_plan(list(actions))
+    assert problem is None
+    hero = unit(engine, engine.combat.turn.hero_id)
+    opening = engine.build(hero.id).schedule.opening_categories
+    out = []
+    for position, intent in enumerate(intents):
+        target = unit(engine, intent.committed_target_ids[0]) if intent.committed_target_ids else hero
+        combo = len(intents) == 2 and position == 1 and intents[0].category in opening
+        out.append(action_forecast(engine, hero, engine.intent_face(intent), intent, target, combo))
+    return out
+
+
+def test_modifiers_that_cancel_each_other_out_are_still_named():
+    """Found by three playtesters: a weakened Scout's combo shot. The amount is the printed one, and the player is told why."""
+    engine = start("scout")
+    add_status(engine, "h01", "weaken")
+    begin_hero(engine, "h01", striker_d8=4, tools_d4=1)  # Poison, then Quick Shot (1 damage)
+    foe = enemies(engine)[0].id
+    assert die_forecast(engine, "tools_d4")["note"] == "deals 0 (Weaken -1)"  # alone, the shot loses to Weaken
+    plan = [action("striker_d8", foe), action("tools_d4", foe)]
+    second = planned(engine, *plan)[1]
+    assert second["damage"] == 1 and second["note"] == "deals 1 (Exploit Opening +1, Weaken -1)"
+    commit(engine, *plan)
+    finish_activation(engine)
+    assert resolved(engine, "damage")[-1]["effective"] == 1
+
+
+def test_a_heal_larger_than_the_missing_health_is_forecast_at_what_it_will_heal():
+    engine = start("apprentice", "squire")
+    squire = unit(engine, "h02")
+    squire.hp = squire.max_hp - 1
+    begin_hero(engine, "h01", arcane_d6=3, focus_d4=4)  # Mend: heal 3
+    # On the die card the ally is not chosen yet (two could be healed): no amount is promised there.
+    assert die_forecast(engine, "arcane_d6")["note"] == ""
+    forecast = planned(engine, action("arcane_d6", "h02"))[0]
+    assert forecast["note"] == f"heals 1 ({squire.name} is at {squire.hp}/{squire.max_hp} HP)"
+    commit(engine, action("arcane_d6", "h02"))
+    finish_activation(engine)
+    assert resolved(engine, "heal")[-1]["healed"] == 1
+
+
+def test_a_heal_on_the_only_possible_target_is_forecast_on_the_die_card_too():
+    engine = start("apprentice")
+    hero = unit(engine, "h01")
+    hero.hp = hero.max_hp - 2
+    begin_hero(engine, "h01", arcane_d6=3, focus_d4=4)
+    assert die_forecast(engine, "arcane_d6")["note"] == f"heals 2 ({hero.name} is at {hero.hp}/{hero.max_hp} HP)"
+    hero.hp = hero.max_hp
+    assert die_forecast(engine, "arcane_d6")["note"] in ("", f"heals 0 ({hero.name} is at full health)")
+    hero.hp = hero.max_hp - 3
+    assert die_forecast(engine, "arcane_d6")["note"] == ""  # all of it is used: as printed
+
+
+def test_mana_gained_above_the_maximum_is_forecast_at_what_will_be_gained():
+    engine = start("apprentice")
+    hero = unit(engine, "h01")
+    hero.mana = hero.max_mana - 1
+    begin_hero(engine, "h01", arcane_d6=6, focus_d4=1)  # Channel: +2 mana
+    forecast = die_forecast(engine, "focus_d4")
+    assert forecast["note"] == f"+1 mana ({hero.name} has {hero.mana} of at most {hero.max_mana})"
+    commit(engine, action("focus_d4"))
+    finish_activation(engine)
+    assert resolved(engine, "gain_mana")[-1]["gained"] == 1
+
+
+def test_the_mana_forecast_counts_from_the_mana_the_plan_has_left():
+    """A later action of a plan starts from the mana the earlier ones leave, not from the mana of now."""
+    engine = start("apprentice")
+    hero = unit(engine, "h01")
+    hero.mana = hero.max_mana
+    begin_hero(engine, "h01", arcane_d6=6, focus_d4=1)
+    intents, _ = engine.preview_plan([action("focus_d4")])
+    face = engine.intent_face(intents[0])
+    assert action_forecast(engine, hero, face, intents[0], hero)["note"] == f"+0 mana ({hero.name} has {hero.max_mana} of at most {hero.max_mana})"
+    assert action_forecast(engine, hero, face, intents[0], hero, mana=hero.max_mana - 2)["note"] == ""
+    assert action_forecast(engine, hero, face, intents[0], hero, mana=hero.max_mana - 1)["note"].startswith("+1 mana")
+
+
+def test_a_shield_above_the_maximum_is_forecast_at_what_will_be_gained():
+    engine = start("squire")
+    hero = unit(engine, "h01")
+    cap = engine.content.balance["shield"]["cap"]
+    hero.shields = cap - 2
+    begin_hero(engine, "h01", iron_d6=3, oath_d4=4)  # Guard: 3, and Steadfast adds 1
+    forecast = die_forecast(engine, "iron_d6")
+    assert forecast["shield"] == 2 and forecast["note"] == f"+2 shield (Steadfast +1, {hero.name} has {cap - 2} of at most {cap})"
+    commit(engine, action("iron_d6", "h01"))
+    finish_activation(engine)
+    assert resolved(engine, "shield")[-1]["gained"] == 2 and hero.shields == cap
+
+
+# --------------------------------------------------------------------------------------------
+# Playtest of 2026-11-21 (D10, D15): the combat log
+# --------------------------------------------------------------------------------------------
+
+
+def test_the_log_says_when_a_hit_was_larger_than_the_health_that_was_left():
+    engine = start("squire", content=packaged_content())  # the shipped Strike: 3 damage
+    foe = enemies(engine)[0]
+    foe.hp = 1
+    begin_hero(engine, "h01", iron_d6=1, oath_d4=4)  # Strike
+    strike = engine.die_for("h01", "iron_d6").faces[0].power
+    assert strike >= 3
+    commit(engine, action("iron_d6", foe.id))
+    finish_activation(engine)
+    line = next(line for line in reversed(combat_log(engine)) if " uses Strike" in line)
+    assert f"{foe.name} takes 1 damage [{strike} base, {strike - 1} more than its health]" in line
+    # A weakened hit: every number of the line is accounted for (the tester's "takes 1 damage [3 base, -1 Weaken]").
+    engine = start("squire", content=packaged_content())  # the shipped Strike: 3 damage
+    foe = enemies(engine)[0]
+    foe.hp = 1
+    add_status(engine, "h01", "weaken")
+    begin_hero(engine, "h01", iron_d6=1, oath_d4=4)
+    commit(engine, action("iron_d6", foe.id))
+    finish_activation(engine)
+    line = next(line for line in reversed(combat_log(engine)) if " uses Strike" in line)
+    assert f"takes 1 damage [{strike} base, -1 Weaken, {strike - 2} more than its health]" in line
+
+
+def test_a_hit_that_fits_the_health_has_no_such_remark():
+    engine = start("squire")
+    foe = enemies(engine)[0]
+    foe.shields = 1
+    begin_hero(engine, "h01", iron_d6=1, oath_d4=4)
+    strike = engine.die_for("h01", "iron_d6").faces[0].power
+    assert foe.hp > strike
+    commit(engine, action("iron_d6", foe.id))
+    finish_activation(engine)
+    line = next(line for line in reversed(combat_log(engine)) if " uses Strike" in line)
+    assert line.endswith(f"{foe.name} takes {strike - 1} damage, 1 absorbed by shield.")
+
+
+def test_the_log_credits_a_bonus_to_the_passive_that_gave_it():
+    engine = start("squire")
+    begin_hero(engine, "h01", iron_d6=3, oath_d4=4)  # Guard
+    commit(engine, action("iron_d6", "h01"))
+    finish_activation(engine)
+    assert any("gains 4 shield (incl. +1 Steadfast)" in line for line in combat_log(engine))
+    event = events_of(engine, EventType.ACTION_RESOLVED)[-1]
+    names = {"h01": "Aldric"}
+    assert "(incl. +1 Bulwark)" in str(describe_event(event, names, None, {"h01": "Bulwark"}))
+    assert "(incl. +1 bonus)" in str(describe_event(event, names))  # the passive is not known: no name is made up

@@ -48,6 +48,7 @@ tests, and add an entry here.
 | D-31 | The demo's configuration | **Owner decisions, 2026-11-12, after the research:** Settings is grouped (Display and comfort, Play aids, Class Evolution, Demo and testing), the four demo options sit in the last group; the dice seed is chosen on the New Run screen and can be typed; new settings: text size, high contrast, battle speed at start, confirm before passing with an unused die, tooltip delay, Settings from the pause menu, reset all settings to defaults. No audio, controller, remapping or difficulty settings. | Section 7.26 |
 | D-32 | The demo: how it is judged, and one default | **Owner decisions, 2026-11-12, after every setting of D-31 was merged:** the owner plays the demo and judges it against the goal ("a fully configurable and playable demo"); "Confirm a pass" stays **on by default**. | Sections 7.29 and 7.30 |
 | D-33 | An Android version | **Owner decisions, 2026-11-21, after the evaluation:** a real Android app with new phone screens on the existing rules, save and controller; the screens are built with **Flet**, starting with a walking skeleton that must pass a go or no-go check; the fallback is a native Android UI (Chaquopy and Kotlin); the app works upright and sideways from the start. What the app is for (own phone, a few people, the Play Store) is not decided. | Section 7.31, `docs/android/PLAN.md` |
+| D-34 | What is fixed after the playtest by the team | **Owner decisions, 2026-11-21, on `docs/PLAYTEST_TEAM_2026-11-21.md`:** (1) every defect and every case of missing information that needs no design decision is fixed; (2) the game still picks a single legal target by itself, but says so, and a number key never removes a planned action; (3) "Abandon Run" and "Retry" ask once more, and the profile reset is confirmed by a separate button in another place; (4) both rule faults are fixed: a vocation change converts health from what the hero had when the change window opened, and an upgrade card that would change nothing is not offered. The rules version goes up and the balance is measured again. Not decided: dismissing a hero, starting classes, the effect of a slower mastery pace. | Section 7.32 |
 
 ## 2. Content authored under delegation
 
@@ -1980,6 +1981,53 @@ where).
 **Not verified:** no Android build has been made and nothing has run on a phone. Flet's Android
 output against the Play rules, its start-up time and its speed are unknown until the skeleton
 has measured them. The web facts come from one research pass on one day.
+
+### 7.32 Fixes after the playtest by the team (owner decision D-34, 2026-11-21)
+
+**The owner's four answers** are in row D-34. The findings and their IDs are in
+`docs/PLAYTEST_TEAM_2026-11-21.md`; its section 6 lists what is fixed and what is open.
+
+**Batch 1: predictions and what the battle screen says** (no rule changed; replay pin unchanged)
+
+| Finding | What was wrong | What it is now |
+|---------|----------------|----------------|
+| D1 | The die card of a planned combo said "Now deals 0 (Weaken -1)"; the attack dealt 1 | A die in a legal plan shows the plan's prediction. Modifiers that cancel out are named: "Now deals 1 (Exploit Opening +1, Weaken -1)" |
+| D14 | A heal, mana or shield cut by a maximum had no "Now" line | "Now heals 1 (Squire 2 is at 14/15 HP)", "Now +1 mana (Apprentice 1 has 5 of at most 6)", "Now +2 shield (Steadfast +1, Squire 1 has 10 of at most 12)" |
+| M1 | Corruption backlash was explained nowhere and not predicted | The plan says "Corruption 5: -1 HP when this activation ends." (also before any action is planned, and not when the plan removes enough corruption). The rule is on the hero's inspect panel, in its help text and in the Controls help, with the numbers of the content |
+| M2 | "A higher weight is chosen more often" hid the priority | The enemy's inspect panel gives the order: an ability that would bring a hero down, then a status the hero does not have, then the weights |
+| D13 | The reaction prompt quoted the printed damage | The prompt ends with "Now deals 2 (Weaken -1)." when the amount differs |
+| D5 | Internal names in "Used this intent" | "Used: Interpose (Squire 1)", sized by measuring, listed only when something was used |
+| D10 | The log credited every shield bonus to "Steadfast" | The bonus carries the name of the hero's own passive. For an action from before the hero's last change of vocation it is called "bonus", because the log does not record the passive of that time |
+| D15 | "takes 1 damage [3 base, -1 Weaken]" | "takes 1 damage [3 base, -1 Weaken, 1 more than its health]" |
+| D4 | The line about a lost target was cut off | Shorter ("If its target is gone: next in its row, then lowest HP%.") and sized by measuring; the whole rule is in the Controls help |
+| D7 | "Order (O)" did nothing when the rules fix the order | It is off then, and says why. No shipped class leaves the order to the player, so in the shipped game it is always off with two actions |
+| D16 | "will reroll" with no reroll left | Not shown then |
+| D17 | "React 1" on a downed hero; statuses and a gauge on a defeated enemy | A downed hero shows "React 0" and an empty gauge; a defeated enemy shows neither gauge nor statuses |
+| D6 | The status bar kept an old message | A new activation announces itself ("Scout 2 is up. Roll the dice (R)."). A message is dropped when the player moves to another screen, the pause menu, the controls help or another group of settings and nothing new was said |
+
+- **A second look at my own first version.** The first heal prediction named the first possible
+  ally on the die card ("heals 0 (Apprentice 1 is at full health)") before the player had chosen
+  one. A test showed it. The die card now predicts a heal only when one ally is possible.
+- **Two things I did not build, and why.** A plan with two heals on one ally, and a mana gain
+  after a costly action in the same plan, cannot happen with the shipped classes or the five
+  playable vocations (their schedules were read). The prediction takes the plan's mana as a
+  parameter and is tested with it; health given back earlier in the same plan is not tracked.
+- **Evidence:**
+  - 32 new tests (1,236 in all, warnings as errors, coverage of the rules 97.46%). Each prediction
+    test reads the prediction, lets the engine resolve the action and compares the two.
+  - 44 deliberate breaks of the new code, with a control run: all 44 make a test fail. One
+    survived the first run (the O key's own check, behind a button that is already off); a
+    direct test now covers it.
+  - The line about a lost target and the reaction prompt, whose sizes are chosen by measuring,
+    are tested under four fonts of very different width. The backlash line was measured under
+    eleven fonts by a throw-away script. Screenshots of the changed screens were looked at, at
+    both text sizes.
+  - Replay pin and the content files unchanged. Simulator on seeds 300 to 339: every result
+    identical to the stored reference (1,703 of 2,200 wins); only the timing fields differ.
+    Both self-checks pass; both Class Evolution checkers print OK.
+- **Not verified:** a person's reading of the new texts. One deliberate break was left out
+  because it cannot fail with the shipped content: the reaction prompt's headline at a fixed
+  size (no shipped enemy action names enough targets to overflow it).
 
 ## 8. Known limits after the MVP review (2026-11-10)
 

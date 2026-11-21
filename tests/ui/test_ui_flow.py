@@ -784,8 +784,11 @@ def test_combo_planning_by_keyboard_alone_with_numbered_targets_order_and_clear(
     play.key(pygame.K_1)
     assert [a["die_id"] for a in play.ctrl.draft] == ["striker_d8", "tools_d4"] and play.ctrl.confirm_problem() is None
 
-    play.key(pygame.K_o)  # swap the drafted order; class rules still put the Status first when it resolves
-    assert [a["die_id"] for a in play.ctrl.draft] == ["tools_d4", "striker_d8"]
+    # The Scout's rule puts the Status first whatever the player wants: Order is off and says why (playtest D7).
+    order = play.ui.widget("plan:order")
+    assert not order.enabled and "fix the order" in (order.reason or "")
+    play.key(pygame.K_o)
+    assert [a["die_id"] for a in play.ctrl.draft] == ["striker_d8", "tools_d4"]
     assert [entry["die_id"] for entry in play.ctrl.plan_preview()["ordered"]] == ["striker_d8", "tools_d4"]
     play.key(pygame.K_c)
     assert play.ctrl.draft == [] and "cleared" in play.ctrl.message.lower()

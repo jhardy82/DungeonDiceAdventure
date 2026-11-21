@@ -16,6 +16,7 @@ from battle_dice.core.engine import Engine
 from battle_dice.core.events import EventType, events_hash, state_hash
 from battle_dice.core.models import CombatPhase
 from battle_dice.core.replay import export_run, verify
+from battle_dice.core.view import combat_log
 from battle_dice.sim.policies import HeuristicPolicy, RandomPolicy
 from tests.conftest import (
     action,
@@ -91,6 +92,16 @@ def test_bulwark_adds_one_shield_on_another_ally(catalog):
     (gain,) = shields_gained(engine)
     assert (gain["target"], gain["bonus"], gain["gained"]) == ("h02", 1, printed + 1) == ("h02", 1, 5)
     assert unit(engine, "h02").shields == 5 and unit(engine, "h01").shields == 0
+
+
+def test_the_log_credits_the_guardians_shield_bonus_to_bulwark(catalog):
+    """Playtest of 2026-11-21, D10: the log called it "Steadfast", which is the Squire's passive."""
+    engine = started(catalog, 1, [("guardian", "front"), ("scout", "back")])
+    begin_hero(engine, "h01", guardian_d4=1, guardian_d6=1)
+    commit(engine, action("guardian_d6", "h02"))
+    finish_activation(engine)
+    line = next(line for line in combat_log(engine) if "gains 5 shield" in line)
+    assert "(incl. +1 Bulwark)" in line and "Steadfast" not in line
 
 
 def test_bulwark_adds_nothing_on_the_guardian_itself(catalog):

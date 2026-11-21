@@ -160,3 +160,20 @@ Started: 2026-11-11
   is not confirmed; Android runs Python 3.14, not 3.15; two arrangements for every screen.
 - **Impacts:** A new app folder and a new Android workflow; the pygame-free layer gains screen
   data for the phone; `docs/android/PLAN.md`; later the Python floor and the wording of messages.
+
+### 2026-11-21 — Owner: what is fixed after the playtest by the team (D-34)
+- **Decision:** Fix every defect and every case of missing information that needs no design
+  decision. Keep the single-target shortcut, say that it happened, and never let a number key
+  remove a planned action. "Abandon Run" and "Retry" ask once more; the profile reset is
+  confirmed by a separate button elsewhere. Fix both rule faults: a vocation change converts
+  health from what the hero had when the change window opened, and an upgrade card that would
+  change nothing is not offered.
+- **Why:** Eight AI playtesters found about 45 different things in 7,374 actions; seven are
+  high. Four were replayed and their causes read in the code.
+- **Alternatives considered:** Only the high findings; none before the owner has played.
+  Always asking for a target. One "press again" for all three safeguards. Leaving the rules.
+- **Trade-offs accepted:** The rules version goes up and the replay pin changes with the rule
+  fixes; the balance is measured again. The Android skeleton waits until the fixes are in.
+- **Impacts:** Battle, upgrade, settings and outcome screens; controller; `core/build.py` and
+  `core/progression.py` for the rules; five pull requests. Not decided: dismissing a hero,
+  starting classes, what a slower mastery pace does to a vocation already opened.

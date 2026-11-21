@@ -95,20 +95,31 @@ def action_forecast(
     intent: ActionIntent | None = None,
     target: Combatant | None = None,
     combo: bool = False,
+    mana: int | None = None,
+    sure_target: bool = True,
 ) -> dict[str, Any]:
     """What an action will really produce, where that differs from the amounts printed on the face.
 
     Uses the engine's own formulas (``effects.damage_breakdown``, ``effects.shield_bonus``), so a
     preview cannot disagree with the resolution. ``combo`` marks the second action of a class combo
     whose first action is planned: its bonus is granted when that first action resolves.
-    ``note`` is empty when every amount is as printed.
+
+    * ``mana`` is the actor's mana just before this action (an earlier action of the plan may have
+      changed it).
+    * ``sure_target`` is false while the target is only the first of several the player may still
+      choose: an amount that depends on the target's own state (a capped heal) is then not predicted.
+    * ``note`` is empty when every amount is as printed and no modifier applies. Modifiers that
+      cancel each other out are still named, so the player sees why the amount is the printed one.
     """
     passive = engine.build(actor.id).passive if actor.is_hero else None
     damage: int | None = None
     shield: int | None = None
     weaken = 0
     notes: list[str] = []
+    mana_now = (actor.mana if mana is None else mana) - (face.mana_cost if actor.is_hero else 0)
     for effect in face.effects:
+        own = effect.get("target", "target") == "self"
+        fixed = own or face.target_scope == "self"  # the receiver is the actor, whatever the player aims at
         if effect["type"] == "damage":
             parts = effects.damage_breakdown(engine, actor, face, effect, intent)
             bonus = parts["bonus"]
@@ -123,13 +134,35 @@ def action_forecast(
                 reasons.append(f"Disrupt -{parts['mitigation']}")
             weaken = parts["weaken"]
             damage = max(0, parts["base"] + bonus - parts["weaken"] - parts["mitigation"])
-            if damage != parts["base"]:
+            if reasons:
                 notes.append(f"deals {damage} ({', '.join(reasons)})")
         elif effect["type"] == "shield" and passive is not None and intent is not None and target is not None:
-            bonus = effects.shield_bonus(engine, actor, face, target, intent)
+            receiver = actor if own else target
+            bonus = effects.shield_bonus(engine, actor, face, receiver, intent)
             shield = face.effect_amount(effect) + bonus
-            if bonus:
-                notes.append(f"+{shield} shield ({passive['name']} +{bonus})")
+            reasons = [f"{passive['name']} +{bonus}"] if bonus else []
+            cap = int(engine.content.balance["shield"]["cap"])
+            single = own or face.target_scope in ("single_ally", "self")
+            if single and receiver.standing and (sure_target or fixed) and receiver.shields + shield > cap:
+                shield = max(0, cap - receiver.shields)
+                reasons.append(f"{receiver.name} has {receiver.shields} of at most {cap}")
+            if reasons:
+                notes.append(f"+{shield} shield ({', '.join(reasons)})")
+        elif effect["type"] == "heal" and intent is not None and (own or face.target_scope in ("single_ally", "self")):
+            receiver = actor if own or target is None else target
+            if receiver.standing and (sure_target or fixed):
+                amount = face.effect_amount(effect)
+                health = receiver.hp
+                real = min(receiver.max_hp - health, amount)
+                if real < amount:
+                    where = "at full health" if health >= receiver.max_hp else f"at {health}/{receiver.max_hp} HP"
+                    notes.append(f"heals {real} ({receiver.name} is {where})")
+        elif effect["type"] == "gain_mana" and intent is not None and actor.is_hero and (own or face.target_scope == "self"):
+            amount = face.effect_amount(effect)
+            real = max(0, min(actor.max_mana - mana_now, amount))
+            if real < amount:
+                notes.append(f"+{real} mana ({actor.name} has {max(0, mana_now)} of at most {actor.max_mana})")
+            mana_now += real
     return {"damage": damage, "shield": shield, "weaken": weaken, "note": "; ".join(notes)}
 
 
@@ -236,6 +269,8 @@ def combatant_view(engine: Engine, c: Combatant) -> dict[str, Any]:
         view["passive"] = copy.deepcopy(build.passive)
         view["reaction"] = {"id": build.reaction_id, **copy.deepcopy(build.reaction)}
         view["corruption_backlash"] = c.corruption >= balance["corruption"]["backlash_threshold"]
+        view["corruption_rule"] = {"threshold": balance["corruption"]["backlash_threshold"],
+                                   "damage": balance["corruption"]["backlash_damage"]}
     else:
         view["actions"] = [
             {**face_view(engine.enemy_action(c, action_id)), "weight": engine.enemy_action(c, action_id).weight}
@@ -287,7 +322,7 @@ def _die_forecast(engine: Engine, hero: Combatant, turn: HeroTurn, option: dict[
             intent = None  # not usable right now (mana); the printed amounts stand
         else:
             target = engine.combat.combatants[intent.committed_target_ids[0]] if intent.committed_target_ids else hero
-    return action_forecast(engine, hero, face, intent, target)
+    return action_forecast(engine, hero, face, intent, target, sure_target=len(option["eligible_target_ids"]) <= 1)
 
 
 def hero_turn_view(engine: Engine) -> dict[str, Any] | None:
@@ -404,7 +439,9 @@ def snapshot(engine: Engine) -> dict[str, Any]:
                 "stage_number": combat.stage_index + 1,
                 "options": reactions.stage_options(engine, combat.reaction_stage),
                 "used": [
-                    {"hero_id": r.reacting_hero_id, "reaction": r.effect, "stage": r.reaction_stage} for r in combat.reactions_used
+                    {"hero_id": r.reacting_hero_id, "reaction": r.effect, "stage": r.reaction_stage,
+                     "name": engine.build(r.reacting_hero_id).reaction["name"]}
+                    for r in combat.reactions_used
                 ],
             }
     if state.phase in (RunPhase.UPGRADE, RunPhase.EQUIPMENT):
@@ -417,8 +454,13 @@ def snapshot(engine: Engine) -> dict[str, Any]:
 # --------------------------------------------------------------------------------------------
 
 
-def describe_event(event: CombatEvent, names: dict[str, str], die_names: dict[str, str] | None = None) -> str | None:
-    """Player-facing log line for an event, or ``None`` for purely technical events."""
+def describe_event(event: CombatEvent, names: dict[str, str], die_names: dict[str, str] | None = None,
+                   passive_names: dict[str, str] | None = None) -> str | None:
+    """Player-facing log line for an event, or ``None`` for purely technical events.
+
+    ``passive_names`` gives each hero's passive by hero id, so a bonus is credited to the passive
+    that gave it. Without it a bonus is called "bonus".
+    """
 
     def name(cid: str | None) -> str:
         return names.get(cid or "", cid or "?")
@@ -429,6 +471,7 @@ def describe_event(event: CombatEvent, names: dict[str, str], die_names: dict[st
     d = event.delta
     kind = event.type
     actor = name(event.actor_id)
+    passive = (passive_names or {}).get(event.actor_id or "", "bonus")
     if kind == EventType.BATTLE_STARTED:
         return f"--- Battle {d['battle']} begins ---"
     if kind == EventType.ACTIVATION_STARTED:
@@ -458,16 +501,20 @@ def describe_event(event: CombatEvent, names: dict[str, str], die_names: dict[st
             if r["type"] == "damage":
                 mods = []
                 if r["bonus"]:
-                    mods.append(f"+{r['bonus']} bonus")
+                    mods.append(f"+{r['bonus']} {passive}")
                 if r["weaken"]:
                     mods.append(f"-{r['weaken']} Weaken")
                 if r["mitigation"]:
                     mods.append(f"-{r['mitigation']} Disrupt")
-                detail = f" [{r['base']} base{', ' if mods else ''}{', '.join(mods)}]" if mods else ""
+                # A hit larger than the health that was left: say so, or the numbers do not add up.
+                beyond = r["effective"] - r["absorbed"] - r["hp_damage"]
+                if beyond > 0:
+                    mods.append(f"{beyond} more than its health")
+                detail = f" [{r['base']} base, {', '.join(mods)}]" if mods else ""
                 shield = f", {r['absorbed']} absorbed by shield" if r["absorbed"] else ""
                 parts.append(f"{target} takes {r['hp_damage']} damage{shield}{detail}")
             elif r["type"] == "shield":
-                bonus = f" (incl. +{r['bonus']} Steadfast)" if r.get("bonus") else ""
+                bonus = f" (incl. +{r['bonus']} {passive})" if r.get("bonus") else ""
                 parts.append(f"{target} gains {r['gained']} shield{bonus}")
             elif r["type"] == "heal":
                 parts.append(f"{target} is revived" if r["revived"] else f"{target} heals {r['healed']}")
@@ -543,5 +590,14 @@ def combat_log(engine: Engine, limit: int | None = None) -> list[str]:
     die_names = {die_id: entry["name"] for die_id, entry in engine.content.documents["dice"]["dice"].items()}
     for member in engine.state.party:  # an evolved hero's dice come with its build, not with the shipped content
         die_names.update({die_id: die.name for die_id, die in engine.build(member["id"]).dice.items()})
-    lines = [line for line in (describe_event(e, names, die_names) for e in engine.events) if line]
+    # A bonus is credited to the passive the hero has now. Before its last change of vocation the
+    # hero had another one, which the log does not record: there the bonus is just called "bonus".
+    passive_names = {member["id"]: str(engine.build(member["id"]).passive["name"]) for member in engine.state.party}
+    changed = {e.delta["id"]: position for position, e in enumerate(engine.events) if e.type == EventType.VOCATION_CHANGED}
+    lines = []
+    for position, event in enumerate(engine.events):
+        known = passive_names if changed.get(event.actor_id or "", -1) < position else {}
+        line = describe_event(event, names, die_names, known)
+        if line:
+            lines.append(line)
     return lines if limit is None else lines[-limit:]
