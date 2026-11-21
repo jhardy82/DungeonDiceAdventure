@@ -153,9 +153,19 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1194 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1203 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
+```
+
+**Playtesting step by step.** `tools/playtest_screen.py` plays the real screens without a window:
+it applies key presses and clicks, prints the screen as text with every control and its state,
+and saves a screenshot. A session replays exactly, so a finding comes with the steps that
+reproduce it. The guide and the roles for playtesters are in `.claude/skills/playtest/`.
+
+```bash
+PYTHONPATH=src python tools/playtest_screen.py --session /tmp/session start
+PYTHONPATH=src python tools/playtest_screen.py --session /tmp/session do key:n click:add:squire key:b
 ```
 
 UI tests run headless (`SDL_VIDEODRIVER=dummy` is set by the tests). CI runs the same checks on

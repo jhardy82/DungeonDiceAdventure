@@ -47,6 +47,7 @@ tests, and add an entry here.
 | D-30 | Class Evolution: Field Medic's numbers | **Owner decision, 2026-11-12, after the measurement:** the revival costs what the Heal costs (no extra mana) and the ally comes back at **5 HP**; still once per encounter. Measured: 316 wins of 480 against 297 without the skill. This replaces the catalog's "revive to 1 HP ... if it costs +1 mana". | Section 7.25 |
 | D-31 | The demo's configuration | **Owner decisions, 2026-11-12, after the research:** Settings is grouped (Display and comfort, Play aids, Class Evolution, Demo and testing), the four demo options sit in the last group; the dice seed is chosen on the New Run screen and can be typed; new settings: text size, high contrast, battle speed at start, confirm before passing with an unused die, tooltip delay, Settings from the pause menu, reset all settings to defaults. No audio, controller, remapping or difficulty settings. | Section 7.26 |
 | D-32 | The demo: how it is judged, and one default | **Owner decisions, 2026-11-12, after every setting of D-31 was merged:** the owner plays the demo and judges it against the goal ("a fully configurable and playable demo"); "Confirm a pass" stays **on by default**. | Sections 7.29 and 7.30 |
+| D-33 | An Android version | **Owner decisions, 2026-11-21, after the evaluation:** a real Android app with new phone screens on the existing rules, save and controller; the screens are built with **Flet**, starting with a walking skeleton that must pass a go or no-go check; the fallback is a native Android UI (Chaquopy and Kotlin); the app works upright and sideways from the start. What the app is for (own phone, a few people, the Play Store) is not decided. | Section 7.31, `docs/android/PLAN.md` |
 
 ## 2. Content authored under delegation
 
@@ -1917,6 +1918,68 @@ all eleven fonts.
 **Not verified:** no person has read the Large size on a real display; the sizes were checked by
 measurement and by screenshots made in this session. The system font on Windows (Segoe UI)
 cannot be run here; it is exercised by the Windows job of the pull request only.
+
+### 7.31 An Android version: evaluation and plan (owner decision D-33, 2026-11-21)
+
+**The owner's question:** evaluate a version for Android phones, especially a Galaxy S25 Ultra.
+
+**Answer in one line.** Feasible, but as two separate jobs: running the game on Android at all,
+and screens a phone can show. The owner chose a real Android app with new phone screens.
+
+**Measured in this session (throw-away scripts and environments, nothing in the repository
+changed)**
+
+| Question | Result |
+|----------|--------|
+| The current screens on a 6.9 inch 19.5:9 phone, sideways (one layout unit is 0.10 mm) | Typical text 1.4 mm high, smallest 1.2 mm; typical control 4.5 mm on its smaller side, smallest 2.2 mm |
+| Share below Android's guideline (12sp, about 1.9 mm; 48dp, about 9 mm) | 98% of the text; 97% of the controls are under 7 mm |
+| Enlargement needed | About 1.5 times for text, 2 times for controls. The Large text setting (15%) does not close that |
+| Which code needs pygame | Only `ui/` (4 files, 2,554 lines) and `__main__.py`. Rules, content, career, controller and simulator (about 10,500 lines) do not import it |
+| Python versions | Both self-checks pass on 3.11, 3.12, 3.13 and 3.14. The whole test suite passes on 3.12; all non-screen tests pass on 3.14 with warnings as errors |
+| Input the screens handle | Mouse move, mouse press, key press. Not reachable by touch: the inspect panel and help texts (pointer at rest), typing a seed, the F, M and Space keys |
+| Runtime dependency with a compiled part | `jsonschema` (content check at start) needs `rpds-py` |
+
+- The measurement walked the 68 states of the two tours of `tests/ui/test_text_size.py`.
+
+**Routes considered (web research on 2026-11-21, primary sources read by a research agent)**
+
+| Route | State | Outcome |
+|-------|-------|---------|
+| Package the pygame screens (python-for-android) | No pygame-ce recipe is shipped; the only pygame recipe is marked broken in the tool's own CI; pygame-ce says it "does not support android for now" | Rejected |
+| Browser build (pygbag) | Works in principle; save persistence, offline use and speed on a phone not confirmed | Not chosen by the owner |
+| New phone screens on the existing rules | Supported toolkits exist | **Chosen** |
+
+**Toolkits for the new screens**
+
+| | Flet 1.1.2 | Chaquopy 17.2 with a Kotlin UI | Kivy 2.3.2 |
+|---|---|---|---|
+| Screens written in | Python | Kotlin | Python |
+| Python on Android | 3.12 to 3.14 | 3.10 to 3.15 | 3.14 |
+| `jsonschema` on Android | Works (wheel for `rpds-py` on its index) | Not installable | Needs an own recipe |
+| Screen reader | Supported | Supported | Not supported |
+| Play Store rules (API 36, 16 KB pages) | Not confirmed | Best position | User reports only |
+| Biggest risk | Young: 1.0 on 2026-09-14 | A second language and codebase | Accessibility and store rules |
+
+**A spike that decided it.** A throw-away phone screen (about 130 lines) was put on the real
+controller with Flet: enemies, heroes, rolled dice, a tap on "Use", the target choice. It ran
+with no pygame imported, and it was drawn and tapped in the development container at the
+phone's size (384 x 832 dp). So the architecture holds, and phone screens can be checked
+without a phone. It also showed that the controller's messages name keys ("Reroll (R)",
+"Esc cancels"), which touch needs differently.
+
+**Owner decisions (D-33)**
+
+- A real Android app: keep rules, save and controller; new phone screens.
+- Toolkit: Flet, with a walking skeleton first and a go or no-go check after it.
+- Upright and sideways from the start.
+- Purpose not decided yet, so the Play Store stays possible and is not assumed.
+
+**The plan** is in `docs/android/PLAN.md` (phases, the go or no-go checks, what can be checked
+where).
+
+**Not verified:** no Android build has been made and nothing has run on a phone. Flet's Android
+output against the Play rules, its start-up time and its speed are unknown until the skeleton
+has measured them. The web facts come from one research pass on one day.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 
