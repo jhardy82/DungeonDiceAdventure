@@ -170,7 +170,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1341 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
+python -m pytest                 # 1356 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -426,7 +426,12 @@ one battle, upright and sideways, with a self-check that plays a whole run on th
 
 - The app is in `android/`; its screens are plain data in `src/battle_dice/phone/`.
 - It is built on GitHub (workflow "Android (walking skeleton)"), which also starts it on an
-  emulator. The APK is an artifact of that workflow's run.
+  emulator four times (upright, with a larger system font, turned sideways while it runs,
+  started while held sideways) and requires a passed self-check and the fitting layout each
+  time. The APK is an artifact of that workflow's run (`battle-dice-android-apk`;
+  about 108 MB, for phones and for the emulator).
+- To try it on a phone: download that artifact, unpack it, copy `battle-dice-android.apk` to the
+  phone and open it there. Android asks once to allow installs from that source.
 - Nothing here is finished or meant for a store yet. Whether the approach is kept is decided
   after phase 0 (the plan lists the checks).
 

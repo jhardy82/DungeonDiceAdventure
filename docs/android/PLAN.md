@@ -31,7 +31,7 @@ section 7.31. This file is the plan that was approved, kept up to date as phases
 
 | Phase | What | State |
 |-------|------|-------|
-| 0. Walking skeleton | A minimal app (menu, party, one battle) built as an APK on GitHub, started in an emulator there, installed by the owner on the S25 Ultra | Built in the repository; the first build on GitHub is the next step (see "Phase 0, as built") |
+| 0. Walking skeleton | A minimal app (menu, party, one battle) built as an APK on GitHub, started in an emulator there, installed by the owner on the S25 Ultra | Built, and built and started on GitHub (see "Phase 0, as built" and "Phase 0, measured"). Open: the owner's install on the phone |
 | 1. Groundwork | Python 3.14 allowed and tested beside 3.15; controller messages without key names for touch; screen data in the pygame-free layer | After phase 0 |
 | 2. Phone screens, shipped game | Menu, Settings, party setup, battle, upgrade, outcome, pause; each upright and sideways | The main job |
 | 3. Class Evolution on the phone | Roster, career, skills, vocation change, the third-battle decision | |
@@ -53,24 +53,66 @@ section 7.31. This file is the plan that was approved, kept up to date as phases
   libraries). The app was started in a browser at 384 x 832 and 832 x 384 and tapped through
   menu, party and the start of a battle; the self-check line showed Python 3.14.6 and 2.6 to 2.9
   seconds.
-- **Not checked yet:** everything that needs the Android build. The container cannot reach the
-  servers the build needs, so the first build happens on GitHub. The workflow file has not run.
-  The app's identifier (`dev.battledice`) is a placeholder.
+- **Not checkable there:** everything that needs the Android build. The container cannot reach
+  the servers the build needs, so the build runs on GitHub (next section).
+- The app's identifier (`dev.battledice`) is a placeholder.
+
+## Phase 0, measured on GitHub (2026-11-21)
+
+Six runs of the workflow "Android (walking skeleton)" on pull request 42. All numbers are from
+their logs.
+
+| What | Measured |
+|------|----------|
+| The build | Passed at the first attempt. The whole job took about 8 minutes (the Android build step itself 290 seconds); 10 to 12 minutes since Gradle runs one worker at a time (see the faults below) |
+| APK size | 107.6 MB for two processor types together (`arm64-v8a` for phones, `x86_64` for the emulator); 128 native libraries |
+| 16 KB pages | Every native library is aligned for 16 KB pages, inside the library and inside the APK |
+| API levels | Target 36 (what Google Play asks for), minimum 24 (Android 7.0) |
+| Screen orientation | The app's manifest fixes none |
+| Python inside the app | 3.14.10 |
+| The self-check inside the app | Passed at every start: a whole run (3 battles, 1,424 events, the same as on the desktop), 3 heroes saved, the save read back, pygame not loaded |
+| Time, emulator | The self-check run itself 4 to 12 seconds (ten readings); from the tap on the icon to the report 10 to 21 seconds (the script looks every 5 seconds). An emulator on a shared build machine is not a phone; the phone's time is not known |
+| Layout | Upright: the app reports 411 x 891 dp. Turned sideways while it runs: 891 x 411 dp and the sideways layout; the screenshot is 3120 x 1440. Started while the device is held sideways (its screen free to turn): the same, 891 x 411 dp, screenshot 3120 x 1440 |
+
+**Three faults the runs found, and what was done.** None of them was caught by the check that
+was meant to catch it; each was found by reading the log.
+
+| Run | What happened | Cause | What was done |
+|-----|---------------|-------|---------------|
+| 1 | Reported as passed. The log showed the app's second start saying "SELF-CHECK FAILED: the heroes or what they earned did not reach the save" | The self-check kept its save between starts and found the first check's heroes beside its own. On a phone, every start after the first would have shown a failed check. The game's own save was not involved | The self-check starts from nothing each time (it removes what an earlier check left, only in a folder that carries its own marker). The emulator script requires a passed self-check at every start |
+| 2 and 5 | Run 2 was reported as passed; the app's own log line showed the start named "sideways" laid out upright (411 x 891). Run 5, with the check made strict, failed there | The emulator's display stayed upright when the screen was locked sideways **before** the app started: in run 5 the screenshot was 1440 x 3120. The app laid out for the screen it was given. Why that emulator does not turn in this case is not known | The script names the layout each start must report and writes the screenshot's size beside the app's line; on a wrong layout it prints what the device says about its rotation. Sideways is now shown two ways that work: the screen turned while the app runs, and the device held sideways (motion sensor, screen free to turn) before the app starts. Run 6 passed both |
+| 4 | The build failed in Gradle: "Unable to determine the current character ... '\\0'" in the task that downloads Python for `x86_64`. Nothing that goes into the APK had changed | A race in the build plugin (serious_python_android 6.1.3, read from its source): four download tasks run side by side and share one file of download marks; one read it while another wrote it | The workflow lets Gradle run one worker at a time. A passing build does not prove a race gone; the reasoning rests on the plugin's source and the error text. If it shows again, it is a fault of the build tool to report there |
+
+**Not shown:** an app started while the screen is *locked* sideways (see runs 2 and 5). On a
+phone that is an unusual setting; the owner's phone can show it in a minute.
+
+**Not judged by anyone yet:** the screenshots (upright, larger font, sideways twice). They are
+in the run's artifact `battle-dice-android-emulator`. The development container cannot download
+artifacts, so they have not been looked at; whether the app follows the system font size is
+therefore still open (see the table below).
 
 ## Go or no-go after phase 0
 
 Phase 2 starts only if **all** of these hold. If one fails and cannot be fixed, the fallback is
 proposed to the owner before any real screen is built.
 
-| Check | How it is shown |
-|-------|-----------------|
-| The APK builds on GitHub's machines from the repository | A workflow run with the APK as an artifact |
-| The app starts in an Android emulator and plays the built-in self-check run through the real controller | The workflow reads the app's report |
-| The save file (SQLite) can be written and read inside the app | Part of that report |
-| The APK targets the API level Google Play asks for (36) and its native libraries are aligned for 16 KB pages | Checked on the built APK in the workflow |
-| The app follows the system font size | A second emulator run with a larger font scale, with a screenshot |
-| It starts and plays acceptably on the owner's S25 Ultra | The owner's report |
-| Size and start-up time are known | Measured and written here |
+| Check | How it is shown | State on 2026-11-21 |
+|-------|-----------------|---------------------|
+| The APK builds on GitHub's machines from the repository | A workflow run with the APK as an artifact | **Holds** |
+| The app starts in an Android emulator and plays the built-in self-check run through the real controller | The workflow reads the app's report | **Holds**, at four starts in each of two runs |
+| The save file (SQLite) can be written and read inside the app | Part of that report | **Holds** |
+| The APK targets the API level Google Play asks for (36) and its native libraries are aligned for 16 KB pages | Checked on the built APK in the workflow | **Holds** |
+| The app follows the system font size | A second emulator run with a larger font scale, with a screenshot | **Open:** the screenshot exists; nobody has looked at it |
+| It starts and plays acceptably on the owner's S25 Ultra | The owner's report | **Open:** only the owner can do this |
+| Size and start-up time are known | Measured and written here | **Holds** for the emulator (107.6 MB; see above). The phone's start-up time is open |
+
+Four of seven hold, one more for the emulator only. The decision is the owner's, after the
+install on the phone.
+
+**How the owner installs it.** On GitHub: the repository, "Actions", the newest run of "Android
+(walking skeleton)", the artifact `battle-dice-android-apk`. Unpack it and copy
+`battle-dice-android.apk` to the phone. Android asks once to allow installs from that source.
+The APK is signed with a debug key: fine for trying it, not for the Play Store.
 
 ## What can and cannot be checked without a phone
 
