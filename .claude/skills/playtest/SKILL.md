@@ -62,8 +62,16 @@ How it behaves:
   text view does not show those.
 - **Use several sessions.** One per scenario keeps each action list short. Name them
   `DIR/run1`, `DIR/settings`, and so on.
-- **Keep calls few.** Put obvious steps into one `do`. Aim for at most about 120 commands in
-  total. Use `look` only when you need the whole screen again.
+- **Keep calls few.** Put obvious steps into one `do`. Stay inside the command budget you are
+  given. Use `look` only when you need the whole screen again.
+- **Never play blind to save commands.** A chain of keys pressed without reading the screens is
+  not play. If the budget runs out, stop and say what was not covered. Do not report on a
+  stretch you did not read.
+- **The seed is the driver's.** The first run of a session has seed 500 (or `--seed N`) and each
+  further run the next number, also while the game says "Dice seed: random". That is how a
+  session stays repeatable; it is not a fault of the game.
+- **Help text delay.** `hover:KEY` shows the help of the next frame. If the setting "Help text
+  delay" is on, follow it with `wait:MS` to let the delay pass.
 
 ## 3. How to play
 
@@ -98,8 +106,9 @@ Severity:
 
 ## 5. The report
 
-Write the report to `DIR/REPORT.md`. Reproduce every Blocker, High and Medium finding once
-more **in a fresh session** before you report it, and give that session's action list.
+**The report is your final message**, in the format below. Do not write it to a file: a
+subagent's report files are refused. Reproduce every Blocker, High and Medium finding once more
+**in a fresh session** before you report it, and give that session's action list.
 
 ```markdown
 # Playtest report: <role>
@@ -133,8 +142,8 @@ Rules for the report:
 - **No finding without steps.** If you cannot reproduce it, say so and keep it under
   "Impressions".
 - **Say what you did not test.** An empty section is a claim that everything was covered.
-- Your final message to whoever sent you: the path of the report, the number of findings by
-  severity, and the three most important ones in one line each. Nothing else.
+- Begin the final message with the number of findings by severity and the three most important
+  ones in one line each; the full report follows.
 
 ## 6. Roles
 
