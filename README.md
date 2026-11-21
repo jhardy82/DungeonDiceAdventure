@@ -167,7 +167,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1256 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1289 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -296,11 +296,13 @@ What changes with the gate on:
 
 - **Party setup** shows your saved heroes. Recruit a Squire, an Apprentice or a Scout (keys 1,
   2, 3); recruiting is free and a roster holds 12 heroes.
-- **Every won battle earns mastery** for each hero in the party. The upgrade screen, the
-  outcome screen and the status line say what was earned, or why nothing was.
+- **Every won battle earns mastery** for each hero in the party. The upgrade screen (under its
+  heading), the outcome screen and the status line say what was earned, or why nothing was.
 - **Career** (the button on a party slot or a roster row) lists what a hero has mastered and
   what it can become. Vocations that are not discovered show as `???`. A vocation the rules
-  cannot run yet is marked "Coming later".
+  cannot run yet is marked "Coming later". The numbers on the right are the hero's own as that
+  vocation; where its mastery adds something, the vocation's own number is named too
+  ("HP 18 (17 +1 mastery)").
 - **Skills** (key K on the Career screen) lists the skills a hero has learned and lets you equip
   them between runs. A mastered vocation teaches one. The first that works in battle is the
   Guardian's **Field Medic**: once per battle its Heal may bring a downed ally back at 5 HP, for
@@ -358,7 +360,9 @@ right, so the profile is made with that start. Esc returns to the main menu; **N
 1. In the party setup, add "Squire 1" and click **Career** on its slot. Select **Squire** and
    press **Make active**: the hero is a Squire again and keeps the Guardian unlocked. Esc.
 2. Add the Scout and begin. Win Battle 1.
-3. On the upgrade screen press **Career (C)**, select **Guardian**, press **Make active**. Esc.
+3. On the upgrade screen press **Career (C)** and select **Guardian**. The panel on the right
+   says what the change would do ("If made active now: HP 15/15 -> 18/18, ..."). Press
+   **Make active**: the status line gives the hero's health, mana, dice and bench die. Esc.
 4. The upgrade cards are now for the Guardian's dice. Choose one and fight Battle 2 as a
    Guardian.
 

@@ -264,7 +264,7 @@ def combatant_view(engine: Engine, c: Combatant) -> dict[str, Any]:
     if c.side == SIDE_HERO:
         build = engine.build(c.id)
         view["class_name"] = build.name
-        view["dice"] = [die_view(engine.die_for(c.id, d)) for d in c.equipped_dice_ids]
+        view["dice"] = sorted((die_view(engine.die_for(c.id, d)) for d in c.equipped_dice_ids), key=lambda die: -int(die["size"]))
         view["scheduling"] = copy.deepcopy(build.scheduling)
         view["passive"] = copy.deepcopy(build.passive)
         view["reaction"] = {"id": build.reaction_id, **copy.deepcopy(build.reaction)}
@@ -332,6 +332,8 @@ def hero_turn_view(engine: Engine) -> dict[str, Any] | None:
         return None
     hero = combat.combatants[turn.hero_id]
     options = planning.die_options(engine, hero, turn) if turn.rolled else []
+    # Die 1 is the larger die for every vocation (playtest K5: a Guardian's dice are listed the other way round).
+    options.sort(key=lambda option: -int(option["die_size"]))
     for option in options:
         option["forecast"] = _die_forecast(engine, hero, turn, option)
         option["face"] = face_view(option["face"])
@@ -483,7 +485,7 @@ def describe_event(event: CombatEvent, names: dict[str, str], die_names: dict[st
     if kind == EventType.COMBATANT_DEFEATED:
         return f"{name(d['id'])} is defeated."
     if kind == EventType.HERO_REVIVED:
-        return f"{name(d['id'])} is revived at {d['hp']} HP (its gauge starts over)."
+        return f"{name(d['id'])} is revived at {d['hp']} HP (its gauge starts over; statuses it had stay)."
     if kind == EventType.DICE_ROLLED:
         return f"{actor} rolls {die(d['die_id'])}: {d['face_name']} (face {d['face']}/{d['die_size']})."
     if kind == EventType.DICE_REROLLED:

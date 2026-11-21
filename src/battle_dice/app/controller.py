@@ -907,7 +907,8 @@ class AppController:
         self.upgrade_hero = heroes[0].id
         self.upgrade_die = heroes[0].equipped_dice_ids[0]
         self.upgrade_offer = None
-        self.info("Battle 1 won. Choose one dice upgrade (required).")
+        earned = self.mastery_line()
+        self.info(f"Battle 1 won. {earned + ' ' if earned else ''}Choose one dice upgrade (required).")
 
     def select_upgrade_hero(self, hero_id: str) -> None:
         engine = self.engine
@@ -1195,6 +1196,26 @@ class AppController:
         wanted = battle if battle is not None else link.last_awards[-1]["battle"]
         return [self.award_line(a) for a in link.last_awards if a["battle"] == wanted]
 
+    def dice_as_listed(self, run_hero: str) -> list[str]:
+        """The names of a fighting hero's dice in the order the battle lists them: the larger die first."""
+        engine = self.engine
+        assert engine is not None
+        held = sorted(engine.combat.combatants[run_hero].equipped_dice_ids, key=lambda die_id: -engine.die_for(run_hero, die_id).size)
+        return [self.die_name(run_hero, die_id) for die_id in held]
+
+    def mastery_line(self, compact: bool = False) -> str:
+        """What the heroes earned in the latest battle, as one line; ``""`` with Class Evolution off.
+
+        ``compact`` gives each hero's points only ("Squire 1 +1, Scout 2 +1"), for where the full account has no room.
+        """
+        link = self.progression
+        if compact and link is not None and link.last_awards:
+            latest = link.last_awards[-1]["battle"]
+            points = [f"{a['name']} +{a['base_points'] + a['challenge_points']}" for a in link.last_awards if a["battle"] == latest]
+            return "Mastery: " + ", ".join(points)
+        awards = self.awards_view()
+        return "Mastery: " + "  ".join(awards) if awards else ""
+
     # -- roster ----------------------------------------------------------------------------------
 
     def roster_view(self) -> list[dict[str, Any]]:
@@ -1340,7 +1361,19 @@ class AppController:
                          "can_activate": playable and entry["unlocked"] and not entry["active"] and open_now})
         selected = self.career_vocation or hero.active_vocation_id
         chosen = next(row for row in rows if row.get("vocation_id") == selected)
+        # The hero's own numbers as the selected vocation: the vocation's, plus what the hero's mastery adds for good.
+        own = link.career.service.effective_stats(hero, selected) if chosen.get("playable") else {}
+        bonus = link.career.service.permanent_stat_bonus(hero) if own else {}
+        fighter = link.run_hero(hero_id) if in_run else None
+        change = ""
+        if fighter is not None and self.engine is not None and chosen.get("can_activate"):
+            pools = self.engine.pools_after_change(fighter, own["max_hp"], own["max_mana"])
+            bench = [die["name"] for die in self.class_view(selected)["bench"]]
+            change = (f"If made active now: HP {pools['hp'][0]}/{pools['max_hp'][0]} -> {pools['hp'][1]}/{pools['max_hp'][1]}, "
+                      f"mana {pools['mana'][0]}/{pools['max_mana'][0]} -> {pools['mana'][1]}/{pools['max_mana'][1]}. "
+                      f"It fights on with the dice below. Bench die: {', '.join(bench) if bench else 'none'}.")
         return {"hero_id": hero_id, "name": hero.display_name or hero_id, "active_vocation_id": hero.active_vocation_id,
+                "own_stats": own, "stat_bonus": {stat: amount for stat, amount in bonus.items() if amount}, "change_preview": change,
                 "rows": rows, "selected": selected, "selected_needs": chosen["needs"], "in_run": in_run,
                 "open_now": open_now, "locked": locked, "fighting": in_run and link.run_hero(hero_id) is not None,
                 "deciding": self.engine is not None and self.engine.state.phase == RunPhase.CONTINUE}
@@ -1416,10 +1449,16 @@ class AppController:
             assert run_hero is not None and self.engine is not None
             self.upgrade_hero, self.upgrade_offer = run_hero, None
             self.upgrade_die = self.engine.combat.combatants[run_hero].equipped_dice_ids[0]
+            unit = self.engine.combat.combatants[run_hero]
+            dice = ", ".join(self.dice_as_listed(run_hero))
+            bench = ", ".join(self.die_name(run_hero, die_id) for die_id in self.engine.state.inventory.get(run_hero, [])) or "none"
+            # What the change did, in numbers: nothing about the hero changes silently (playtest M8).
+            now = (f"{hero_name} is now a {name} and fights on as one: HP {unit.hp}/{unit.max_hp}, mana {unit.mana}/{unit.max_mana}, "
+                   f"dice {dice}, bench die {bench}.")
             if self.engine.state.phase == RunPhase.UPGRADE:
-                self.info(f"{hero_name} is now a {name} and fights on as one. Its health and mana were carried over; choose the upgrade for its new dice.")
+                self.info(f"{now} Choose the upgrade for its new dice.")
             else:
-                self.info(f"{hero_name} is now a {name} and fights on as one. Its health and mana were carried over.")
+                self.info(now)
             return
         self.info(f"{hero_name} has unlocked {name}." if what == "claim" else f"{hero_name} is now a {name}.")
 

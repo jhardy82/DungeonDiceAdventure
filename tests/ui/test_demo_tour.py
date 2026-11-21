@@ -129,7 +129,7 @@ def test_run_two_becoming_a_guardian_inside_a_run(tmp_path):
     play.key(pygame.K_c)  # step 3
     play.click("career:guardian:select")
     play.click("career:guardian:activate")
-    assert play.ctrl.message.startswith("Squire 1 is now a Guardian and fights on as one.")
+    assert play.ctrl.message.startswith("Squire 1 is now a Guardian and fights on as one: HP ")
     play.key(pygame.K_ESCAPE)
     assert play.ctrl.screen == Screen.UPGRADE  # step 4
     assert [offer["die_id"] for offer in play.ctrl.current_offers()] == ["guardian_d6"] * 3

@@ -463,7 +463,9 @@ def inspected_combatant(ui: UI, view: dict[str, Any]) -> dict[str, Any] | None:
 def draw_inspect(ui: UI, c: dict[str, Any], view: dict[str, Any], top: float, height: float) -> None:
     """Everything about one unit in full sentences: stats, every status stack, abilities or dice."""
     x, width = 486.0, 306.0
-    ui.panel(478, top, 324, height, f"Inspect: {c['name']}", border=Theme.HERO if c["side"] == "hero" else Theme.ENEMY, width=2)
+    vocation = c.get("class_name", "")
+    title = f"Inspect: {c['name']}" + (f", {vocation}" if vocation and vocation not in c["name"] else "")
+    ui.panel(478, top, 324, height, title, border=Theme.HERO if c["side"] == "hero" else Theme.ENEMY, width=2)
     bottom = top + height - 6
     y = top + 26
 
@@ -595,6 +597,8 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
     for index, die in enumerate(turn["dice"][:2]):
         x = 16 + index * 256
         face = die["face"]  # always the real result; the tumble only animates the artwork
+        if die.get("skill_note"):  # an equipped skill lets this face revive: the two lines must not contradict
+            face = {**face, "text": face["text"].replace(" (cannot revive)", "")}
         tumbling = ui.anim.is_tumbling(die["die_id"])
         in_plan = die["die_id"] in drafted
         awaiting = ctrl.targeting_die == die["die_id"]
@@ -874,7 +878,24 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
     ui.text(20, 12, "Recovery and Upgrade", 28, Theme.ACCENT, bold=True)
     ui.sprite("chest", 372, 8, 40, 40)
     step = "Step 2 of 2: optional swap and rows, then start Battle 2." if chosen else "Step 1 of 2: choose one dice upgrade (required)."
-    ui.text(420, 22, step, 17, Theme.TEXT, bold=True)
+    earned = ctrl.mastery_line()
+    if earned:  # Class Evolution: what the won battle gave each saved hero stays on this screen (playtest D3)
+        ui.text(420, 9, step, 17, Theme.TEXT, bold=True)
+        # The room is one line, or two short ones, between the step and the panels. How much fits there depends on
+        # the font of the machine, so it is measured: the full account first, then each hero's points only.
+        for words in (earned, ctrl.mastery_line(compact=True)):
+            one_line = next((size for size in (14, 13) if ui.text_width(words, size) <= 716), None)
+            two_lines = next((size for size in (12, 11, 10) if len(ui.wrap_lines(words, 716, size)) <= 2), None)
+            if one_line is not None:
+                ui.text(420, 32, words, one_line, Theme.GOOD, max_width=716)
+                break
+            if two_lines is not None:
+                ui.paragraph(420, 29, words, 716, two_lines, Theme.GOOD, line_height=13, max_lines=2)
+                break
+        else:  # not even the points fit (no party of the demo gets here): the start of them is better than nothing
+            ui.paragraph(420, 29, ctrl.mastery_line(compact=True), 716, 10, Theme.GOOD, line_height=13, max_lines=2)
+    else:
+        ui.text(420, 22, step, 17, Theme.TEXT, bold=True)
 
     by_id = {c["id"]: c for c in view["combatants"]}
     ui.panel(12, 56, 300, 420, "Heroes after recovery")
@@ -1090,7 +1111,8 @@ def draw_roster_setup(ui: UI, ctrl: AppController) -> None:
     ui.text(16, 570, "Mastery is earned by winning battles. A mastered class opens new vocations.", 14, Theme.DIM, max_width=560)
 
     limit = ctrl.progression.career.service.roster_limit
-    ui.panel(588, 60, 676, 606, f"Roster ({len(roster)} of {limit} heroes)")
+    over = len(roster) > limit  # the roster size was lowered in Settings: nobody is lost, nobody can be recruited
+    ui.panel(588, 60, 676, 606, f"Roster ({len(roster)} heroes; the roster size is now {limit})" if over else f"Roster ({len(roster)} of {limit} heroes)")
     full = len(ctrl.party) >= maximum
     y = 88.0
     if not roster:
@@ -1173,9 +1195,19 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
     ui.panel(788, 78, 476, 540, info["name"])
     ui.sprite(ui.assets.combatant_key(ctrl.sprite_class(view["selected"])), 1206, 82, 50, 50)
     x, y = 802.0, 106.0
-    ui.text(x, y, f"HP {info['max_hp']}   Speed {info['speed']}   Mana {info['start_mana']}/{info['max_mana']}   Rerolls {info['rerolls']}", 15,
-            Theme.TEXT, max_width=390)
+    own, bonus = view["own_stats"], view["stat_bonus"]
+    if own:
+        # This hero's numbers as that vocation. Where its mastery adds something, the vocation's own number is named.
+        def stat(key: str) -> str:
+            return f"{own[key]} ({info[key]} +{bonus[key]} mastery)" if bonus.get(key) else str(own[key])
+        numbers = f"HP {stat('max_hp')}   Speed {stat('speed')}   Mana {info['start_mana']}/{stat('max_mana')}   Rerolls {info['rerolls']}"
+    else:
+        numbers = f"HP {info['max_hp']}   Speed {info['speed']}   Mana {info['start_mana']}/{info['max_mana']}   Rerolls {info['rerolls']}"
+    size = next((size for size in (15, 14, 13, 12) if ui.text_width(numbers, size) <= 390), 12)
+    ui.text(x, y, numbers, size, Theme.TEXT, max_width=390)
     y += 24
+    if view["change_preview"]:
+        y = ui.paragraph(x, y, view["change_preview"], 448, 13, Theme.WARN, line_height=16, max_lines=4) + 5
     if view["selected_needs"]:
         ui.text(x, y, "To claim", 14, Theme.WARN, bold=True)
         y = ui.paragraph(x + 76, y, view["selected_needs"], 372, 14, Theme.TEXT, line_height=17, max_lines=5) + 5

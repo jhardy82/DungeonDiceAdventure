@@ -2074,6 +2074,47 @@ No rule is changed; the replay pin is unchanged.
   other case ("Abandon Run", then "Quit" under the resting pointer; Quit loses nothing) and S4
   (the bench swap is final on one click), both in batch 5.
 
+### 7.34 Playtest fixes, batch 3: what the Class Evolution screens say (D-34, 2026-11-21)
+
+No rule is changed; the replay pin and the simulator results are unchanged.
+
+| Finding | What was wrong | What it is now |
+|---------|----------------|----------------|
+| D3 | What a won battle earned was a status line that the next message replaced at once; the upgrade screen had no place for it | The upgrade screen carries it under its heading ("Mastery: Squire 1 +1, now rank 2.  Scout 2 +1, now rank 2."), on two lines when five heroes need them. The status line says it together with what to do next |
+| D11 | "Roster (8 of 6 heroes)" after the roster size was lowered | "Roster (8 heroes; the roster size is now 6)" |
+| D12 | The Career screen showed a vocation's own health while the hero has more | The hero's own numbers, with the vocation's number and the mastery bonus named: "HP 18 (17 +1 mastery)" |
+| M8 | A vocation change showed no numbers before the button was pressed; the bench die vanished silently; no battle screen named the vocation | Before: "If made active now: HP 12/15 -> 15/18, mana 3/3 -> 3/3. It fights on with the dice below. Bench die: none." After: the message gives health, mana, dice and bench die. A unit's inspect panel names its vocation where its name does not ("Inspect: Squire 1, Guardian") |
+| K5 | Die 1 was the d6 for a Squire and the d4 for a Guardian | Die 1 is the larger die for every vocation, in the planner and on the unit's panel |
+| M10 | A die said "(cannot revive)" and "Field Medic: revive at 5 HP" together; a revived hero kept its Poison without a word | With Field Medic usable the card says "heal 2; costs 1 mana" and the note. The log says "(its gauge starts over; statuses it had stay)" |
+
+- **The preview cannot disagree with the change.** The engine has one function for the health
+  and mana a hero would have after a change (`pools_after_change`); the change itself calls it,
+  and the Career screen calls it for the preview. Batch 4 changes the rule in that one place.
+- **K5 is a change of the view only.** The engine's order of a hero's dice is as it was (it is
+  part of a run's record); the screens list the larger die first.
+- **Not done here:** D18 and D19 were fixed in batch 2. R5 (a slower mastery pace takes
+  "mastered" away but keeps what it had opened) waits for the owner's decision.
+- **Evidence:**
+  - 33 new tests (1289 in all, warnings as errors, coverage of the rules 97.49%). The preview
+    test reads the preview, makes the change and compares the hero's health and mana with it.
+    Three existing tests quoted the old change message and were updated.
+  - 27 deliberate breaks of the new code, with a control run: all 27 make a test fail. Three
+    survived the first run (a preview after the run has ended, the order of the dice in the
+    change message, a long account of what was earned); each got a test.
+  - Replay pin and content unchanged. Simulator on seeds 300 to 339 identical to the stored
+    reference. Both self-checks pass; both Class Evolution checkers print OK.
+  - Screenshots of the upgrade screen with five heroes and of the Career screen with a preview
+    were looked at, at 1280 x 720 and at 960 x 540 with Large text. The first version cut the
+    mastery line off at the small size; it now takes two lines.
+- **A failure on the build machine, and what it showed.** The first push failed on Linux: a test
+  of mine used a made-up account of 249 characters and expected it to fit on two lines, which it
+  does only with the font of the development container. Reproduced under nine of eleven fonts.
+  The fault was in the game too: an account that does not fit was cut off. Now the screen
+  measures, and where the full account has no room it gives each hero's points ("Mastery:
+  Squire 1 +1, Scout 2 +1, ..."). The tests build their texts by measuring and run under five
+  fonts and two window sizes.
+- **Not verified:** a person's reading.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

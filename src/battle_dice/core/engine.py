@@ -534,6 +534,17 @@ class Engine:
             raise CommandRejected(problem)
         state.phase = RunPhase.EQUIPMENT
 
+    def pools_after_change(self, hero_id: str, max_hp: int, max_mana: int) -> dict[str, list[int]]:
+        """A hero's health and mana if it took a vocation with these maxima now, each as ``[before, after]``.
+
+        The change itself uses this, so what a screen shows before the change is what the change does.
+        """
+        unit = self.combat.combatants[hero_id]
+        return {
+            "hp": [unit.hp, convert_pool(unit.hp, unit.max_hp, max_hp)], "max_hp": [unit.max_hp, max_hp],
+            "mana": [unit.mana, convert_pool(unit.mana, unit.max_mana, max_mana)], "max_mana": [unit.max_mana, max_mana],
+        }
+
     def _change_vocation(self, hero_id: str, class_id: str, hero: dict[str, Any]) -> None:
         """A saved hero takes another vocation inside the run (fixture CE-19).
 
@@ -568,8 +579,9 @@ class Engine:
 
         unit = self.combat.combatants[hero_id]
         before = {"hp": unit.hp, "max_hp": unit.max_hp, "mana": unit.mana, "max_mana": unit.max_mana}
-        unit.hp, unit.max_hp = convert_pool(unit.hp, unit.max_hp, build.max_hp), build.max_hp
-        unit.mana, unit.max_mana = convert_pool(unit.mana, unit.max_mana, build.max_mana), build.max_mana
+        pools = self.pools_after_change(hero_id, build.max_hp, build.max_mana)
+        unit.hp, unit.max_hp = pools["hp"][1], build.max_hp
+        unit.mana, unit.max_mana = pools["mana"][1], build.max_mana
         unit.max_corruption = build.max_corruption
         unit.corruption = min(unit.corruption, build.max_corruption)
         unit.speed, unit.base_initiative = build.speed, build.base_initiative
