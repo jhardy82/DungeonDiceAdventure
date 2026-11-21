@@ -2406,7 +2406,12 @@ against them; every one made a test fail.
   one I had missed.
 - Found on the way: one of the emulator script's tests assumed that no second passes while it
   runs. On a busy machine one does. The assertion now accepts any number of seconds.
-- 1,401 tests (19 new). Twelve deliberate breaks: ten were noticed at once, two were not (the
+- **A check that was missing, found by its absence.** My first push of this work had a step
+  name with a colon in it. That made `ci.yml` unreadable, and GitHub then ran none of its jobs
+  and said nothing: the pull request showed two passing checks where six were due. I noticed
+  the missing jobs, not a failure. The line is fixed, every workflow file was read with a YAML
+  library here, and a test now reads the workflow files for that fault (it needs no library).
+- 1405 tests. Twelve deliberate breaks: ten were noticed at once, two were not (the
   word "click" alone, and the phone layer's own wording of a desktop controller's message); a
   test was added for each, and both are noticed now.
 

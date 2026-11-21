@@ -97,7 +97,7 @@ Groundwork that any phone toolkit needs. It changes nothing a desktop player see
 
 | Step | What | State |
 |------|------|-------|
-| 1. The code runs on the phone's Python | The whole suite (1,401 tests, warnings as errors) and both self-checks run on Python 3.14 in a job of their own on every pull request. Lint treats 3.14 as the oldest Python the code must run on, and the type check runs a second time as 3.14 | Done |
+| 1. The code runs on the phone's Python | The whole suite (1405 tests, warnings as errors) and both self-checks run on Python 3.14 in a job of their own on every pull request. Lint treats 3.14 as the oldest Python the code must run on, and the type check runs a second time as 3.14 | Done |
 | 2. Messages without key names | A controller made with `touch=True` words everything it says for a finger: "Roll the dice (R)." becomes "Roll the dice.", "Press again to ..." becomes "Tap again to ...", "press its number or click it" becomes "tap it" (`src/battle_dice/app/wording.py`). The phone app asks for it. A desktop controller says its messages as written | Done |
 | 3. Screen data outside pygame | What each desktop screen works out while drawing (rows, labels, reasons) moves into the pygame-free layer, screen by screen, as the phone screens need it | With phase 2 |
 
