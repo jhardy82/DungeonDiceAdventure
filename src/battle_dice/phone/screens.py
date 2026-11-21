@@ -12,22 +12,15 @@ it waits for the player. Both use the same controller the desktop game uses; no 
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from battle_dice.app.controller import AppController, Screen
+from battle_dice.app.wording import touch_wording  # a controller made for a desktop is worded for touch here
 
 Json = dict[str, Any]
-#: Hints at keys in the controller's messages, which a phone has not: " (R)", " (Z, X)", " (Esc cancels)", " (Enter)".
-_KEY_HINT = re.compile(r"\s*\((?:[A-Z](?:, [A-Z])*|Esc|Enter|Esc cancels)\)")
 #: Steps the game may take on its own before it must wait for the player again.
 _SETTLE_LIMIT = 5000
 CLASS_ORDER = ("squire", "apprentice", "scout")
-
-
-def touch_wording(text: str) -> str:
-    """A message of the controller without its key hints: "Roll the dice (R)." becomes "Roll the dice."."""
-    return _KEY_HINT.sub("", text)
 
 
 def _action(action_id: str, label: str, enabled: bool = True, reason: str | None = "", primary: bool = False) -> Json:

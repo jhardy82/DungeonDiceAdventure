@@ -33,8 +33,22 @@ turn_screen() {
 # hold_device 1 (sideways) or 0 (upright): what the device's motion sensor feels, with the screen free to
 # turn by itself. A screen locked sideways before an app starts stayed upright on the build's emulator
 # (pull request 42, runs 2 and 5: the screenshots were upright), so the fourth start is done this way.
+#
+# The screen is set free through the window manager, and the script waits until the device says so. A
+# rotation lock that has just ended (the third start's) switches auto-rotate off once more a moment later:
+# in pull request 44 the fourth start then found "auto-rotate: 0" and an upright screen, after two runs in
+# which it had not.
 hold_device() {
+  local started=$SECONDS
+  adb shell cmd window user-rotation free > /dev/null 2>&1 || true
   adb shell settings put system accelerometer_rotation 1
+  sleep "$pause"
+  while [ "$(adb shell settings get system accelerometer_rotation | tr -d '\r')" != 1 ]; do
+    [ $((SECONDS - started)) -ge "$settle" ] && break
+    adb shell cmd window user-rotation free > /dev/null 2>&1 || true
+    adb shell settings put system accelerometer_rotation 1
+    sleep "$poll"
+  done
   if [ "$1" = 1 ]; then adb emu sensor set acceleration 9.81:0:0 > /dev/null; else adb emu sensor set acceleration 0:9.81:0 > /dev/null; fi
 }
 

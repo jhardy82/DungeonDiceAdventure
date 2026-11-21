@@ -2313,7 +2313,7 @@ development container, so it ran on GitHub with this pull request.
 **A build that failed without a change (the fourth run)**
 
 - Gradle failed in the task that downloads Python for `x86_64`: "Unable to determine the current
-  character ... '\\0'". Nothing that goes into the APK had changed since three passing builds.
+  character ... '\0'". Nothing that goes into the APK had changed since three passing builds.
 - Cause, read from the build plugin's source (serious_python_android 6.1.3): four download tasks
   run side by side and share one file of download marks; one read it while another wrote it.
 - The workflow now lets Gradle run one worker at a time. I did not simply run the job again: a
@@ -2379,6 +2379,49 @@ the replay pin, the shipped content and the vocation catalog are untouched.
 **Checked:** 1,382 tests (26 new: the rules of a dismissal, the save and its migration, the
 screens at two window sizes and three fonts). Twenty deliberate breaks of the new code were run
 against them; every one made a test fail.
+
+### 7.39 Android, phase 1, step 1: the code is tested on the phone's Python (D-35, 2026-11-21)
+
+- The Android app embeds Python 3.14; the desktop game asks for 3.15. Until now only the
+  phone's self-check ran on 3.14 (in the Android build). A 3.15-only construct anywhere else
+  would have reached the phone unseen.
+- Now a job of its own runs the whole suite and both self-checks on 3.14 on every pull request.
+  Lint's target is 3.14, and the type check runs a second time as 3.14.
+- **My reading, stated so it can be corrected:** "Python 3.14 allowed" in the plan is done as
+  *tested on 3.14*, not as a lower `requires-python`. Lowering it would change what the desktop
+  package, the launcher and the README promise, which is the owner's stack decision (3.15) and
+  is not needed for the phone: the Android build takes the package from the source tree.
+- Measured in the development container on 3.14.6: 1,382 tests pass with warnings as errors,
+  both self-checks pass. No code had to change.
+
+**Step 2: messages worded for touch**
+
+- A controller made with `touch=True` says every message without key names, and with "tap"
+  where a desktop presses or clicks. The wording is one small module without a toolkit
+  (`app/wording.py`); the phone app asks for it; a desktop controller is unchanged.
+- **My reading:** the messages stay written once, for the desktop, and are worded for touch by
+  rule, instead of being written twice. Two wordings side by side would drift apart. The risk
+  of a rule is a message it does not cover, so a test reads every message in the source and
+  fails when one still names a key, a press or a click after wording. On its first run it found
+  one I had missed.
+- Found on the way: one of the emulator script's tests assumed that no second passes while it
+  runs. On a busy machine one does. The assertion now accepts any number of seconds.
+- **The emulator check failed once on this pull request, and the script was at fault.** The
+  start "held sideways before the app starts" came up upright after passing twice before. The
+  rotation facts the script prints on a wrong layout (added in phase 0 for exactly this) showed
+  "auto-rotate: 0" right after the script had switched it on: the rotation lock of the start
+  before, just ended, switched it off once more a moment later. The script now frees the
+  rotation through the window manager and asks the device until it says the screen is free.
+  A test plays that against a stand-in device that takes the setting back once. I did not run
+  the job again to see it pass by luck.
+- **A check that was missing, found by its absence.** My first push of this work had a step
+  name with a colon in it. That made `ci.yml` unreadable, and GitHub then ran none of its jobs
+  and said nothing: the pull request showed two passing checks where six were due. I noticed
+  the missing jobs, not a failure. The line is fixed, every workflow file was read with a YAML
+  library here, and a test now reads the workflow files for that fault (it needs no library).
+- 1,406 tests (24 new in this pull request). Twelve deliberate breaks of step 2: ten were noticed at once, two were not (the
+  word "click" alone, and the phone layer's own wording of a desktop controller's message); a
+  test was added for each, and both are noticed now.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 

@@ -50,7 +50,7 @@ def main(page: ft.Page) -> None:
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 0
     folder = storage()
-    controller = AppController(log_dir=folder / "logs")
+    controller = AppController(log_dir=folder / "logs", touch=True)
     report = {"line": "Self-check running ..."}
     told: dict[str, tuple | None] = {"screen": None}
 

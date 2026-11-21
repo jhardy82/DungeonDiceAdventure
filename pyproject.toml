@@ -38,7 +38,9 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 110
-target-version = "py315"
+# The oldest Python the code must run on: 3.14, the Python inside the Android app (docs/android/PLAN.md).
+# The desktop game asks for 3.15 (requires-python above); lint keeps the code free of what only 3.15 has.
+target-version = "py314"
 src = ["src", "tests"]
 
 [tool.ruff.lint]

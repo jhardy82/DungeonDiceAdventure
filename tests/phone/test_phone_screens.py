@@ -5,6 +5,7 @@ The tests play through ``screen`` and ``act`` alone: what a toolkit will draw, a
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 
@@ -270,7 +271,12 @@ case "$*" in
   "shell settings put system user_rotation "*) echo "$*" >> "$state/settings"; [ -f "$state/stuck" ] || echo "$6" > "$state/turned" ;;
   "emu sensor set acceleration 9.81:0:0") echo "$*" >> "$state/settings"; [ -f "$state/stuck" ] || echo 1 > "$state/turned" ;;
   "emu sensor set acceleration 0:9.81:0") echo "$*" >> "$state/settings"; echo 0 > "$state/turned" ;;
-  "shell settings put "*|"shell cmd window user-rotation lock "*) echo "$*" >> "$state/settings" ;;
+  "shell settings put system accelerometer_rotation "*)
+    echo "$*" >> "$state/settings"
+    # A device that takes the setting back once, as the emulator did after a rotation lock had just ended.
+    if [ "$6" = 1 ] && [ -f "$state/takes_it_back" ]; then rm "$state/takes_it_back"; echo 0 > "$state/auto"; else echo "$6" > "$state/auto"; fi ;;
+  "shell settings put "*|"shell cmd window user-rotation "*) echo "$*" >> "$state/settings" ;;
+  "shell settings get system accelerometer_rotation") cat "$state/auto" ;;
   "shell settings get system "*) echo 0 ;;
   "shell dumpsys window displays") printf '  mDisplayRotation=ROTATION_0\n  size of the display\n  mLastOrientation=-1\n' ;;
   *) echo "the stand-in for adb does not know: $*" >&2; exit 9 ;;
@@ -286,6 +292,7 @@ STARTS = ("1_upright", "2_larger_font", "3_sideways", "4_started_sideways")
 
 
 def emulator_check(tmp_path, logs: list[str | None], turned: str | None = SIDEWAYS, stuck: bool = False, follows: tuple[int, ...] = (1, 2, 3, 4),
+                   takes_it_back: bool = False, settle: str = "0",
                    packages: str = "package:com.android.chrome\npackage:dev.battledice.battle_dice_android\n"):
     """Runs the script. ``logs`` is the device log of each start in turn (None: the app never reports; starts
     that are not given pass);
@@ -302,6 +309,9 @@ def emulator_check(tmp_path, logs: list[str | None], turned: str | None = SIDEWA
     (tools / "adb").chmod(0o755)
     (state / "starts").write_text("0\n", encoding="utf-8")
     (state / "turned").write_text("0\n", encoding="utf-8")
+    (state / "auto").write_text("0\n", encoding="utf-8")
+    if takes_it_back:
+        (state / "takes_it_back").write_text("", encoding="utf-8")
     (state / "packages").write_text(packages, encoding="utf-8")
     if stuck:
         (state / "stuck").write_text("", encoding="utf-8")
@@ -312,7 +322,7 @@ def emulator_check(tmp_path, logs: list[str | None], turned: str | None = SIDEWA
             (state / f"log_{number}_turned").write_text(f"{turned}\n", encoding="utf-8")
     script = Path(__file__).resolve().parents[2] / "android" / "tools" / "emulator_check.sh"
     env = {**os.environ, "PATH": f"{tools}{os.pathsep}{os.environ['PATH']}", "FAKE_ADB_STATE": str(state),
-           "EMULATOR_CHECK_PAUSE": "0", "EMULATOR_CHECK_POLL": "0", "EMULATOR_CHECK_LIMIT": "0", "EMULATOR_CHECK_SETTLE": "0"}
+           "EMULATOR_CHECK_PAUSE": "0", "EMULATOR_CHECK_POLL": "0", "EMULATOR_CHECK_LIMIT": "0", "EMULATOR_CHECK_SETTLE": settle}
     done = subprocess.run(["bash", str(script), "app.apk", str(out)], env=env, capture_output=True, text=True, check=False, timeout=60)
     return done, out, state
 
@@ -327,7 +337,8 @@ def test_the_emulator_check_passes_when_every_start_passes_and_the_layout_follow
     assert "package: dev.battledice.battle_dice_android" in done.stdout
     report = (out / "report.txt").read_text(encoding="utf-8").splitlines()
     assert [line.split(":")[0] for line in report] == [name for start in STARTS for name in (start, start)] + ["EMULATOR CHECK OK"]
-    assert all("BATTLE DICE SELF-CHECK OK" in line and line.endswith("seconds_until_report=0") for line in report[0:8:2])
+    # (The seconds are whatever the machine took: a busy one may need one or two even with nothing to wait for.)
+    assert all("BATTLE DICE SELF-CHECK OK" in line and re.search(r" seconds_until_report=\d+$", line) for line in report[0:8:2])
     assert report[1] == "1_upright: BATTLE DICE SCREEN: layout=upright width=411 height=891 (expected upright; the screenshot is 1440x3120)"
     assert report[5] == "3_sideways: BATTLE DICE SCREEN: layout=sideways width=891 height=411 (expected sideways; the screenshot is 3120x1440)"
     assert report[7] == "4_started_sideways: BATTLE DICE SCREEN: layout=sideways width=891 height=411 (expected sideways; the screenshot is 3120x1440)"
@@ -335,10 +346,10 @@ def test_the_emulator_check_passes_when_every_start_passes_and_the_layout_follow
     # The larger font is set for the second start only. The screen is turned in the third start and turned back;
     # for the fourth the device is held sideways with its screen free to turn, and put back upright and locked.
     turn = lambda way: ["shell settings put system accelerometer_rotation 0", f"shell settings put system user_rotation {way}", f"shell cmd window user-rotation lock {way}"]  # noqa: E731
-    free = "shell settings put system accelerometer_rotation 1"
+    free = ["shell cmd window user-rotation free", "shell settings put system accelerometer_rotation 1"]
     assert (state / "settings").read_text(encoding="utf-8").splitlines() == [
         "shell settings put system font_scale 1.3", "shell settings put system font_scale 1.0", *turn(1), *turn(0),
-        free, "emu sensor set acceleration 9.81:0:0", free, "emu sensor set acceleration 0:9.81:0", "shell settings put system accelerometer_rotation 0"]
+        *free, "emu sensor set acceleration 9.81:0:0", *free, "emu sensor set acceleration 0:9.81:0", "shell settings put system accelerometer_rotation 0"]
     assert "auto-rotate" not in done.stdout, "the device's rotation facts are printed only when a layout is wrong"
     assert (state / "turned").read_text(encoding="utf-8").strip() == "0"
 
@@ -385,8 +396,10 @@ def test_the_report_shows_when_it_was_the_screen_that_did_not_turn(tmp_path):
     assert done.returncode == 1
     assert "3_sideways: BATTLE DICE SCREEN: layout=upright width=411 height=891 (expected sideways; the screenshot is 1440x3120)" in done.stdout
     # What the device says about its rotation follows each wrong layout, in the job's log and in the report.
-    facts = "    auto-rotate: 0, user rotation: 0\n    mDisplayRotation=ROTATION_0\n    mLastOrientation=-1\n"
-    assert done.stdout.count(facts) == 2 and "size of the display" not in done.stdout
+    # (At the third start the screen is locked, at the fourth it is free to turn: the facts say which.)
+    display = "    mDisplayRotation=ROTATION_0\n    mLastOrientation=-1\n"
+    assert "    auto-rotate: 0, user rotation: 0\n" + display in done.stdout and "    auto-rotate: 1, user rotation: 0\n" + display in done.stdout
+    assert done.stdout.count(display) == 2 and "size of the display" not in done.stdout
 
 
 @needs_bash
@@ -395,6 +408,19 @@ def test_the_emulator_check_tells_a_turn_while_running_from_a_start_on_a_turned_
     done, _, _ = emulator_check(tmp_path, [PASSED] * 4, follows=(3,))
     assert done.returncode == 1 and done.stdout.rstrip().endswith("EMULATOR CHECK FAILED: not the expected layout at: 4_started_sideways"), done.stdout
     assert "3_sideways: BATTLE DICE SCREEN: layout=sideways width=891 height=411 (expected sideways; the screenshot is 3120x1440)" in done.stdout
+
+
+@needs_bash
+def test_the_screen_is_set_free_again_when_the_device_takes_that_back(tmp_path):
+    """Pull request 44: a rotation lock that had just ended switched auto-rotate off once more, and the start
+    that needs a free screen found it locked upright. The script now asks until the device says it is free."""
+    done, _, state = emulator_check(tmp_path, [PASSED] * 4, takes_it_back=True, settle="20")
+    assert done.returncode == 0 and GOOD_END in done.stdout, done.stdout + done.stderr
+    asked = (state / "settings").read_text(encoding="utf-8").splitlines()
+    first = asked.index("shell cmd window user-rotation free")
+    assert asked[first:first + 5] == ["shell cmd window user-rotation free", "shell settings put system accelerometer_rotation 1",
+                                      "shell cmd window user-rotation free", "shell settings put system accelerometer_rotation 1",
+                                      "emu sensor set acceleration 9.81:0:0"], "asked twice, and only then is the device held sideways"
 
 
 @needs_bash
