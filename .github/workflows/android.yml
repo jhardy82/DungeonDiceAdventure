@@ -57,7 +57,11 @@ jobs:
             echo "== $apk"
             python android/tools/check_apk.py "$apk"
             aapt2="$(find "$HOME/Android" "${ANDROID_HOME:-/nonexistent}" -name aapt2 -type f 2>/dev/null | sort | tail -n 1)"
-            if [ -n "$aapt2" ]; then "$aapt2" dump badging "$apk" | grep -E "^package:|sdkVersion|targetSdkVersion|native-code" || true; else echo "aapt2 not found: the target API is not read here"; fi
+            if [ -n "$aapt2" ]; then
+              "$aapt2" dump badging "$apk" | grep -E "^package:|sdkVersion|targetSdkVersion|native-code" || true
+              # Whether the app's own description fixes the screen one way (it must not: upright and sideways).
+              "$aapt2" dump xmltree "$apk" --file AndroidManifest.xml | grep -i "screenOrientation" || echo "the app's manifest fixes no screen orientation"
+            else echo "aapt2 not found: the target API is not read here"; fi
           done | tee apk_check.txt
           { echo "### The built APK"; echo '```'; cat apk_check.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
