@@ -34,7 +34,7 @@
 
 ### In Progress
 - Android app (D-33): phase 0, the walking skeleton with Flet (`docs/android/PLAN.md`); starts after the playtest fixes
-- Fixes after the playtest by eight AI playtesters (D-34): batches 1 and 2 of 5 done (predictions and the battle screen; keys, safeguards and mouse reach); the state of each finding is in section 6 of `docs/PLAYTEST_TEAM_2026-11-21.md`
+- Fixes after the playtest by eight AI playtesters (D-34): batches 1 to 3 of 5 done (predictions and the battle screen; keys, safeguards and mouse reach; what the Class Evolution screens say); the state of each finding is in section 6 of `docs/PLAYTEST_TEAM_2026-11-21.md`
 - Every setting the owner chose in D-31 is in
 - Waiting for the owner's playtest of the demo (D-32); "Confirm a pass" on by default is confirmed
 

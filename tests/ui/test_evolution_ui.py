@@ -992,7 +992,7 @@ def test_before_the_upgrade_a_hero_becomes_a_guardian_from_the_upgrade_screen(tm
     assert (fighter.archetype_id, fighter.max_hp, fighter.equipped_dice_ids) == ("guardian", 18, ["guardian_d6", "guardian_d4"])
     assert fighter.hp == -((-hp * 18) // 15), "health is carried over in proportion, rounded up"
     assert play.ctrl.progression.state.heroes["hero_001"].active_vocation_id == "guardian"
-    assert play.ctrl.message.startswith("Squire 1 is now a Guardian and fights on as one.") and not play.ctrl.message_is_error
+    assert play.ctrl.message.startswith("Squire 1 is now a Guardian and fights on as one: HP ") and not play.ctrl.message_is_error
     play.key(pygame.K_ESCAPE)
     assert play.ctrl.screen == Screen.UPGRADE and (play.ctrl.upgrade_hero, play.ctrl.upgrade_die, play.ctrl.upgrade_offer) == ("h01", "guardian_d6", None)
     assert play.ui.widget("up:die:guardian_d6") is not None and play.ui.widget("up:die:iron_d6") is None
@@ -1114,7 +1114,8 @@ def test_before_stopping_or_fighting_on_a_hero_becomes_a_guardian(tmp_path, monk
     fighter = engine.combat.combatants["h01"]
     assert (fighter.archetype_id, fighter.max_hp, fighter.equipped_dice_ids) == ("guardian", 18, ["guardian_d6", "guardian_d4"])
     assert fighter.hp == -((-hp * 18) // 15) and "h01" not in engine.state.die_overrides
-    assert play.ctrl.message == "Squire 1 is now a Guardian and fights on as one. Its health and mana were carried over."
+    assert play.ctrl.message == (f"Squire 1 is now a Guardian and fights on as one: HP {fighter.hp}/18, mana {fighter.mana}/{fighter.max_mana}, "
+                                 "dice Guardian d6, Guardian d4, bench die none.")
     play.key(pygame.K_ESCAPE)
     assert play.ctrl.screen == Screen.CONTINUE and play.ctrl.continue_view()["heroes"][0]["vocation_name"] == "Guardian"
     assert "Guardian" in drawn and play.app.render_faults == 0 and shortened == [], shortened
