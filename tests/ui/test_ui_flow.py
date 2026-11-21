@@ -974,10 +974,12 @@ def test_swapping_out_the_larger_die_needs_a_second_press(tmp_path, monkeypatch)
     play.click("up:offer:0")
     play.click("up:apply")
     assert "up:swap:h01:iron_d6" in play.ui.keys()
-    play.click("up:swap:h01:oath_d4") if "iron_d6" in play.ctrl.engine.state.upgrades[0]["die_id"] else None
     engine = play.ctrl.engine
     upgraded = engine.state.upgrades[0]["die_id"]
     if upgraded == "iron_d6":  # the upgraded die is locked; nothing larger can be given up in this run
+        play.click("up:swap:h01:oath_d4")  # every swap is asked for once more (playtest S4)
+        assert "vanguard_d4" not in engine.combat.combatants["h01"].equipped_dice_ids and "cannot be undone" in play.ctrl.message
+        play.click("up:swap:h01:oath_d4")
         assert engine.combat.combatants["h01"].equipped_dice_ids.count("vanguard_d4") == 1
         return
     play.click("up:swap:h01:iron_d6")
@@ -985,7 +987,7 @@ def test_swapping_out_the_larger_die_needs_a_second_press(tmp_path, monkeypatch)
     assert play.ctrl.message_is_error and "gives up the larger die" in play.ctrl.message
     drawn, shortened = record_text(monkeypatch)
     play.app.frame(0)
-    assert "Confirm: give up Iron d6" in drawn and "Confirm: give up Iron d6" not in shortened
+    assert "Press again: give up Iron d6" in drawn and "Press again: give up Iron d6" not in shortened
     play.click("up:swap:h01:iron_d6")
     assert "vanguard_d4" in engine.combat.combatants["h01"].equipped_dice_ids
     assert "iron_d6" not in engine.combat.combatants["h01"].equipped_dice_ids

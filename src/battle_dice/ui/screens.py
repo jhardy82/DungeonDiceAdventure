@@ -132,7 +132,7 @@ CONTROLS_TEXT = [
     ("Pacing", "Automatic steps play on a short timer.  F changes the battle speed.  Space steps immediately while the game is resolving.  M turns motion and flashes off or on.  Both are also buttons at the top of a battle, and both are settings: what you choose is kept."),
     ("During a run", "Esc opens the menu: resume, read these controls, change settings, or abandon the run.  While a target is being chosen, Esc cancels that choice first.  Abandoning a run, and Retry after a run, ask once more: press again to do it."),
     ("Upgrade", "After Battle 1, pick a hero and a die, select one of three cards, then A applies it.  Optionally swap one die per hero or change rows, then Enter starts Battle 2."),
-    ("Reading the board", "A yellow 'Now ...' line under a face or a planned action is the amount that will really happen when something changes the printed one (Weaken, class bonuses, a maximum).  HP, SH (shield), MP (mana), CR (corruption): from CR {backlash_threshold} on, a hero loses {backlash_damage} HP at the end of each of its activations, and a '!' marks it.  PSN (Poison) / WKN (Weaken) / SPD+ (Speed Up) show total stacks and, in brackets, activations left.  Point at or focus a unit card to list its abilities, dice and every status in the centre panel.  The gauge bar fills to 100 by speed each tick; the Next row forecasts who acts."),
+    ("Reading the board", "A yellow 'Now ...' line under a face or a planned action is the amount that will really happen when something changes the printed one (Weaken, class bonuses, a maximum).  HP, SH (shield), MP (mana), CR (corruption): from CR {backlash_threshold} on, a hero loses {backlash_damage} HP at the end of each of its activations, and a '!' marks it.  PSN (Poison) / WKN (Weaken) / SPD+ (Speed Up) show total stacks and, in brackets, activations left.  Point at or focus a unit card to list its abilities, dice and every status in the centre panel.  The gauge bar fills to 100 by speed each tick (a tick is one step of the battle's clock); the Next row forecasts who acts.  Initiative breaks a tie between two units that are ready at the same moment.  'speed' on a die face is the action's speed: where a class leaves the order of two actions open, the higher speed goes first.  'v1' after a die is its version; an upgrade makes it v2.  'React 1' is a reaction charge, given back at the hero's own activation; whether a reaction is possible also depends on mana, the row and the enemy action."),
 ]
 
 
@@ -144,6 +144,31 @@ def draw_seed_control(ui: UI, ctrl: AppController) -> None:
     ui.button("party:seed", 960, 8, 304, 46, view["label"], ctrl.toggle_seed, enabled=view["reason"] is None, reason=view["reason"],
               selected=view["entering"], hotkeys=() if view["entering"] else (pygame.K_d,), sublabel=view["hint"], size=size,
               tooltip="The same seed, party and choices give the same run. A finished run shows its seed.")
+
+
+#: What the size of the party and the two rows change (playtest M5: nothing on the screen said it).
+PARTY_NOTE = "More heroes meet more and tougher enemies.  A melee attack must hit the front row while anyone stands there; the back row is safe until then."
+
+
+def draw_party_note(ui: UI) -> None:
+    """Under the heading of both party screens, on one line or two, sized by measuring."""
+    one_line = next((size for size in (13, 12) if ui.text_width(PARTY_NOTE, size) <= 700), None)
+    if one_line is not None:
+        ui.text(250, 36, PARTY_NOTE, one_line, Theme.FAINT, max_width=700)
+    else:
+        size = next((size for size in (12, 11, 10) if len(ui.wrap_lines(PARTY_NOTE, 700, size)) <= 2), 10)
+        ui.paragraph(250, 32, PARTY_NOTE, 700, size, Theme.FAINT, line_height=12, max_lines=2)
+
+
+def path_text(ui: UI, label: str, path: Any, size: int, room: float) -> str:
+    """A label and a path that fit ``room``: a long path keeps its end, where the file's name is (playtest L7)."""
+    whole = f"{label}{path}"
+    if ui.text_width(whole, size) <= room:
+        return whole
+    tail = str(path)
+    while len(tail) > 1 and ui.text_width(f"{label}...{tail}", size) > room:
+        tail = tail[1:]
+    return f"{label}...{tail}"
 
 
 def draw_seed_pad(ui: UI, ctrl: AppController) -> None:
@@ -192,8 +217,9 @@ def draw_party_setup(ui: UI, ctrl: AppController) -> None:
         return
     minimum, maximum = ctrl.party_limits()
     ui.text(24, 14, "Party Setup", 30, Theme.ACCENT, bold=True)
-    ui.text(250, 26, f"{len(ctrl.party)} / {maximum} heroes.  Any mix of classes, duplicates allowed.  Starting dice are fixed by class.", 15, Theme.DIM,
+    ui.text(250, 14, f"{len(ctrl.party)} / {maximum} heroes.  Any mix of classes, duplicates allowed.  Starting dice are fixed by class.", 15, Theme.DIM,
             max_width=700)
+    draw_party_note(ui)
     draw_seed_control(ui, ctrl)
 
     ui.panel(16, 60, 430, 470, "Party (click a hero to inspect)")
@@ -225,7 +251,8 @@ def draw_party_setup(ui: UI, ctrl: AppController) -> None:
         ui.button(f"add:{class_id}", 16 + position * 146, 540, 138, 50, f"+ {cls['name']} ({position + 1})",
                   partial(ctrl.add_hero, class_id), enabled=not full,
                   reason=f"The party already has {maximum} heroes.", hotkeys=(NUMBER_KEYS[position],),
-                  tooltip=f"Add a {cls['name']} ({cls['scheduling']['label']}). Suggested row: {cls['suggested_row']}.")
+                  tooltip=f"Add {'an' if cls['name'][:1] in 'AEIOU' else 'a'} {cls['name']} ({cls['scheduling']['label']}). "
+                          f"Suggested row: {cls['suggested_row']}. Its sheet is on the right while this button is pointed at or focused.")
 
     problem = ctrl.begin_problem()
     ui.button("party:begin", 16, 606, 284, 60, "Begin Encounter  (B)", ctrl.begin_run, enabled=problem is None,
@@ -234,8 +261,12 @@ def draw_party_setup(ui: UI, ctrl: AppController) -> None:
     ui.button("party:back", 308, 606, 138, 60, "Back  (Esc)", ctrl.to_main_menu, tooltip="Return to the main menu.")
     ui.escape_action = ctrl.to_main_menu
 
-    # Inspector: the selected hero's class, or the first class when the party is empty.
-    if ctrl.party:
+    # Inspector: the class of the add button that is pointed at or has the focus ring (so a class can be read
+    # by keyboard before a hero of it is added: playtest A3), else the selected hero's class, else the first class.
+    looked_at = next((c for c in class_ids if ui.is_hot(f"add:{c}")), None)
+    if looked_at is not None:
+        class_id = looked_at
+    elif ctrl.party:
         class_id = ctrl.party[min(ctrl.selected_slot, len(ctrl.party) - 1)]["class_id"]
     else:
         class_id = class_ids[0]
@@ -741,7 +772,10 @@ def draw_reactions(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
     names = {c["id"]: c["name"] for c in view["combatants"]}
     stage = reaction["stage"]
     options = reaction["options"]
-    ui.panel(8, 476, 1264, 214, f"Reaction window: stage {reaction['stage_number']} of 3: {stage.capitalize()}   (Guard -> Resource -> Interrupt -> enemy action)",
+    # A prompt that begins at stage 2 or 3 says which stages had nothing to offer (playtest M3).
+    passed = " and ".join(name.capitalize() for name in reaction["passed"])
+    order = f"({passed}: no hero could react)" if passed else "(Guard -> Resource -> Interrupt -> enemy action)"
+    ui.panel(8, 476, 1264, 214, f"Reaction window: stage {reaction['stage_number']} of 3: {stage.capitalize()}   {order}",
              border=Theme.ACCENT, width=2)
     # The amount that will really land, where it differs from the printed one (Weaken, a resisted interrupt).
     now = f"  Now {intent['forecast']['note']}." if intent["forecast"]["note"] else ""
@@ -876,7 +910,7 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
     upgrade = view["upgrade"]
     chosen = upgrade["upgrade_chosen"]
     ui.text(20, 12, "Recovery and Upgrade", 28, Theme.ACCENT, bold=True)
-    ui.sprite("chest", 372, 8, 40, 40)
+    ui.sprite("chest", 378, 8, 40, 40)
     step = "Step 2 of 2: optional swap and rows, then start Battle 2." if chosen else "Step 1 of 2: choose one dice upgrade (required)."
     earned = ctrl.mastery_line()
     if earned:  # Class Evolution: what the won battle gave each saved hero stays on this screen (playtest D3)
@@ -898,6 +932,7 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
         ui.text(420, 22, step, 17, Theme.TEXT, bold=True)
 
     by_id = {c["id"]: c for c in view["combatants"]}
+    recovered = ctrl.recovery_view()
     ui.panel(12, 56, 300, 420, "Heroes after recovery")
     for index, hero in enumerate(upgrade["heroes"]):
         c = by_id[hero["hero_id"]]
@@ -906,7 +941,8 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
         ui.button(f"up:hero:{hero['hero_id']}", 20, y, 196, 68, hero["hero_name"],
                   partial(ctrl.select_upgrade_hero, hero["hero_id"]), selected=selected,
                   sublabel=f"HP {c['hp']}/{c['max_hp']}  MP {c['mana']}  CR {c['corruption']}",
-                  tooltip="Show this hero's dice. HP partly recovered, mana refilled, shields and statuses cleared, corruption kept.")
+                  tooltip=f"Show this hero's dice. Recovery: {recovered.get(hero['hero_id'], (c['hp'], c['hp']))[0]} -> "
+                          f"{recovered.get(hero['hero_id'], (c['hp'], c['hp']))[1]} HP; mana refilled, shields and statuses cleared, corruption kept.")
         ui.button(f"up:row:{hero['hero_id']}", 222, y, 82, 68, c["row"].capitalize(),
                   partial(ctrl.toggle_formation, hero["hero_id"]), sublabel="row",
                   tooltip="Move this hero to the other row for Battle 2.")
@@ -974,7 +1010,7 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
         for swap in bench["swaps"]:
             request = (hero_view["hero_id"], swap["out_die_id"], bench["die"]["id"])
             ui.button(f"up:swap:{hero_view['hero_id']}:{swap['out_die_id']}", 952, y, 306, 38,
-                      ("Confirm: give up " if ctrl.swap_confirm == request else "Swap out ")
+                      ("Press again: give up " if ctrl.swap_confirm == request else "Swap out ")
                       + die_names.get(swap["out_die_id"], swap["out_die_id"]),
                       partial(ctrl.swap_die, hero_view["hero_id"], swap["out_die_id"], bench["die"]["id"]),
                       enabled=swap["allowed"], reason=swap["reason"], selected=ctrl.swap_confirm == request,
@@ -1043,9 +1079,12 @@ def draw_outcome(ui: UI, ctrl: AppController) -> None:
         award_y = 208.0
         for award in awards[:5]:
             award_y = ui.paragraph(966, award_y, award, 286, 14, Theme.TEXT, line_height=17, max_lines=3) + 8
-    log_text = f"Event log: {outcome['log_path']}" if outcome["log_path"] else f"Event log not written: {outcome['log_error'] or 'unknown reason'}"
+    log_text = (path_text(ui, "Event log: ", outcome["log_path"], 13, 1200) if outcome["log_path"]
+                else f"Event log not written: {outcome['log_error'] or 'unknown reason'}")
     ui.text(640, 522, log_text, 13, Theme.FAINT, align="center", max_width=1200)
-    ui.text(640, 542, f"Seed {outcome['seed']} (use --seed to replay the same dice).", 13, Theme.FAINT, align="center")
+    # How to meet the same dice again, in the game's own terms (playtest M7: "--seed" is a launch option).
+    ui.text(640, 542, f"Seed {outcome['seed']}. To play the same dice again: New Run, Dice seed (D), type {outcome['seed']}.", 13, Theme.FAINT,
+            align="center", max_width=1200)
     ui.button("out:retry", 250, 580, 250, 60, "Press again: new run  (R)" if ctrl.asked("retry") else "Retry Same Party  (R)",
               ctrl.retry_same_party, hotkeys=(pygame.K_r,), default=True, size=18, selected=ctrl.asked("retry"),
               tooltip="Start a new run at Battle 1 with the same heroes and rows. No upgrade carries over. Asked once more.")
@@ -1072,7 +1111,8 @@ def draw_roster_setup(ui: UI, ctrl: AppController) -> None:
     roster = ctrl.roster_view()
     by_id = {row["hero_id"]: row for row in roster}
     ui.text(24, 14, "Party Setup", 30, Theme.ACCENT, bold=True)
-    ui.text(250, 26, f"{len(ctrl.party)} / {maximum} heroes in the party.  Your heroes are saved and keep what they master.", 15, Theme.DIM, max_width=700)
+    ui.text(250, 14, f"{len(ctrl.party)} / {maximum} heroes in the party.  Your heroes are saved and keep what they master.", 15, Theme.DIM, max_width=700)
+    draw_party_note(ui)
     draw_seed_control(ui, ctrl)
 
     ui.panel(16, 60, 560, 470, "Party")
@@ -1304,7 +1344,7 @@ def draw_continue(ui: UI, ctrl: AppController) -> None:
 def draw_settings(ui: UI, ctrl: AppController) -> None:
     """The settings in four groups: player settings first, the demo's aids last. A button moves a setting to its next value."""
     ui.text(24, 14, "Settings", 30, Theme.ACCENT, bold=True)
-    where = f"Saved in {ctrl.settings_path}" if ctrl.settings_path else "No settings file is in use: changes last for this session."
+    where = path_text(ui, "Saved in ", ctrl.settings_path, 14, 1090) if ctrl.settings_path else "No settings file is in use: changes last for this session."
     ui.text(170, 26, where, 14, Theme.DIM, max_width=1090)
     for index, (group, title) in enumerate(ctrl.SETTINGS_GROUPS):
         ui.button(f"settings:tab:{group}", 16 + index * 312, 58, 304, 40, f"{index + 1}. {title}", partial(ctrl.select_settings_tab, group),
@@ -1319,7 +1359,8 @@ def draw_settings(ui: UI, ctrl: AppController) -> None:
         ui.panel(16, y, 1248, 54, fill=Theme.PANEL_ALT)
         ui.text(30, y + 17, row["label"], 17, Theme.TEXT, bold=True, max_width=210)
         ui.button(f"settings:{row['key']}", 250, y + 6, 330, 42, row["value"], partial(ctrl.change_setting, row["key"]),
-                  enabled=row["reason"] is None, reason=row["reason"], size=15, tooltip="Click to change.")
+                  enabled=row["reason"] is None, reason=row["reason"], size=15,
+                  tooltip="Click to change it, or press Enter while it has the focus ring.")
         ui.paragraph(596, y + 9, row["help"], 656, 14, Theme.DIM, line_height=17, max_lines=2)
         y += 60
     if ctrl.settings_tab == "evolution":
@@ -1338,7 +1379,7 @@ def draw_settings(ui: UI, ctrl: AppController) -> None:
                       tooltip="Delete the save now and start a new profile. This cannot be undone.")
         elif evolution:
             # One line with its label: a path has no spaces to wrap at, and a long one (Windows) is cut as a whole.
-            ui.text(596, y + 19, f"Save file: {ctrl.progression.path}", 13, Theme.FAINT, max_width=656)
+            ui.text(596, y + 19, path_text(ui, "Save file: ", ctrl.progression.path, 13, 656), 13, Theme.FAINT, max_width=656)
         else:
             ui.paragraph(596, y + 9, "Deletes every saved hero and starts a new profile. A second button has to confirm it.", 656, 13,
                          Theme.FAINT, line_height=17, max_lines=2)
@@ -1347,7 +1388,7 @@ def draw_settings(ui: UI, ctrl: AppController) -> None:
                 max_width=1230)
     label = "Press again: all settings to defaults" if ctrl.defaults_confirm else "Reset all settings to defaults"
     ui.button("settings:defaults", 934, 630, 330, 44, label, ctrl.reset_settings, enabled=not ctrl.settings_in_run, reason=ctrl.RUN_LOCKED, size=15,
-              tooltip="Every setting returns to its default. Your saved heroes are kept. Asked twice.")
+              tooltip="Every setting returns to its default. Your saved heroes are kept. Asked once more.")
     ui.button("settings:back", 16, 630, 220, 44, "Back  (Esc)", ctrl.close_settings, hotkeys=(pygame.K_b,), default=True)
     ui.escape_action = ctrl.close_settings
     status_bar(ui, ctrl)

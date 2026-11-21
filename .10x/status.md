@@ -32,9 +32,10 @@
 - The demo's configuration (D-31), part 2a: four new settings: high contrast, battle speed at start, confirm a pass that leaves a die unused, help text delay
 - The demo's configuration (D-31), part 2b: text size (Normal, Large). Each frame is measured and a text grows only where it has room; a layout check walks 39 states under three fonts and two window sizes
 
+- Fixes after the playtest by eight AI playtesters (D-34), five batches, all merged: predictions and the battle screen; keys, safeguards and mouse reach; what the Class Evolution screens say; two rule fixes (rules 1.1.2, catalog 0.5.1); remaining information and layout. of 57 findings 44 are fixed, 3 fixed in part, 7 left as they are with a reason, 3 wait for the owner (decision log sections 7.32 to 7.36)
+
 ### In Progress
-- Android app (D-33): phase 0, the walking skeleton with Flet (`docs/android/PLAN.md`); starts after the playtest fixes
-- Fixes after the playtest by eight AI playtesters (D-34): batches 1 to 4 of 5 done (predictions and the battle screen; keys, safeguards and mouse reach; what the Class Evolution screens say; the two rule fixes, rules 1.1.2 and catalog 0.5.1); the state of each finding is in section 6 of `docs/PLAYTEST_TEAM_2026-11-21.md`
+- Android app (D-33): phase 0, the walking skeleton with Flet (`docs/android/PLAN.md`)
 - Every setting the owner chose in D-31 is in
 - Waiting for the owner's playtest of the demo (D-32); "Confirm a pass" on by default is confirmed
 
