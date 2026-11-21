@@ -282,6 +282,26 @@ IDs: RA roster auditor, KB keyboard only, BR breaker, ST strategist. All were Me
 **For the owner:** ST-3 (should enemies attack more?), ST-2 (reasons in the event log, with the
 next rules version) and KB-4 (reaction keys by the hero's place).
 
+**ST-3, measured.** One player's impression in one battle; so it was counted over whole
+simulated runs: the informed simulated player, every party composition of each size, seeds 300
+to 309, both battles (`rules 1.1.2`, content `1.3.1`).
+
+| Heroes | Runs | Enemy actions | Attacks | Statuses |
+|--------|------|---------------|---------|----------|
+| 1 | 30 | 624 | 48% | 47% |
+| 2 | 60 | 2,473 | 25% | 71% |
+| 3 | 100 | 4,918 | 17% | 80% |
+| 4 | 150 | 9,357 | 22% | 76% |
+| 5 | 210 | 16,661 | 15% | 83% |
+
+- The impression holds: with two or more heroes, at least three of four enemy actions are a
+  Weaken or a Poison. The enemies' rule prefers a status on a hero who does not have one, and a
+  status lasts two activations.
+- What it means for a player (the strategist's words, not measured): shields and Interpose
+  rarely matter, and heroes mostly deal their damage at -1.
+- Changing it changes the balance (the target is 70 to 85% wins per party size), so it is an
+  owner decision with a simulator run, not a fix.
+
 **Tally of this round:** 34 findings (roster auditor 9, keyboard 8, breaker 8, strategist 9; no
 Blocker, no High). 28 are fixed, one of them in part (KB-7). 6 are left with a reason (ST-2,
 ST-3, ST-9, KB-4, KB-6, BR-8).
