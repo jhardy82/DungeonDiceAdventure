@@ -1,0 +1,28 @@
+# The Flet project of the phone app (owner decision D-33). Built on GitHub by .github/workflows/android.yml:
+# the workflow copies src/battle_dice from the repository into android/src before it builds, so the app
+# carries the same rules, content and controller as the desktop game.
+[project]
+name = "battle-dice-android"
+version = "0.1.0"
+description = "Battle Dice for Android: the walking skeleton"
+requires-python = ">=3.12"
+dependencies = [
+    "flet==1.1.2",
+    "jsonschema>=4.21",
+]
+
+[dependency-groups]
+dev = ["flet-cli==1.1.2"]
+
+[tool.flet]
+# A placeholder. The owner chooses the real identifier before anything is uploaded to a store:
+# it cannot be changed afterwards.
+org = "dev.battledice"
+product = "Battle Dice"
+company = "Battle Dice"
+
+[tool.flet.app]
+path = "src"
+
+[tool.flet.android]
+target_arch = ["arm64-v8a", "x86_64"]

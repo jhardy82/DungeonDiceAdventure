@@ -35,7 +35,7 @@
 - Fixes after the playtest by eight AI playtesters (D-34), five batches, all merged: predictions and the battle screen; keys, safeguards and mouse reach; what the Class Evolution screens say; two rule fixes (rules 1.1.2, catalog 0.5.1); remaining information and layout. of 57 findings 44 are fixed, 3 fixed in part, 7 left as they are with a reason, 3 wait for the owner (decision log sections 7.32 to 7.36)
 
 ### In Progress
-- Android app (D-33): phase 0, the walking skeleton with Flet (`docs/android/PLAN.md`)
+- Android app (D-33): phase 0, the walking skeleton with Flet, is built in the repository (a self-check without a screen, the phone screens as data, the app, the build workflow); its first build on GitHub and the go or no-go checks are next (`docs/android/PLAN.md`)
 - Every setting the owner chose in D-31 is in
 - Waiting for the owner's playtest of the demo (D-32); "Confirm a pass" on by default is confirmed
 

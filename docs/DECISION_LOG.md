@@ -2236,6 +2236,37 @@ L1 to L7).
 | Waiting for the owner | 3 | R3 (dismiss a hero), R4 (starting classes), R5 (mastery pace) |
 
 
+### 7.37 Android, phase 0: the walking skeleton as built (D-33, 2026-11-21)
+
+Phase 0 of `docs/android/PLAN.md`. Nothing of the desktop game is changed; the replay pin and
+the simulator results are unchanged.
+
+- **A self-check without a screen** (`src/battle_dice/app/selfcheck.py`). The game's own
+  self-check draws every screen with pygame, which a phone has not. This one plays a whole run
+  with saved heroes through the real controller, closes the save and reads it again.
+- **The phone screens as data** (`src/battle_dice/phone/screens.py`): menu, party and one battle,
+  and what each tap does. No toolkit is imported; the plan's rule "screens are data first".
+- **The app** (`android/`): Flet draws that data, upright and sideways, and shows the
+  self-check's line on its menu.
+- **The build** (`.github/workflows/android.yml`): builds the APK, reads its size, processor
+  types and 16 KB alignment, starts it on an emulator, reads the self-check from the device log
+  and keeps screenshots (upright, larger system font, sideways). It runs only when the phone app
+  changes or when started by hand, so the other pull requests are not slowed.
+
+**My readings, stated so they can be corrected**
+
+- The build copies the game's package into the app instead of installing it: the package asks
+  for Python 3.15 and the phone's Python is 3.14. Allowing 3.14 beside 3.15 is phase 1.
+- The emulator step uses the public action `reactivecircus/android-emulator-runner` (version
+  tag `v2`), as Flet's own build does. It runs in the repository's build with read-only access.
+- The APK check measures and reports; it does not fail the build. Whether the numbers pass is
+  the go or no-go decision after phase 0, not a build rule.
+
+**Checked here:** 13 tests; the app tapped through in a browser at 384 x 832 and 832 x 384
+(menu, party, start of a battle). **Not checked:** the Android build itself. The development
+container cannot reach the servers it needs, so the first build runs on GitHub with this pull
+request, and its result is recorded in the plan.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

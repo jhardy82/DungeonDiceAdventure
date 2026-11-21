@@ -1,0 +1,107 @@
+name: Android (walking skeleton)
+
+# Phase 0 of docs/android/PLAN.md: build the phone app's APK, look at what was built, start it on an
+# emulator and read its own self-check. Runs only when the phone app changes, or when started by hand.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "android/**"
+      - "src/battle_dice/phone/**"
+      - "src/battle_dice/app/selfcheck.py"
+      - ".github/workflows/android.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build the APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Put the game's package into the app, without the desktop screens
+        # The phone app carries the same rules, content, save and controller as the desktop game.
+        # The pygame screens and the desktop entry point stay out: the phone has no pygame.
+        run: |
+          cp -r src/battle_dice android/src/battle_dice
+          rm -rf android/src/battle_dice/ui android/src/battle_dice/__main__.py
+          find android/src -name __pycache__ -prune -exec rm -rf {} +
+      - name: The app's own self-check on this machine first (Python 3.14, no pygame installed)
+        run: |
+          python -m pip install "jsonschema>=4.21"
+          cd android/src
+          python -c "import sys, tempfile; from battle_dice.app import selfcheck; print(selfcheck.report_line(selfcheck.run(tempfile.mkdtemp()))); assert 'pygame' not in sys.modules"
+      - name: Install the Flet build tool
+        run: python -m pip install "flet==1.1.2" "flet-cli==1.1.2"
+      - name: Build the APK (Flet installs Flutter, a JDK and the Android SDK by itself)
+        working-directory: android
+        run: |
+          set -o pipefail
+          flet build apk --yes --verbose --python-version 3.14 --build-number "${{ github.run_number }}" 2>&1 | tee ../android_build.log | tail -n 300
+      - name: What was built
+        if: always()
+        run: |
+          ls -la android/build/apk 2>/dev/null || echo "no APK folder"
+          grep -n -i -m5 "targetSdk\|compileSdk\|minSdk" android_build.log || echo "the build log names no SDK level"
+          for apk in android/build/apk/*.apk; do
+            [ -f "$apk" ] || continue
+            echo "== $apk"
+            python android/tools/check_apk.py "$apk"
+            aapt2="$(find "$HOME/Android" "${ANDROID_HOME:-/nonexistent}" -name aapt2 -type f 2>/dev/null | sort | tail -n 1)"
+            if [ -n "$aapt2" ]; then "$aapt2" dump badging "$apk" | grep -E "^package:|sdkVersion|targetSdkVersion|native-code" || true; else echo "aapt2 not found: the target API is not read here"; fi
+          done | tee apk_check.txt
+          { echo "### The built APK"; echo '```'; cat apk_check.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: battle-dice-android-apk
+          path: |
+            android/build/apk/*.apk
+            android_build.log
+            apk_check.txt
+          if-no-files-found: warn
+
+  emulator:
+    name: Start the app on an emulator
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          name: battle-dice-android-apk
+          path: built
+      - name: Let the emulator use hardware virtualisation
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install, start, read the self-check, take screenshots
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_7_pro
+          disable-animations: true
+          script: bash android/tools/emulator_check.sh "$(find built -name '*.apk' | sort | head -n 1)" emulator_out
+      - name: The report
+        if: always()
+        run: |
+          { echo "### On the emulator"; echo '```'; cat emulator_out/report.txt 2>/dev/null || echo "no report"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: battle-dice-android-emulator
+          path: emulator_out
+          if-no-files-found: warn

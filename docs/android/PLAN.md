@@ -31,12 +31,31 @@ section 7.31. This file is the plan that was approved, kept up to date as phases
 
 | Phase | What | State |
 |-------|------|-------|
-| 0. Walking skeleton | A minimal app (menu, party, one battle) built as an APK on GitHub, started in an emulator there, installed by the owner on the S25 Ultra | Next |
+| 0. Walking skeleton | A minimal app (menu, party, one battle) built as an APK on GitHub, started in an emulator there, installed by the owner on the S25 Ultra | Built in the repository; the first build on GitHub is the next step (see "Phase 0, as built") |
 | 1. Groundwork | Python 3.14 allowed and tested beside 3.15; controller messages without key names for touch; screen data in the pygame-free layer | After phase 0 |
 | 2. Phone screens, shipped game | Menu, Settings, party setup, battle, upgrade, outcome, pause; each upright and sideways | The main job |
 | 3. Class Evolution on the phone | Roster, career, skills, vocation change, the third-battle decision | |
 | 4. Android behaviour | Back gesture, resuming a run after the app was closed, cutout and safe areas, icon and name | |
 | 5. Play Store | Only on a separate owner decision: signing, developer account, store listing | Not decided |
+
+## Phase 0, as built (2026-11-21)
+
+| Part | Where | What it is |
+|------|-------|------------|
+| A self-check without a screen | `src/battle_dice/app/selfcheck.py` | One whole run with saved heroes through the real controller, played by the simulated player; the save is written, closed and read again. Prints one line that starts with `BATTLE DICE SELF-CHECK` |
+| The phone screens as data | `src/battle_dice/phone/screens.py` | Menu, party and one battle as plain data, and what each tap does. No toolkit is imported. Messages lose their key hints ("Roll the dice (R)." becomes "Roll the dice.") |
+| The app | `android/src/main.py`, `android/pyproject.toml` | Flet draws that data: upright in one column, sideways with the buttons on the right. On start it runs the self-check and shows its line on the menu |
+| The build | `.github/workflows/android.yml` | Copies the game's package into the app without the pygame screens, runs the self-check on Python 3.14, builds the APK, reads its size, processor types and 16 KB alignment, starts it on an emulator, reads the self-check from the device log, and keeps screenshots: upright, with a larger system font, sideways |
+| The checks of a built APK | `android/tools/check_apk.py`, `android/tools/emulator_check.sh` | Used by the build |
+
+- **Checked in the development container:** 13 tests (a whole battle played by taps alone; refused
+  taps; the self-check; no pygame loaded in a fresh interpreter; the APK check on made-up
+  libraries). The app was started in a browser at 384 x 832 and 832 x 384 and tapped through
+  menu, party and the start of a battle; the self-check line showed Python 3.14.6 and 2.6 to 2.9
+  seconds.
+- **Not checked yet:** everything that needs the Android build. The container cannot reach the
+  servers the build needs, so the first build happens on GitHub. The workflow file has not run.
+  The app's identifier (`dev.battledice`) is a placeholder.
 
 ## Go or no-go after phase 0
 
