@@ -42,6 +42,16 @@ jobs:
           python -c "import sys, tempfile; from battle_dice.app import selfcheck; print(selfcheck.report_line(selfcheck.run(tempfile.mkdtemp()))); assert 'pygame' not in sys.modules"
       - name: Install the Flet build tool
         run: python -m pip install "flet==1.1.2" "flet-cli==1.1.2"
+      - name: One Gradle worker at a time
+        # The Android part of the build downloads four archives (Python and its bridge, for each processor
+        # type) in tasks that run side by side and share one file of download marks (serious_python_android
+        # 6.1.3: useETag in every Download task). Now and then one task reads that file while another
+        # writes it, and the build fails with "Unable to determine the current character ... '\0'".
+        # Seen in the fourth build of pull request 42. With one worker the tasks run one after another.
+        run: |
+          mkdir -p "$HOME/.gradle"
+          echo "org.gradle.workers.max=1" >> "$HOME/.gradle/gradle.properties"
+          cat "$HOME/.gradle/gradle.properties"
       - name: Build the APK (Flet installs Flutter, a JDK and the Android SDK by itself)
         working-directory: android
         run: |
@@ -51,7 +61,7 @@ jobs:
         if: always()
         run: |
           ls -la android/build/apk 2>/dev/null || echo "no APK folder"
-          grep -n -i -m5 "targetSdk\|compileSdk\|minSdk" android_build.log || echo "the build log names no SDK level"
+          grep -a -n -i -m5 "targetSdk\|compileSdk\|minSdk" android_build.log || echo "the build log names no SDK level"
           for apk in android/build/apk/*.apk; do
             [ -f "$apk" ] || continue
             echo "== $apk"
