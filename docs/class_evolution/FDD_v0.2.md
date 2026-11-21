@@ -5,7 +5,7 @@
 | Document | BD-FDD-CE-001, version 0.2 |
 | Status | **Approved by the owner, 2026-11-11.** Building has started with Phase 1 (section 9). |
 | Replaces | BD-UNIFIED-FDD-001 v0.1 (the 6,270-line design document reviewed on 2026-11-11) |
-| Baseline | Rules `1.1.1`, content `1.3.1`, RNG `BD-PCG32-v1` |
+| Baseline | Rules `1.1.2`, content `1.3.1`, RNG `BD-PCG32-v1` (rules `1.1.1` when v0.2 was approved; `1.1.2` since owner decision D-34 of 2026-11-21: decision log, section 7.35) |
 | Feature gate | `class_evolution_v1`, off |
 | Date | 2026-11-11 |
 

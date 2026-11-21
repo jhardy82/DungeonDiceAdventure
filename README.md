@@ -103,7 +103,8 @@ To build it yourself: `python -m pip install ".[package]"`, then
    in three stages: **Guard**, **Resource**, **Interrupt**. Each reacting hero has one row; click
    the ally to protect on that row. Then the enemy action resolves.
 5. Win Battle 1, apply one required **dice upgrade**, optionally swap one die per hero and change rows,
-   then win Battle 2.
+   then win Battle 2. Every upgrade card changes the die: a card that would only rename a face
+   is not offered.
 
 | Class | Scheduling | Passive | Reaction |
 |-------|------------|---------|----------|
@@ -167,7 +168,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1289 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1301 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -227,7 +228,8 @@ battle-dice-replay logs/run-123-1.jsonl      # or: python -m battle_dice.replay_
 
 It replays the commands on a fresh rules engine and checks the rules version, the content hash,
 the event-log hash, the final-state hash and every event line. Exit code 0 means every log
-reproduced exactly. Logs written before version 1.1.1 carry no commands and cannot be replayed.
+reproduced exactly. A log replays only under the rules version that wrote it (now 1.1.2); logs
+written before version 1.1.1 carry no commands and cannot be replayed at all.
 
 Three fixed-seed runs are pinned by hash in `tests/golden/replay_pin.json`, so unintended drift
 between builds or platforms fails a test. After an intended rules or content change, bump the
@@ -317,7 +319,9 @@ What changes with the gate on:
     is dealt there, and an upgraded die the hero gives up loses its upgrade.
 
   Either way the hero fights on with the new vocation's dice, and its health and mana carry
-  over in proportion. During a battle, and after the upgrade is chosen, nothing can be changed.
+  over in proportion (rounded up). Changing back gives the hero exactly what it had: several
+  changes at one such moment gain nothing. During a battle, and after the upgrade is chosen,
+  nothing can be changed.
 - **After Battle 2** you may end the run with a victory or fight a third battle. Losing it
   loses the run; mastery already earned is kept.
 - **The save file** is `saves/profile.sqlite` beside the `logs` folder (the per-user application

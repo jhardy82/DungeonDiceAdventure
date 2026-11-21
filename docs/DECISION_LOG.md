@@ -2115,6 +2115,69 @@ No rule is changed; the replay pin and the simulator results are unchanged.
   fonts and two window sizes.
 - **Not verified:** a person's reading.
 
+### 7.35 Playtest fixes, batch 4: two rule fixes, rules 1.1.2 (D-34, 2026-11-21)
+
+**The owner's answer:** fix both. Rules go from 1.1.1 to 1.1.2; the vocation catalog, which names
+the rules it was written against, from 0.5.0 to 0.5.1. Content stays 1.3.1.
+
+| Finding | Rule under 1.1.1 | Rule under 1.1.2 |
+|---------|------------------|------------------|
+| R2, D2: a free heal | Every change of vocation inside a run converted health and mana from what the last change had left, rounding up. Changing back and forth four times took a hero from 12 of 15 health to 18 of 18 | Inside one window (before the upgrade is chosen, or before deciding to stop or fight on) every change is converted from what the hero had when it first changed there. Changing back gives exactly what the hero had |
+| R1: an empty upgrade card | Imbue could offer a face that differs from the one it replaces in its name only ("Strike: 3 melee damage" to "Heavy Blow: 3 melee damage") | A card that would change nothing the rules read is not offered; the next valid card takes its place. Three cards are still offered |
+
+**How it is built**
+
+- **The free heal.** The run's state remembers, per hero, the health and mana of the first change
+  in the open window (`change_base`). The field is left out of the hashed state while it is
+  empty, so a run without a change hashes as before. It is emptied when the upgrade is chosen,
+  when the next battle starts and when the run is ended at the decision. The one function that
+  computes the pools of a change (`pools_after_change`, batch 3) reads it; the Career screen's
+  preview uses the same function, so it shows the way back as what it is ("HP 15/18 -> 12/15").
+- **The empty card.** A face has `mechanics()`: everything the rules read, with its tags (rules
+  read tags: a spell, a schedule slot) and without its name. Imbue leaves out a face whose
+  mechanics equal those of the face it would replace.
+- **My reading:** between runs (party setup) a hero has no stored health, so there is nothing to
+  gain there; the career rules' own conversion (fixture CE-17) is unchanged.
+
+**What the version change touches**
+
+- A log replays only under the rules that wrote it (`verify_log` refuses with the two versions
+  named). Logs written under 1.1.1 no longer replay in this build.
+- The replay pin is regenerated: its run carries the new version, so its hashes change. No
+  move of that run changed.
+- A save made under catalog 0.5.0 gets the catalog 0.5.1 installed when it is opened; heroes
+  and their mastery are kept (the store's own tests cover a catalog change).
+- The specification's baseline (FDD header, the acceptance fixtures and their schema, the
+  example profile) names rules 1.1.2.
+
+**Balance, measured again (simulated player, 2,200 runs per sample; target 70 to 85% per party size)**
+
+| Party size | Seeds 300 to 339, rules 1.1.1 | Seeds 300 to 339, rules 1.1.2 | Seeds 340 to 379, rules 1.1.2 | Seeds 340 to 379, old Imbue rule |
+|-----------:|------------------------------:|------------------------------:|------------------------------:|---------------------------------:|
+| 1 | 79.2% | 79.2% | 80.0% | 80.0% |
+| 2 | 73.8% | 73.8% | 73.8% | 73.8% |
+| 3 | 79.0% | 79.0% | 78.8% | 78.8% |
+| 4 | 76.5% | 76.5% | 76.0% | 76.0% |
+| 5 | 78.1% | 78.1% | 77.3% | 77.3% |
+| All | 1,703 of 2,200 | 1,703 of 2,200 | 1,693 of 2,200 | 1,693 of 2,200 |
+
+- In both samples every run is identical under the old and the new Imbue rule: the simulated
+  player never took the empty card. No simulated hero changes vocation back and forth, so the
+  other fix cannot show in these numbers; its effect is the 12 of 15 to 18 of 18 it removes.
+- How often the empty card was offered under 1.1.1: 21 of 1,440 cards (1.5%) over seeds 300 to
+  339 and three parties with a Squire. Only the Squire family has such a pair.
+- Every party size stays inside the target in both samples. **No number of a class was changed.**
+- **Evidence:**
+  - 12 new tests (1,301 in all, warnings as errors, coverage of the rules 97.49%): the change
+    back and forth at the rule level and through the screens, the window's start and end, mana as
+    well as health, a replay of a run with three changes, the hashed state of a run without one,
+    and the upgrade cards over 40 seeds and three parties (none empty; three cards each).
+  - 14 deliberate breaks of the rule code, with a control run: all 14 make a test fail.
+  - `ruff` and `mypy` clean. Both self-checks pass and report rules 1.1.2; both Class Evolution
+    checkers print OK. The shipped content files are unchanged.
+- **Not verified:** play by a person. A save file made by an earlier build was not opened by
+  hand with this one; the store's tests cover a change of catalog version.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

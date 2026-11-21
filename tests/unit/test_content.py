@@ -233,7 +233,7 @@ def test_missing_document_is_reported():
 def test_versions_and_owner_rule_changes_of_1_1_0(content):
     from battle_dice import RULES_VERSION
 
-    assert RULES_VERSION == "1.1.1" and content.content_version == "1.3.1"
+    assert RULES_VERSION == "1.1.2" and content.content_version == "1.3.1"  # 1.1.2: the two rule fixes of D-34
     assert {doc["content_version"] for doc in content.documents.values()} == {"1.3.1"}
     assert content.classes["squire"]["passive"]["type"] == "defense_die_bonus"
     assert content.balance["upgrades"]["max_swaps_per_hero"] == 1

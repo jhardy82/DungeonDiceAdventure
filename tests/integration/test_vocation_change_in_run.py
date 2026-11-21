@@ -389,3 +389,118 @@ def test_a_really_played_run_with_a_change_at_the_decision_replays(catalog):
     again = verify(packaged_content(), record)
     assert (events_hash(again.events), state_hash(again.state)) == (events_hash(engine.events), state_hash(engine.state))
     assert [c["type"] for c in record["commands"]].count(cmd.CHANGE_VOCATION) == 1 and again.build("h01").vocation_id == "guardian"
+
+
+# --------------------------------------------------------------------------------------------
+# Rules 1.1.2 (owner decision D-34): a change back and forth gains nothing
+# --------------------------------------------------------------------------------------------
+
+AS_SQUIRE = {"hero_id": "hero_001", "name": "Aldric"}
+
+
+def change(engine: Engine, class_id: str):
+    return engine.do(cmd.CHANGE_VOCATION, hero_id="h01", class_id=class_id, hero=GUARDIAN if class_id == "guardian" else AS_SQUIRE)
+
+
+def pools(engine: Engine) -> tuple[int, int, int, int]:
+    hero = unit(engine, "h01")
+    return hero.hp, hero.max_hp, hero.mana, hero.max_mana
+
+
+def test_changing_back_and_forth_does_not_heal(catalog):
+    """Found by a playtester: 12/15 became 18/18 by changing four times. Each change rounded up from the last result."""
+    engine = after_battle_one(catalog)
+    hero = unit(engine, "h01")
+    hero.hp, hero.mana = 10, 1  # of 14 and 3
+    start = pools(engine)
+    ok(change(engine, "guardian"))
+    as_guardian = pools(engine)
+    assert as_guardian == (convert_pool(10, 14, 18), 18, convert_pool(1, 3, 3), 3) == (13, 18, 1, 3)
+    for _ in range(4):
+        ok(change(engine, "squire"))
+        assert pools(engine) == start, "back as a Squire the hero has exactly what it had"
+        ok(change(engine, "guardian"))
+        assert pools(engine) == as_guardian, "and as a Guardian what the first change gave it"
+    # Under rules 1.1.1 the second round already gave 13/18 -> 11/14 -> 15/18.
+    assert convert_pool(convert_pool(13, 18, 14), 14, 18) == 15 > 13
+
+
+def test_the_window_remembers_what_the_hero_had_and_forgets_it_when_it_closes(catalog):
+    engine = after_battle_one(catalog)
+    hero = unit(engine, "h01")
+    hero.hp, hero.mana = 10, 1
+    assert engine.state.change_base == {}
+    ok(change(engine, "guardian"))
+    assert engine.state.change_base == {"h01": {"hp": 10, "max_hp": 14, "mana": 1, "max_mana": 3}}
+    ok(change(engine, "squire"))
+    assert engine.state.change_base["h01"]["hp"] == 10, "the first change of the window sets it; later ones do not move it"
+    ok(change(engine, "guardian"))
+    offer = engine.state.upgrade_offers["h01"]["guardian_d6"][0]
+    ok(engine.do(cmd.CHOOSE_UPGRADE, hero_id="h01", die_id="guardian_d6", offer_id=offer["offer_id"]))
+    assert engine.state.change_base == {}, "the upgrade is chosen: the window is closed"
+
+
+def test_each_window_starts_from_the_health_of_its_own_moment(catalog):
+    engine = at_the_decision(catalog)
+    hero = unit(engine, "h01")
+    hero.hp = 7
+    assert engine.state.change_base == {}
+    ok(change(engine, "guardian"))
+    assert pools(engine)[:2] == (convert_pool(7, 14, 18), 18) and engine.state.change_base["h01"]["hp"] == 7
+    ok(change(engine, "squire"))
+    assert pools(engine)[:2] == (7, 14)
+    ok(change(engine, "guardian"))
+    ok(engine.do(cmd.CONTINUE_RUN))
+    assert engine.state.phase == RunPhase.BATTLE and engine.state.change_base == {}
+
+
+def test_ending_the_run_at_the_decision_also_closes_the_window(catalog):
+    engine = at_the_decision(catalog)
+    ok(change(engine, "guardian"))
+    assert engine.state.change_base
+    ok(engine.do(cmd.END_RUN))
+    assert engine.state.change_base == {}
+
+
+def test_a_run_without_a_change_has_the_state_it_always_had(catalog):
+    """The new field is absent from the hashed state while it is empty, so no run without a change hashes differently."""
+    from battle_dice.core.models import to_plain
+
+    engine = after_battle_one(catalog)
+    assert "change_base" not in to_plain(engine.state)
+    health = unit(engine, "h01").hp
+    ok(change(engine, "guardian"))
+    assert to_plain(engine.state)["change_base"] == {"h01": {"hp": health, "max_hp": 14, "mana": 3, "max_mana": 3}}
+
+
+def test_the_preview_and_the_change_agree_after_a_change_back(catalog):
+    engine = after_battle_one(catalog)
+    unit(engine, "h01").hp = 10
+    ok(change(engine, "guardian"))
+    ok(change(engine, "squire"))
+    promised = engine.pools_after_change("h01", 18, 3)
+    ok(change(engine, "guardian"))
+    assert promised["hp"] == [10, 13] and pools(engine)[:2] == (promised["hp"][1], 18)
+    assert events_of(engine, EventType.VOCATION_CHANGED)[-1].delta["hp"] == [10, 13]
+
+
+def test_a_run_with_changes_back_and_forth_replays_from_its_record(catalog):
+    engine = next(e for e in (played_to_the_upgrade(catalog, seed) for seed in range(11, 20)) if e is not None)
+    for class_id in ("guardian", "squire", "guardian"):
+        ok(change(engine, class_id))
+    play_run(engine, HeuristicPolicy())
+    assert engine.finished()
+    record = export_run(engine)
+    assert [c["params"]["class_id"] for c in record["commands"] if c["type"] == cmd.CHANGE_VOCATION] == ["guardian", "squire", "guardian"]
+    again = verify(packaged_content(), record)
+    assert (events_hash(again.events), state_hash(again.state)) == (events_hash(engine.events), state_hash(engine.state))
+
+
+def test_mana_is_converted_from_what_the_hero_had_too(catalog):
+    """A Squire with 1 of 3 mana, a Scout (4 mana at most) and back: under rules 1.1.1 it came back with 2."""
+    engine = after_battle_one(catalog)
+    unit(engine, "h01").mana = 1
+    ok(change(engine, "scout"))
+    assert pools(engine)[2:] == (convert_pool(1, 3, 4), 4) == (2, 4)
+    ok(change(engine, "squire"))
+    assert pools(engine)[2:] == (1, 3) and convert_pool(2, 4, 3) == 2, "not the 2 that rounding up twice would give"

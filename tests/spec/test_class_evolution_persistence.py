@@ -180,7 +180,7 @@ def add_run(conn: sqlite3.Connection, run_id: str, phase: str = "battle", **over
         "profile_id": PROFILE,
         "catalog_version": CATALOG,
         "content_sha256": EXAMPLE["catalog"]["content_sha256"],
-        "rules_version": "1.1.1",
+        "rules_version": "1.1.2",
         "rng_version": "BD-PCG32-v1",
         "seed_decimal": "7",
         "build_sha256": HASH_A,
@@ -393,9 +393,9 @@ def test_the_example_tells_the_v01_story_on_the_shipped_baseline(loaded):
 
     assert loaded.execute(
         "SELECT rules_version, catalog_version, rng_version, phase FROM run"
-    ).fetchall() == [("1.1.1", CATALOG, "BD-PCG32-v1", "upgrade")]
+    ).fetchall() == [("1.1.2", CATALOG, "BD-PCG32-v1", "upgrade")]
     assert loaded.execute("SELECT catalog_version, rules_version FROM content_catalog").fetchall() == [
-        (CATALOG, "1.1.1")
+        (CATALOG, "1.1.2")
     ]
 
 

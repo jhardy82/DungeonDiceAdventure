@@ -493,6 +493,7 @@ class Engine:
         battle = state.encounter_index + 1
         state.phase = RunPhase.VICTORY
         state.outcome = terminal.OUTCOME_VICTORY
+        state.change_base.clear()
         self.emit(EventType.RUN_VICTORY, delta={"battle": battle, "declined": declined})
 
     def _start_next_battle(self) -> None:
@@ -501,6 +502,7 @@ class Engine:
         heroes = previous.side(SIDE_HERO)
         state.encounter_index += 1
         state.upgrade_offers = {}
+        state.change_base.clear()  # a new battle: what a hero had before a change no longer matters
         state.combat = self._build_combat(state.encounter_index + 1, heroes, event_seq=previous.event_seq)
         state.phase = RunPhase.BATTLE
         self._emit_battle_started()
@@ -533,16 +535,23 @@ class Engine:
         if problem:
             raise CommandRejected(problem)
         state.phase = RunPhase.EQUIPMENT
+        state.change_base.clear()  # the window for changing vocation is closed
 
     def pools_after_change(self, hero_id: str, max_hp: int, max_mana: int) -> dict[str, list[int]]:
         """A hero's health and mana if it took a vocation with these maxima now, each as ``[before, after]``.
 
         The change itself uses this, so what a screen shows before the change is what the change does.
+
+        Inside one window (before the upgrade, or before stopping or fighting on) every change is
+        converted from what the hero had when it first changed there, not from what the last change
+        left. Rounding up at each step of a change back and forth once healed a hero for nothing
+        (rules 1.1.2, owner decision D-34).
         """
         unit = self.combat.combatants[hero_id]
+        base = self.state.change_base.get(hero_id) or {"hp": unit.hp, "max_hp": unit.max_hp, "mana": unit.mana, "max_mana": unit.max_mana}
         return {
-            "hp": [unit.hp, convert_pool(unit.hp, unit.max_hp, max_hp)], "max_hp": [unit.max_hp, max_hp],
-            "mana": [unit.mana, convert_pool(unit.mana, unit.max_mana, max_mana)], "max_mana": [unit.max_mana, max_mana],
+            "hp": [unit.hp, convert_pool(base["hp"], base["max_hp"], max_hp)], "max_hp": [unit.max_hp, max_hp],
+            "mana": [unit.mana, convert_pool(base["mana"], base["max_mana"], max_mana)], "max_mana": [unit.max_mana, max_mana],
         }
 
     def _change_vocation(self, hero_id: str, class_id: str, hero: dict[str, Any]) -> None:
@@ -580,6 +589,7 @@ class Engine:
         unit = self.combat.combatants[hero_id]
         before = {"hp": unit.hp, "max_hp": unit.max_hp, "mana": unit.mana, "max_mana": unit.max_mana}
         pools = self.pools_after_change(hero_id, build.max_hp, build.max_mana)
+        state.change_base.setdefault(hero_id, dict(before))  # the first change of this window: later ones start from here
         unit.hp, unit.max_hp = pools["hp"][1], build.max_hp
         unit.mana, unit.max_mana = pools["mana"][1], build.max_mana
         unit.max_corruption = build.max_corruption
