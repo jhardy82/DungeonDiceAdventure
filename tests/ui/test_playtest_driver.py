@@ -114,6 +114,16 @@ def test_a_click_on_a_control_that_is_off_shows_the_games_reason_and_hover_shows
     assert code == 0 and "[pointer]" in next(line for line in out.splitlines() if line.strip().startswith("add:squire"))
 
 
+def test_the_help_text_delay_can_be_seen_with_hover_and_wait(driver, capsys, tmp_path):
+    folder = tmp_path / "s"
+    run(driver, capsys, folder, "start")
+    run(driver, capsys, folder, "do", "key:s", "key:2", "click:settings:tooltip_delay")  # None -> Short (350 ms)
+    code, out = run(driver, capsys, folder, "do", "--full", "hover:settings:confirm_pass")
+    assert code == 0 and "Help text delay: Short." in out and "Click to change." not in out, "the help waits for the delay"
+    code, out = run(driver, capsys, folder, "do", "--full", "wait:400")
+    assert "Click to change." in out
+
+
 def test_a_feature_flag_and_a_window_size_are_part_of_the_session(driver, capsys, tmp_path):
     folder = tmp_path / "s"
     code, out = run(driver, capsys, folder, "start", "--size", "960x540", "--feature", "class_evolution_v1")

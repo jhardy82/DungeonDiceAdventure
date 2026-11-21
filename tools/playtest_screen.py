@@ -16,7 +16,8 @@ start (fresh settings, fresh save), so a session is repeatable and needs no runn
 Actions:
     click:KEY      click the control with this key (as listed under CONTROLS), enabled or not
     clickxy:X,Y    click at a point of the 1280x720 layout
-    hover:KEY      rest the pointer on a control, to read its help text
+    hover:KEY      rest the pointer on a control, to read its help text (with the setting "Help text
+                   delay" on, the help shows only after a following wait:MS)
     key:NAME       press a key: a letter or digit, or escape, enter, space, tab, shift+tab, backspace,
                    up, down, left, right
     type:DIGITS    press these digit keys one after another
@@ -24,6 +25,10 @@ Actions:
 
 After every action the game runs on until it waits for the player, as it does for a person.
 Animation is off, so what is printed is the settled screen.
+
+The first run of a session uses the session's seed (500 unless --seed is given) and each further
+run the next number, also while the game's New Run screen says "Dice seed: random". That keeps a
+session repeatable; it is the driver's doing, not the game's.
 """
 
 from __future__ import annotations
@@ -144,7 +149,7 @@ class Game:
         elif kind == "hover":
             self.app.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=self._point_of(value), rel=(0, 0), buttons=(0, 0, 0)))
             self.app.frame(0)  # the pointer is looked up at the end of a frame ...
-            self.app.frame(1000)  # ... and its help shows in the next one, after any delay the player set
+            self.app.frame(0)  # ... and its help shows in the next one; with a help text delay set, only after `wait:MS`
         elif kind == "key":
             self._press(value)
         elif kind == "type":

@@ -34,6 +34,7 @@
 
 ### In Progress
 - Android app (D-33): phase 0, the walking skeleton with Flet (`docs/android/PLAN.md`)
+- Playtest by eight AI playtesters (2026-11-21): report in `docs/PLAYTEST_TEAM_2026-11-21.md`; the owner decides what is fixed
 - Every setting the owner chose in D-31 is in
 - Waiting for the owner's playtest of the demo (D-32); "Confirm a pass" on by default is confirmed
 
