@@ -134,6 +134,10 @@ class AppController:
         #: Where the message was last seen (screen, pause, settings group) and which message that was.
         self._message_place: tuple[Any, ...] | None = None
         self._message_seen = 0
+        #: What was asked for once and is done only when asked for again at once ("press again").
+        self._asked: str | None = None
+        #: The enemy action a reaction was already used on: a further reaction then needs a second press.
+        self._reacted_to: str | None = None
         self.error_text = ""
         # In-run menu (Esc). While it is open nothing in the run advances.
         self.paused = False
@@ -188,10 +192,28 @@ class AppController:
     def info(self, text: str) -> None:
         self.message, self.message_is_error = text, False
         self.message_serial += 1
+        self._asked = None  # something else happened: a "press again" is over
 
     def warn(self, text: str) -> None:
         self.message, self.message_is_error = text, True
         self.message_serial += 1
+        self._asked = None
+
+    def _ask_once(self, what: str, question: str) -> bool:
+        """A safeguard for what cannot be undone: the first request only asks, the next one in a row does it.
+
+        Returns True when ``what`` may be done now. Anything else the game says in between ends the question.
+        """
+        if self._asked == what:
+            self._asked = None
+            return True
+        self.warn(question)
+        self._asked = what
+        return False
+
+    def asked(self, what: str) -> bool:
+        """Whether ``what`` waits for its second press (a button then says so)."""
+        return self._asked == what
 
     def expire_message(self) -> None:
         """Once a frame: a message belongs to the place it was given in.
@@ -202,6 +224,7 @@ class AppController:
         place = (self.screen, self.paused, self.pause_help, self.settings_tab)
         if place != self._message_place and self.message_serial == self._message_seen:
             self.message, self.message_is_error = "", False
+            self._asked = None
         self._message_place = place
         self._message_seen = self.message_serial
 
@@ -308,6 +331,8 @@ class AppController:
             hint = "type digits, Enter to set, Esc to cancel"
         elif self.fixed_seed is None:
             label, hint = "Dice seed: random", "press D to type a seed"
+        elif self._seed_from_flag:
+            label, hint = f"Dice seed: {self.fixed_seed}", "set by a launch flag"
         else:
             label, hint = f"Dice seed: {self.fixed_seed}", "press D for a random seed"
         return {"label": label, "hint": hint, "entering": self.seed_entry is not None, "seed": self.fixed_seed,
@@ -389,14 +414,18 @@ class AppController:
     def toggle_pause_help(self) -> None:
         self.pause_help = not self.pause_help
 
+    ABANDON_QUESTION = "Press again to abandon this run. It is not saved and cannot be continued."
+
     def abandon_to_menu(self) -> None:
-        """Give up the current run. Nothing is saved; an unfinished run writes no event log."""
-        self.to_main_menu()
-        self.info("Run abandoned.")
+        """Give up the current run, asked once more. Nothing is saved; an unfinished run writes no event log."""
+        if self._ask_once("abandon:menu", self.ABANDON_QUESTION):
+            self.to_main_menu()
+            self.info("Run abandoned.")
 
     def abandon_to_party(self) -> None:
-        self.modify_party()
-        self.info("Run abandoned. Change the party, then begin a new run.")
+        if self._ask_once("abandon:party", self.ABANDON_QUESTION):
+            self.modify_party()
+            self.info("Run abandoned. Change the party, then begin a new run.")
 
     def party_limits(self) -> tuple[int, int]:
         limits = self.content.balance["party"]
@@ -478,8 +507,12 @@ class AppController:
         self._sync_screen()
 
     def retry_same_party(self) -> None:
-        """Defeat or victory summary -> a brand-new run at Battle 1 with the same party."""
-        self.begin_run()
+        """Defeat or victory summary -> a brand-new run at Battle 1 with the same party, asked once more.
+
+        R is also Roll and Reroll in a battle: one key press too many must not take the result away unread.
+        """
+        if self._ask_once("retry", "Press Retry again to start a new run with this party. This result will be gone."):
+            self.begin_run()
 
     def modify_party(self) -> None:
         self._leave_run()
@@ -511,8 +544,11 @@ class AppController:
                 and engine.state.phase == RunPhase.BATTLE and engine.needs_input()
                 and engine.combat.phase in CombatPhase.STAGE_BY_WINDOW)
 
-    def _reaction_opened(self) -> None:
-        """A reaction decision has just opened: skip it if the player declined every stage, else say so."""
+    def _reaction_opened(self, before: str = "") -> None:
+        """A reaction decision has just opened: skip it if the player declined every stage, else say so.
+
+        ``before`` is what the player has just done; it stays in front of the new prompt.
+        """
         while self._in_reaction_window():
             assert self.engine is not None
             intent = self.engine.combat.committed_intent
@@ -524,7 +560,9 @@ class AppController:
             return
         if "reaction" not in self.hints_shown:
             self.hints_shown.add("reaction")
-            self.info("An enemy action is revealed. A hero may react before it lands: pick a reaction, or Skip Stage (S).")
+            self.info(before + "An enemy action is revealed. A hero may react before it lands: pick a reaction, or Skip Stage (S).")
+        elif before:
+            self.info(before + "Next stage: pick a reaction, Skip Stage (S), or Skip All (A).")
         else:
             self.info("Reaction decision: pick a reaction, Skip Stage (S), or Skip All (A).")
 
@@ -572,6 +610,17 @@ class AppController:
         """Add the rolled face of ``die_id`` to the draft plan (or remove it if already planned)."""
         self._guard(self._use_die, die_id)
 
+    def use_die_key(self, die_id: str) -> None:
+        """The die's number key: plans the die, and never removes it (owner decision D-34).
+
+        "Die, then target" is two presses when a target is asked for and one when the game picks the
+        only legal target itself. The second press of that habit must not take the action out again.
+        """
+        if any(a["die_id"] == die_id for a in self.draft):
+            self.info("That die is already in the plan. Remove it with its Remove button, or clear the plan with C.")
+            return
+        self.use_die(die_id)
+
     def _use_die(self, die_id: str) -> None:
         view = self._turn_view()
         if view is None or not view["rolled"]:
@@ -595,7 +644,8 @@ class AppController:
             if len(option["eligible_target_ids"]) == 1 and scope == "single_enemy":
                 self.draft.append({"die_id": die_id, "target_ids": list(option["eligible_target_ids"])})
                 self.targeting_die = None
-                self._report_draft()
+                target = self.engine.combat.combatants[option["eligible_target_ids"][0]].name if self.engine else "it"
+                self._report_draft(f"{option['face']['name']} aims at {target}, the only legal target. ")
             else:
                 self.targeting_die = die_id
                 skill = f" {option['skill_note']} (once per battle)." if option.get("skill_note") else ""
@@ -651,12 +701,12 @@ class AppController:
         self.targeting_die = None
         self.info("Plan cleared.")
 
-    def _report_draft(self) -> None:
+    def _report_draft(self, before: str = "") -> None:
         preview = self.plan_preview()
         if preview["problem"]:
-            self.warn(preview["problem"])
+            self.warn(before + preview["problem"])
         else:
-            self.info("Plan is legal. Confirm to lock it in, or keep editing.")
+            self.info(before + "Plan is legal. Confirm to lock it in, or keep editing.")
 
     def plan_preview(self) -> dict[str, Any]:
         """Validated view of the draft: resolution order, costs, target fallback, or the problem."""
@@ -782,18 +832,41 @@ class AppController:
     # Battle: reactions
     # ----------------------------------------------------------------------------------------
 
-    def use_reaction(self, hero_id: str, target_id: str | None = None) -> None:
+    def use_reaction(self, hero_id: str, target_id: str | None = None, only: bool = False) -> None:
+        """Use a hero's reaction. ``only`` marks a target the game picked because it was the only one."""
         self.reaction_hero = None
+        engine = self.engine
+        if engine is None or engine.combat.committed_intent is None:
+            return
+        intent_id = engine.combat.committed_intent.id
+        name = engine.build(hero_id).reaction["name"]
+        on = f" on {engine.combat.combatants[target_id].name}" if target_id in engine.combat.combatants else ""
+        if only and on:
+            on += ", the only ally it could help"
         if self._guard(self._send, cmd.USE_REACTION, hero_id=hero_id, target_id=target_id):
-            self.info("Reaction used.")
-            self._reaction_opened()
+            self._reacted_to = intent_id
+            said = f"{name} used{on}."
+            self.info(said)
+            self._reaction_opened(said + " ")
 
     def pick_reaction(self, hero_id: str, needs_target: bool, target_ids: list[str]) -> None:
-        """Keyboard path: choose the reacting hero first, then the ally by number."""
+        """A reaction row, by its number or a click: use it at once when nothing is left to choose.
+
+        After one reaction on an enemy action, a further one-press reaction on the same action is
+        asked for once more: the press may be the second half of "row, then ally" from the stage
+        before, or a second click on the same spot (owner decision D-34).
+        """
+        engine = self.engine
+        intent = engine.combat.committed_intent if engine is not None else None
+        one_press = not needs_target or len(target_ids) == 1
+        if one_press and engine is not None and intent is not None and self._reacted_to == intent.id:
+            name = engine.build(hero_id).reaction["name"]
+            if not self._ask_once(f"react:{hero_id}", f"A reaction was just used on this enemy action. Press again to use {name} as well."):
+                return
         if not needs_target:
             self.use_reaction(hero_id)
         elif len(target_ids) == 1:
-            self.use_reaction(hero_id, target_ids[0])
+            self.use_reaction(hero_id, target_ids[0], only=True)
         elif self.reaction_hero == hero_id:
             self.cancel_reaction_pick()
         else:
@@ -1476,9 +1549,9 @@ class AppController:
             {"group": "comfort", "key": "high_contrast", "label": "High contrast", "value": "On" if current.high_contrast else "Off",
              "help": "White text on black, bright borders, no picture behind the battle. Status is always shown as text as well.", "reason": None},
             {"group": "comfort", "key": "animation", "label": "Motion and flashes", "value": "On" if current.animation else "Off (reduced motion)",
-             "help": "Movement and flashes in battle. M also toggles it during a battle.", "reason": None},
-            {"group": "comfort", "key": "battle_speed", "label": "Battle speed at start", "value": speeds[current.battle_speed],
-             "help": "How fast a battle plays when it begins. F switches the speed during a battle.", "reason": None},
+             "help": "Movement and flashes in battle. M, or the button at the top of a battle, changes this setting too.", "reason": None},
+            {"group": "comfort", "key": "battle_speed", "label": "Battle speed", "value": speeds[current.battle_speed],
+             "help": "How fast a battle plays. F, or the button at the top of a battle, changes this setting too.", "reason": None},
             {"group": "aids", "key": "confirm_pass", "label": "Confirm a pass", "value": "On" if current.confirm_pass else "Off",
              "help": "Pass asks once more when a die could still act, so a turn is not thrown away by one key.", "reason": None},
             {"group": "aids", "key": "tooltip_delay", "label": "Help text delay", "value": delays[current.tooltip_delay],
@@ -1573,7 +1646,18 @@ class AppController:
             return
         if not self.reset_confirm:
             self.reset_confirm = True
-            self.warn("This deletes every saved hero. Press Reset again to do it, or change anything else to cancel.")
+            self.warn("This deletes every saved hero. Confirm with the button on the right, or press this one again to keep them.")
+            return
+        # The same button again keeps the heroes: a double-click must not delete them (owner decision D-34).
+        self.reset_confirm = False
+        self.info("Nothing was deleted. Your saved heroes are kept.")
+
+    def confirm_reset_profile(self) -> None:
+        self._guard(self._confirm_reset_profile)
+
+    def _confirm_reset_profile(self) -> None:
+        """The second, separate button: delete the save and start a new profile from the chosen start."""
+        if not self.reset_confirm or self.settings_in_run or CLASS_EVOLUTION not in self.features:
             return
         self.reset_confirm = False
         self.close()

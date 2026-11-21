@@ -403,6 +403,8 @@ def test_a_run_can_be_abandoned_from_the_pause_menu(tmp_path, button, screen):
     play.begin()
     play.click("battle:menu")
     assert play.ctrl.paused
+    play.click(button)  # asked once more (playtest S1): the run is still there
+    assert play.ctrl.paused and play.ctrl.engine is not None and play.ctrl.message == play.ctrl.ABANDON_QUESTION
     play.click(button)
     assert play.ctrl.screen == screen and play.ctrl.engine is None and not play.ctrl.paused
     assert len(play.ctrl.party) == 2
@@ -820,12 +822,18 @@ def test_arrow_keys_move_the_focus_ring_and_f_and_m_toggle_pacing(tmp_path):
     assert play.ui.focus_key is None and play.ctrl.paused
     play.key(pygame.K_ESCAPE)
 
-    fast = play.app.fast
+    # F and M change the settings themselves, so the Settings screen and the battle agree (playtest D8, M12).
+    play.app.fast = play.ctrl.settings.battle_speed == "fast"
     play.key(pygame.K_f)
-    assert play.app.fast is (not fast) and "Fast mode" in play.ctrl.message
-    animated = play.ui.anim.enabled
+    assert play.app.fast is True and play.ctrl.settings.battle_speed == "fast" and play.ctrl.message == "Battle speed: Fast."
+    play.key(pygame.K_f)
+    assert play.app.fast is False and play.ctrl.settings.battle_speed == "normal"
+    assert play.ctrl.settings.animation is True
     play.key(pygame.K_m)
-    assert play.ui.anim.enabled is (not animated) and "Animation" in play.ctrl.message
+    assert play.ui.anim.enabled is False and play.ctrl.settings.animation is False
+    assert play.ctrl.message == "Motion and flashes: Off (reduced motion)."
+    play.key(pygame.K_m)
+    assert play.ui.anim.enabled is True and play.ctrl.settings.animation is True
 
 
 # --------------------------------------------------------------------------------------------

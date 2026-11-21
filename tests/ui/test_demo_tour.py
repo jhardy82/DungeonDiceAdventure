@@ -36,7 +36,7 @@ def start_a_profile(play: Configured, preset_label: str) -> None:
     assert next(row for row in play.ctrl.settings_view() if row["key"] == "demo_preset")["value"] == preset_label
     play.key(pygame.K_3)
     play.click("settings:reset")
-    play.click("settings:reset")
+    play.click("settings:reset:confirm")
     play.key(pygame.K_ESCAPE)
     assert play.ctrl.screen == Screen.MAIN_MENU
     play.key(pygame.K_n)

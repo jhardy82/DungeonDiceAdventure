@@ -2029,6 +2029,51 @@ has measured them. The web facts come from one research pass on one day.
   because it cannot fail with the shipped content: the reaction prompt's headline at a fixed
   size (no shipped enemy action names enough targets to overflow it).
 
+### 7.33 Playtest fixes, batch 2: keys, safeguards and reach (D-34, 2026-11-21)
+
+No rule is changed; the replay pin is unchanged.
+
+| Finding | What was wrong | What it is now |
+|---------|----------------|----------------|
+| K1 | With one legal target the game picked it silently; the second key press of "die, then target" then removed the action | The pick is named ("Strike aims at Goblin Skirmisher, the only legal target."). A die's number key plans it and never removes it; removing is the Remove button (a click) or Clear (C) |
+| K1, S3 | The same habit, or a second click on the same spot, spent a second reaction in the next stage | After one reaction on an enemy action, a further one-press reaction on the same action is asked for once more. What was done stays in front of the next prompt ("Interpose used on Squire 1, the only ally it could help. Next stage: ...") |
+| K2 | The die button read "Cancel (2)" while 2 picked target 2 | "Cancel (Esc)" |
+| K3, S1 | Retry (R, also Roll and Reroll) and "Abandon Run" acted on one press | Both ask once more; the button says "Press again ...". Anything else the game says in between, or a move to another screen, ends the question |
+| S2 | The profile reset was confirmed by a second click on the same button | The first button only asks. A second button, "Delete every saved hero", appears far to the right. The first button again keeps the heroes |
+| K4 | With a hero down, an ally's target number no longer matched its name | An ally's number key is its place in the party, in the planner and in the reaction rows |
+| K6 | The Controls help said "Esc clears" the focus ring and "hotkeys never move the ring" | The help says what happens: a hotkey or a click takes the ring away; Esc goes back or cancels |
+| A1 | A seed could not be typed with the mouse | A number pad opens under the seed control while a seed is typed |
+| A2 | Battle speed and motion had keys only | Two buttons at the top of a battle |
+| D8, M12 | M and F changed the running battle but not the settings, and any setting change undid M | F, M and the two buttons change the settings themselves. "Battle speed at start" is now "Battle speed" |
+| D9 | Any setting change resized the window to the Settings size | Only the window size setting resizes the window |
+| D18, D19 | A seed fixed by a launch option still offered "press D"; the main menu promised the seed under Settings | Both corrected |
+
+- **My readings, stated so they can be corrected.**
+  - The owner's answer on safeguards named "Abandon Run", "Retry" and the profile reset. I also
+    made a second reaction on the same enemy action ask once more, because it is the other half
+    of finding K1 ("or spends another reaction") and of S3.
+  - "Battle speed at start" (the name chosen in D-31) promised something the game did not do: F
+    carried over into the next battle and a change in Settings changed the running battle. One
+    setting that F, the button and Settings all change is simpler than two meanings.
+  - Enter on the outcome screen is Retry (the main button), so Enter is asked once more too.
+- **A fault the old window bug had hidden.** The check for cut-off texts at 960 x 540 changed a
+  setting first, which (finding D9) resized the window to 1280 x 720, so the rest of that check
+  never ran at the small size. With D9 fixed it did, and showed the longest seed (20 digits) cut
+  off on its button. The label is now sized by measuring.
+- **Evidence:**
+  - 20 new tests (1,256 in all, warnings as errors, coverage of the rules 97.49%). Eight existing
+    tests pinned the old one-press behaviour or the old messages and were changed on purpose.
+  - 44 deliberate breaks of the new code, with a control run: all 44 make a test fail. Three
+    survived the first run (a key action on a control that is off, a mixed list of targets, the
+    seed pad on the party screen of saved heroes); each got a test.
+  - Replay pin and content unchanged. Simulator on seeds 300 to 339: every result identical to
+    the stored reference. Both self-checks pass; both Class Evolution checkers print OK.
+  - Screenshots of the number pad, the two battle buttons, the reset row and the pause menu were
+    looked at, at 1280 x 720 and at 960 x 540 with Large text.
+- **Not verified:** how the second press feels to a person. Left open from this group: S3's
+  other case ("Abandon Run", then "Quit" under the resting pointer; Quit loses nothing) and S4
+  (the bench swap is final on one click), both in batch 5.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one
