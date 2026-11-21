@@ -160,6 +160,16 @@ def action_forecast(
                 if real < amount:
                     where = "at full health" if health >= receiver.max_hp else f"at {health}/{receiver.max_hp} HP"
                     notes.append(f"heals {real} ({receiver.name} is {where})")
+        elif effect["type"] == "remove_corruption" and intent is not None:
+            # A hero with less corruption than the face removes loses only what it has (playtest of 2026-11-21:
+            # Cleanse printed "-2 corruption" and removed 1, or nothing, without a word).
+            receiver = actor if own or target is None else target
+            if receiver.is_hero and (fixed or sure_target):
+                amount = face.effect_amount(effect)
+                real = min(receiver.corruption, amount)
+                if real < amount:
+                    has = "no corruption" if receiver.corruption == 0 else f"{receiver.corruption} corruption"
+                    notes.append(f"-{real} corruption ({receiver.name} has {has})")
         elif effect["type"] == "gain_mana" and intent is not None and actor.is_hero and (own or face.target_scope == "self"):
             amount = face.effect_amount(effect)
             real = max(0, min(actor.max_mana - mana_now, amount))
@@ -167,6 +177,11 @@ def action_forecast(
                 notes.append(f"+{real} mana ({actor.name} has {max(0, mana_now)} of at most {actor.max_mana})")
             mana_now += real
     return {"damage": damage, "shield": shield, "weaken": weaken, "note": "; ".join(notes)}
+
+
+def with_article(noun: str) -> str:
+    """The noun with "a" or "an" before it: "a Squire", "an Apprentice"."""
+    return f"{'an' if noun[:1].lower() in 'aeiou' else 'a'} {noun}"
 
 
 def face_view(face: FaceDefinition, by_enemy: bool = False) -> dict[str, Any]:
@@ -562,7 +577,16 @@ def describe_event(event: CombatEvent, names: dict[str, str], die_names: dict[st
     if kind == EventType.REACTION_USED:
         targets = f" on {', '.join(name(t) for t in d['target_ids'])}" if d["target_ids"] else ""
         cost = f" (-{d['mana_spent']} mana)" if d["mana_spent"] else ""
-        return f"{actor} reacts with {d['name']}{targets}{cost}."
+        # What it did, in numbers, as a die action's line gives them. An interrupt is told by the lines that follow.
+        did = []
+        for result in d.get("results", []):
+            if result["type"] == "shield":
+                did.append(f"{name(result['target'])} gains {result['gained']} shield")
+            elif result["type"] == "remove_corruption":
+                did.append(f"{name(result['target'])} loses {result['removed']} corruption")
+            elif result["type"] == "gain_mana":
+                did.append(f"{name(result['target'])} gains {result['gained']} mana")
+        return f"{actor} reacts with {d['name']}{targets}{cost}" + (f": {'; '.join(did)}." if did else ".")
     if kind == EventType.INTENT_CANCELLED:
         return f"{d['name']} is interrupted by {name(d['by'])}."
     if kind == EventType.INTENT_WEAKENED:
@@ -587,7 +611,7 @@ def describe_event(event: CombatEvent, names: dict[str, str], die_names: dict[st
         return f"{actor} moves to the {d['to']} row."
     if kind == EventType.VOCATION_CHANGED:
         vocation = d["to"].replace("_", " ").title()
-        return (f"{name(d['id'])} is now a {vocation}: HP {d['hp'][0]}/{d['max_hp'][0]} -> {d['hp'][1]}/{d['max_hp'][1]}, "
+        return (f"{name(d['id'])} is now {with_article(vocation)}: HP {d['hp'][0]}/{d['max_hp'][0]} -> {d['hp'][1]}/{d['max_hp'][1]}, "
                 f"mana {d['mana'][0]}/{d['max_mana'][0]} -> {d['mana'][1]}/{d['max_mana'][1]}, "
                 + ("new dice and new upgrade offers." if d["offers"] else "new dice."))
     return None

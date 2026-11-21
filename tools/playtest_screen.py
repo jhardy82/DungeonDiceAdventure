@@ -95,6 +95,9 @@ class Game:
             fixed_seed=session.get("fixed_seed"),
         )
         width, height = (int(part) for part in session["size"].split("x"))
+        # Motion starts switched off, and the setting says so: a playtester reads one fact, not two (the playtest
+        # of 2026-11-21 saw "Motion off (M)" in a battle while Settings said "On").
+        self.ctrl.settings.animation = False
         self.app = GameApp(self.ctrl, size=(width, height), headless=True, animations=False)
         self.settle()
 
@@ -106,6 +109,12 @@ class Game:
             if self.ctrl.screen != Screen.BATTLE or self.ctrl.paused or self.ctrl.waiting_for_player():
                 break
             self.app.frame(100)
+        # With motion switched on, dice tumble for a moment. A person sees them settle before reading the
+        # screen; so does the driver, instead of printing "Rolling ..." beside controls that are already on.
+        for _ in range(100):
+            if not (self.app.ui.anim.enabled and self.app.ui.anim.tumbles):
+                break
+            self.app.frame(50)
         self.app.frame(0)
 
     # -- actions ---------------------------------------------------------------------------------

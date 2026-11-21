@@ -138,7 +138,8 @@ def test_both_party_screens_say_what_size_and_rows_change(tmp_path, monkeypatch,
         monkeypatch.setattr(toolkit, "FONT_CANDIDATES", fonts)
         assert play.ctrl.screen == Screen.PARTY_SETUP, name
         assert screens.PARTY_NOTE in drawn and screens.PARTY_NOTE not in shortened, name
-    assert "more and tougher enemies" in screens.PARTY_NOTE and "front row" in screens.PARTY_NOTE
+    # (It said "more and tougher enemies". Measured for the playtest of 2026-11-21: more, yes; each one is not tougher.)
+    assert "More heroes meet more enemies." in screens.PARTY_NOTE and "tougher" not in screens.PARTY_NOTE and "front row" in screens.PARTY_NOTE
 
 
 def test_the_controls_help_explains_the_shorthand_of_the_board(tmp_path, monkeypatch):

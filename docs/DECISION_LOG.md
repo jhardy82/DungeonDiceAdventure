@@ -2297,7 +2297,8 @@ development container, so it ran on GitHub with this pull request.
   the report showed the cause at once: the screenshot was upright (1440 x 3120), so the
   emulator's display had not turned, and the app had laid out for the screen it was given.
   The second run's case was the same. Why that emulator keeps the display upright there is not
-  known. The fourth start now does what a hand does: the screen is free to turn and the motion
+  known. (Known since pull request 45, section 7.40: the tool that started the app turned it
+  back.) The fourth start now does what a hand does: the screen is free to turn and the motion
   sensor is told the device is sideways, then the app starts. The sixth run passed all four
   starts (sideways: 891 x 411 dp, screenshot 3120 x 1440).
 - Not shown, and said so in the plan: an app started on a screen locked sideways.
@@ -2422,6 +2423,87 @@ against them; every one made a test fail.
 - 1,406 tests (24 new in this pull request). Twelve deliberate breaks of step 2: ten were noticed at once, two were not (the
   word "click" alone, and the phone layer's own wording of a desktop controller's message); a
   test was added for each, and both are noticed now.
+
+### 7.40 The second playtest round and its fixes (2026-11-21)
+
+The owner's standing rule of this day: always fix what is found broken, and leave things better
+than they were found. The demo had not been played by anyone since 47 findings were fixed and
+the D-35 features went in, so four AI playtesters played `main` after pull request 44. Their
+findings, what was done about each, and what was left with its reason are in
+`docs/PLAYTEST_TEAM_2026-11-21.md`, section 7. No rule of a battle changed; the replay pin and
+the content are untouched.
+
+**What the round showed**
+
+- No error screen, no drawing fault, no way to get stuck, at either window size.
+- 22 of 24 predicted numbers matched what happened. Both misses were one gap (Cleanse).
+- Every earlier finding that was re-checked was confirmed fixed, or was one left with a reason.
+- **No player finished a battle inside its budget.** The upgrade screen, Battle 2 and the outcome
+  screen were not played in this round.
+
+**The one systematic fault: a question that did not end**
+
+- Three reports found it independently: an armed Dismiss, Retry or reset stayed armed while the
+  player did something else, and one later press then did the thing. Two of those questions I
+  had built that same day.
+- The old rule was "a question ends when the game says something else". Many actions say
+  nothing (selecting a vocation, Tab, a key nothing answers to).
+- The new rule is in one place. The toolkit tells the controller which control takes each key
+  press and click. A question ends when anything but its own control is used, when eight seconds
+  pass, or when the player leaves the place; its text then leaves the status bar. The three
+  questions that kept flags of their own (defaults, profile reset, die swap) end the same way.
+- **My reading:** eight seconds. Long enough to read the question, short enough that a press a
+  while later is a new decision.
+
+**Two changes of behaviour, made on purpose**
+
+- A die with exactly one legal ally is now planned at once and named, as one with one legal
+  enemy has been since D-34. A lone hero no longer answers "which ally?" with the only one.
+- A party of saved heroes is kept when only the pace or the roster size changes.
+
+**Three findings were the playtest tool's, not the game's.** The driver started with motion off
+while the setting said on, and it printed tumbling dice. Three reports carried that as an
+impression of the game. The driver is fixed, and a test holds it.
+
+**Left for the owner:** whether enemies should attack more (they re-apply statuses as soon as
+they end); reasons in the event log for "no hero could react" (an event-format change, so a
+rules version); reaction keys by the hero's place.
+
+**Checked:** 1,451 tests (45 new), coverage 97.56%, lint and both type checks clean. Forty-one
+deliberate breaks of the new code: 36 were noticed at once. Of the five that were not, four got
+a test of their own and are noticed now; the fifth showed a condition of mine that changed
+nothing, and the condition was removed.
+
+**The emulator check failed once on this pull request, and its cause explains two older faults.**
+
+- What happened: all four starts passed the self-check; the fourth (device held sideways before
+  the app starts) was laid out upright, and the script's rotation facts showed "auto-rotate: 0"
+  although the script had waited until the device said the screen was free.
+- Cause, read in Android's source (release 15, which the emulator runs): the script started the
+  app with the `monkey` tool. `monkey` ends every run by forcing the screen upright and then
+  releasing the rotation lock (`Monkey.java`: "Release the rotation lock if it's still held and
+  restore the original orientation"). And when a locked screen comes back upright, the system
+  bar locks it upright again a moment later (`RotationButtonController.onRotationWatcherChanged`).
+  In the fourth start the screen was sideways when `monkey` ran, so both happened, and the
+  system bar's lock came last. Whether it comes last depends on timing: hence two passes
+  before this failure.
+- What that explains besides: in phase 0 (section 7.37) an app started on a screen locked
+  sideways came up upright, and I wrote that the emulator's reason was not known. It was
+  `monkey` forcing the screen upright. The fault of pull request 44 (section 7.39) was the
+  system bar's lock after the script's own rotation lock; that reading stands.
+- How sure: the two pieces of Android's behaviour are read from its source. That they are what
+  happened in this run is reasoned from the job's log (the times, "auto-rotate: 0, user
+  rotation: 0"). The device's own record of who locked the rotation was not seen, because the
+  script did not print it.
+- What was done: the app is started with `am start` on the screen the launcher would open,
+  which starts it and does nothing else. On a wrong layout the script now prints the device's
+  rotation lock history (the last eight changes, each with its caller), so the next fault of
+  this kind names its cause in the report. Tests: the script's stand-in device now does what
+  `monkey` does; a test runs the script with `monkey` put back and it fails as the job did;
+  another covers a device that does not name the app's start screen (1,453 tests now). Seven
+  deliberate breaks of the changed lines: all noticed.
+- Still not shown: an app started on a screen locked sideways. It has not been tried since the
+  cause was found.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 

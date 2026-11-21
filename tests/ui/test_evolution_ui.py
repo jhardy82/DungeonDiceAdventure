@@ -869,8 +869,10 @@ def test_without_the_skill_the_downed_ally_is_not_a_target(tmp_path):
     die = heal_die(play)
     assert die["skill_note"] is None and die["eligible_target_ids"] == ["h01"]
     play.click("die:guardian_d6:use")
+    # One legal ally (the Guardian itself) is picked and named, as one legal enemy is (playtest of 2026-11-21).
+    assert play.ctrl.draft == [{"die_id": "guardian_d6", "target_ids": ["h01"]}] and "the only legal target" in play.ctrl.message
     play.click("unit:h02")
-    assert play.ctrl.draft == [] and play.ctrl.message_is_error
+    assert play.ctrl.draft == [{"die_id": "guardian_d6", "target_ids": ["h01"]}], "the downed ally is not a target"
 
 
 def test_an_evolved_hero_is_drawn_with_the_picture_of_the_class_it_grew_from(tmp_path, monkeypatch):

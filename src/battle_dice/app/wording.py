@@ -22,6 +22,7 @@ _PHRASES = (
     ("press D for a random seed", "tap for a random seed"),
     ("type digits, Enter to set, Esc to cancel", "type digits, then set or cancel"),
     ("Enter sets it, Esc cancels.", "Then set it or cancel."),
+    ("Shorten it, or press Esc.", "Shorten it, or cancel."),
 )
 _WORDS = (
     (re.compile(r"\bPress\b"), "Tap"),

@@ -31,6 +31,7 @@ class GameApp:
         self.controller = controller or AppController()
         self.ui = UI()
         self.ui.on_disabled = self.controller.warn
+        self.ui.on_input = self.controller.noticed_input  # a question that waits for a second press ends when anything else is used
         self.ui.anim.enabled = animations
         self.running = True
         self.fast = self.controller.settings.battle_speed == "fast"
@@ -84,6 +85,10 @@ class GameApp:
                 self.controller.seed_key("enter")
             elif key == pygame.K_ESCAPE:
                 self.controller.seed_key("escape")
+            else:
+                typed = getattr(event, "unicode", "") or (chr(key) if pygame.K_a <= key <= pygame.K_z else "")
+                if typed.isprintable() and typed.strip():
+                    self.controller.seed_key(typed)  # a letter or a sign: the entry says that it takes digits
             return
         if event.type == pygame.KEYDOWN and self.controller.screen == Screen.BATTLE and not self.controller.paused:
             if event.key == pygame.K_f:
@@ -137,6 +142,7 @@ class GameApp:
         controller = self.controller
         self._follow_settings()
         self.ui.tick(dt_ms)
+        controller.pass_time(dt_ms)
         try:
             self._animate(dt_ms)
         except Exception:  # noqa: BLE001 - an animation fault must reach the error screen

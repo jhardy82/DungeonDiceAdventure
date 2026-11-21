@@ -218,6 +218,8 @@ class Progression:
                 "name": str(skill["name"]),
                 "summary": str(skill["summary"]),
                 "taught_by": self.catalog.name(self.catalog.skill_origin[skill_id][0]),
+                # A slower Mastery pace can take the rank that taught the skill; the skill stays learned (D-35).
+                "earlier_pace": hero.rank(self.catalog.skill_origin[skill_id][0]) < self.catalog.skill_origin[skill_id][1],
                 "cost": cost,
                 "equipped": skill_id in slot_of,
                 "slot_index": slot_of.get(skill_id),

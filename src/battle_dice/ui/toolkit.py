@@ -154,6 +154,10 @@ class UI:
         self._building: list[Widget] = []
         self.focus_key: str | None = None
         self.hover_key: str | None = None
+        #: Told of every key press and click before it acts: the key of the control that takes it, or None
+        #: when no control does (Tab, a key nothing answers to, a click beside every control).
+        self.on_input: Callable[[str | None], Any] | None = None
+        self._input_told = True
         #: How long the pointer has rested on the hovered control, and how long it must before its help shows.
         self.hover_ms = 0.0
         self.tooltip_delay_ms = 0
@@ -198,10 +202,17 @@ class UI:
         surface.fill(Theme.BG)
 
     def end(self) -> None:
+        before = [w.key for w in self.widgets]
         self.widgets = self._building
         keys = {w.key for w in self.widgets}
-        if self.focus_key not in keys:
-            self.focus_key = None
+        if self.focus_key is not None and self.focus_key not in keys:
+            # The focused control is gone. On the same screen (most controls are still there) the ring moves
+            # to the nearest control before it, so the next step is one key away (a keyboard player who removes
+            # a hero from the party); on another screen there is no ring until Tab.
+            neighbour = None
+            if self.focus_key in before and 2 * len(keys.intersection(before)) >= len(before):
+                neighbour = next((key for key in reversed(before[:before.index(self.focus_key)]) if key in keys), None)
+            self.focus_key = neighbour
         self.hover_key = None
         for widget in self.widgets:
             if widget.rect.collidepoint(self.mouse_pos):
@@ -734,6 +745,7 @@ class UI:
     def activate(self, widget: Widget) -> None:
         """Run a widget's action. Focus is never changed here: only Tab and the arrow keys move it,
         so Enter after a hotkey or a click reaches the screen's default control."""
+        self._tell_input(widget.key)
         if not widget.enabled:
             if self.on_disabled is not None:
                 self.on_disabled(widget.reason or "That is not available right now.")
@@ -751,8 +763,21 @@ class UI:
             index = 0 if step > 0 else len(keys) - 1
         self.focus_key = keys[index]
 
+    def _tell_input(self, key: str | None) -> None:
+        self._input_told = True
+        if self.on_input is not None:
+            self.on_input(key)
+
     def handle_event(self, event: pygame.event.Event) -> bool:
         """Route one event to the widgets from the last drawn frame. Returns True when consumed."""
+        pressed = event.type == pygame.KEYDOWN or (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1)
+        self._input_told = not pressed
+        consumed = self._handle_event(event)
+        if not self._input_told:  # a key or a click that reached no control is still something the player did
+            self._tell_input(None)
+        return consumed
+
+    def _handle_event(self, event: pygame.event.Event) -> bool:
         if event.type == pygame.MOUSEMOTION:
             self.mouse_pos = event.pos
             return False
@@ -802,6 +827,7 @@ class UI:
             if key in widget.hotkeys:
                 self.focus_key = None  # a hotkey is a direct command, not a move of the focus ring
                 if widget.key_action is not None and widget.enabled:
+                    self._tell_input(widget.key)
                     widget.key_action()
                 else:
                     self.activate(widget)
