@@ -2095,7 +2095,7 @@ No rule is changed; the replay pin and the simulator results are unchanged.
 - **Not done here:** D18 and D19 were fixed in batch 2. R5 (a slower mastery pace takes
   "mastered" away but keeps what it had opened) waits for the owner's decision.
 - **Evidence:**
-  - 16 new tests (1,272 in all, warnings as errors, coverage of the rules 97.49%). The preview
+  - 33 new tests (1289 in all, warnings as errors, coverage of the rules 97.49%). The preview
     test reads the preview, makes the change and compares the hero's health and mana with it.
     Three existing tests quoted the old change message and were updated.
   - 27 deliberate breaks of the new code, with a control run: all 27 make a test fail. Three
@@ -2106,9 +2106,14 @@ No rule is changed; the replay pin and the simulator results are unchanged.
   - Screenshots of the upgrade screen with five heroes and of the Career screen with a preview
     were looked at, at 1280 x 720 and at 960 x 540 with Large text. The first version cut the
     mastery line off at the small size; it now takes two lines.
-- **Not verified:** a person's reading. With five heroes who each earn the bonus and learn a
-  skill in the same battle, the account would be longer than two lines hold; it is then cut on
-  the upgrade screen and is whole on the outcome screen. No such battle exists in the demo.
+- **A failure on the build machine, and what it showed.** The first push failed on Linux: a test
+  of mine used a made-up account of 249 characters and expected it to fit on two lines, which it
+  does only with the font of the development container. Reproduced under nine of eleven fonts.
+  The fault was in the game too: an account that does not fit was cut off. Now the screen
+  measures, and where the full account has no room it gives each hero's points ("Mastery:
+  Squire 1 +1, Scout 2 +1, ..."). The tests build their texts by measuring and run under five
+  fonts and two window sizes.
+- **Not verified:** a person's reading.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 

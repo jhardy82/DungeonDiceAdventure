@@ -1203,8 +1203,16 @@ class AppController:
         held = sorted(engine.combat.combatants[run_hero].equipped_dice_ids, key=lambda die_id: -engine.die_for(run_hero, die_id).size)
         return [self.die_name(run_hero, die_id) for die_id in held]
 
-    def mastery_line(self) -> str:
-        """What the heroes earned in the latest battle, as one line; ``""`` with Class Evolution off."""
+    def mastery_line(self, compact: bool = False) -> str:
+        """What the heroes earned in the latest battle, as one line; ``""`` with Class Evolution off.
+
+        ``compact`` gives each hero's points only ("Squire 1 +1, Scout 2 +1"), for where the full account has no room.
+        """
+        link = self.progression
+        if compact and link is not None and link.last_awards:
+            latest = link.last_awards[-1]["battle"]
+            points = [f"{a['name']} +{a['base_points'] + a['challenge_points']}" for a in link.last_awards if a["battle"] == latest]
+            return "Mastery: " + ", ".join(points)
         awards = self.awards_view()
         return "Mastery: " + "  ".join(awards) if awards else ""
 

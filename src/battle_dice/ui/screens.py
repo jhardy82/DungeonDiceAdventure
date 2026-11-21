@@ -881,12 +881,19 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
     earned = ctrl.mastery_line()
     if earned:  # Class Evolution: what the won battle gave each saved hero stays on this screen (playtest D3)
         ui.text(420, 9, step, 17, Theme.TEXT, bold=True)
-        one_line = next((size for size in (14, 13) if ui.text_width(earned, size) <= 716), None)
-        if one_line is not None:
-            ui.text(420, 32, earned, one_line, Theme.GOOD, max_width=716)
-        else:  # five heroes: two short lines between the step and the panels
-            size = next((size for size in (12, 11, 10) if len(ui.wrap_lines(earned, 716, size)) <= 2), 10)
-            ui.paragraph(420, 29, earned, 716, size, Theme.GOOD, line_height=13, max_lines=2)
+        # The room is one line, or two short ones, between the step and the panels. How much fits there depends on
+        # the font of the machine, so it is measured: the full account first, then each hero's points only.
+        for words in (earned, ctrl.mastery_line(compact=True)):
+            one_line = next((size for size in (14, 13) if ui.text_width(words, size) <= 716), None)
+            two_lines = next((size for size in (12, 11, 10) if len(ui.wrap_lines(words, 716, size)) <= 2), None)
+            if one_line is not None:
+                ui.text(420, 32, words, one_line, Theme.GOOD, max_width=716)
+                break
+            if two_lines is not None:
+                ui.paragraph(420, 29, words, 716, two_lines, Theme.GOOD, line_height=13, max_lines=2)
+                break
+        else:  # not even the points fit (no party of the demo gets here): the start of them is better than nothing
+            ui.paragraph(420, 29, ctrl.mastery_line(compact=True), 716, 10, Theme.GOOD, line_height=13, max_lines=2)
     else:
         ui.text(420, 22, step, 17, Theme.TEXT, bold=True)
 

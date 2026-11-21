@@ -15,6 +15,7 @@ from battle_dice.core.build import convert_pool
 from battle_dice.core.engine import Engine
 from battle_dice.core.view import combat_log, hero_turn_view
 from battle_dice.settings import Settings
+from battle_dice.ui import toolkit
 from tests.conftest import begin_hero, down, finish_activation, unit, win_battle
 from tests.ui.test_demo_tour import start_a_profile
 from tests.ui.test_evolution_ui import Configured, Evolution, close_every_save, master  # noqa: F401 - the fixture closes the saves
@@ -64,16 +65,27 @@ def test_the_upgrade_screen_says_what_the_battle_earned(tmp_path, monkeypatch):
     assert earned in drawn
 
 
-@pytest.mark.parametrize("size", [(1280, 720), (960, 540)], ids=["1280x720", "960x540"])
-def test_what_five_heroes_earned_is_shown_whole(tmp_path, monkeypatch, size):
-    """One line is too short for five heroes: the text then takes two lines, and is never cut."""
+SIZES = pytest.mark.parametrize("size", [(1280, 720), (960, 540)], ids=["1280x720", "960x540"])
+#: Fonts of very different widths, as other machines have them. () is pygame's own font.
+FONTS = pytest.mark.parametrize("fonts", [("dejavusans",), (), ("liberationmono",), ("dejavuserif",), ("liberationsans",)],
+                                ids=lambda fonts: fonts[0] if fonts else "pygame")
+
+
+@SIZES
+@FONTS
+def test_what_five_heroes_earned_is_shown_whole(tmp_path, monkeypatch, size, fonts):
+    """How much fits between the step and the panels depends on the machine's font: the full account, or each hero's points."""
+    monkeypatch.setattr(toolkit, "FONT_CANDIDATES", fonts)
     play = Evolution(tmp_path, recruits=("squire", "scout", "apprentice", "squire", "scout"), size=size)
     after_battle_one(play)
-    line = play.ctrl.mastery_line()
-    assert line.count("+1") == 5
+    full, compact = play.ctrl.mastery_line(), play.ctrl.mastery_line(compact=True)
+    assert full.count("+1") == 5 and compact == "Mastery: Squire 1 +1, Scout 2 +1, Apprentice 3 +1, Squire 4 +1, Scout 5 +1"
     drawn, shortened = record_text(monkeypatch)
     play.app.frame(0)
-    assert line in drawn and line not in shortened
+    shown = [text for text in drawn if text.startswith("Mastery: ")]
+    assert shown in ([full], [compact]) and shown[0] not in shortened, "one account, and whole"
+    fits = play.ui.text_width(full, 13) <= 716 or len(play.ui.wrap_lines(full, 716, 10)) <= 2
+    assert shown == ([full] if fits else [compact]), "the full account wherever it fits"
 
 
 def test_without_class_evolution_the_upgrade_screen_is_as_it_was(tmp_path, monkeypatch):
@@ -330,14 +342,41 @@ def test_a_heros_dice_are_named_in_the_order_the_battle_lists_them(tmp_path):
     assert play.ctrl.dice_as_listed("h01") == ["Guardian d6", "Guardian d4"]
 
 
-@pytest.mark.parametrize("size", [(1280, 720), (960, 540)], ids=["1280x720", "960x540"])
-def test_a_long_account_of_what_was_earned_is_set_smaller_not_cut(tmp_path, monkeypatch, size):
+@SIZES
+@FONTS
+def test_an_account_too_long_for_one_line_is_set_smaller_and_one_too_long_for_two_gives_the_points(tmp_path, monkeypatch, size, fonts):
+    """The texts are built by measuring, so the test asks the same of every font."""
+    monkeypatch.setattr(toolkit, "FONT_CANDIDATES", fonts)
     play = Evolution(tmp_path, recruits=("squire", "scout", "apprentice", "squire", "scout"), size=size)
     after_battle_one(play)
-    names = ("Squire 1", "Scout 2", "Apprentice 3", "Squire 4", "Scout 5")
-    long = "Mastery: " + "  ".join(f"{name} +2 with the bonus, now rank 3{', learned Field Medic' if name.startswith('Squire') else ''}." for name in names)
-    assert len(play.ui.wrap_lines(long, 716, 14)) > 2, "at the size of a short line this would need three lines"
-    monkeypatch.setattr(play.ctrl, "mastery_line", lambda: long)
-    drawn, shortened = record_text(monkeypatch)
-    play.app.frame(0)
-    assert long in drawn and long not in shortened
+    ui, compact = play.ui, play.ctrl.mastery_line(compact=True)
+
+    def grown(until) -> str:
+        words = "Mastery:"
+        while not until(words):
+            words += " Squire 1 +2 with the bonus, now rank 3."
+        return words
+
+    for name, long in (
+        ("two lines", grown(lambda words: ui.text_width(words, 13) > 716)),              # too long for one line
+        ("too long", grown(lambda words: len(ui.wrap_lines(words, 716, 10)) > 2)),       # too long for two small ones
+    ):
+        monkeypatch.setattr(play.ctrl, "mastery_line", lambda compact_form=False, long=long, **given: compact if compact_form or given.get("compact") else long)
+        drawn, shortened = record_text(monkeypatch)
+        play.app.frame(0)
+        monkeypatch.undo()
+        monkeypatch.setattr(toolkit, "FONT_CANDIDATES", fonts)
+        shown = [text for text in drawn if text.startswith("Mastery:")]
+        assert len(shown) == 1 and shown[0] not in shortened, name
+        if name == "two lines" and len(ui.wrap_lines(long, 716, 10)) <= 2:
+            assert shown == [long], "set smaller on two lines, not cut and not replaced"
+        if name == "too long":
+            assert shown == [compact], "each hero's points instead of a text cut off"
+
+
+def test_the_short_account_is_of_the_latest_battle_only(tmp_path):
+    play = Evolution(tmp_path)
+    play.to_the_decision()
+    assert play.ctrl.mastery_line(compact=True) == "Mastery: Squire 1 +1, Scout 2 +1"
+    assert play.ctrl.mastery_line() == "Mastery: Squire 1 +1, now rank 3.  Scout 2 +1, now rank 3."
+    assert Play(tmp_path / "off", ["squire"]).ctrl.mastery_line(compact=True) == ""
