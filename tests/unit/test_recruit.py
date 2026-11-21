@@ -40,21 +40,30 @@ def test_a_recruit_is_a_starting_class_with_all_three_unlocked(catalog):
     assert result.accepted and result.error_code is None
     assert [event["type"] for event in result.events] == ["HeroRecruited", "VocationClaimed", "VocationClaimed", "VocationClaimed"]
     assert result.events[0] == {"type": "HeroRecruited", "event_id": f"{PROFILE}:0", "event_seq": 0,
-                                "hero_id": "hero_001", "vocation_id": "squire", "display_name": "Squire 1"}
+                                "hero_id": "hero_001", "vocation_id": "squire", "display_name": "Recruit 1"}
     hero = service.state.heroes["hero_001"]
-    assert (hero.active_vocation_id, hero.origin_vocation_id, hero.display_name) == ("squire", "squire", "Squire 1")
+    assert (hero.active_vocation_id, hero.origin_vocation_id, hero.display_name) == ("squire", "squire", "Recruit 1")
     assert hero.unlocked_vocations == catalog.starting_classes() == ["squire", "apprentice", "scout"]
     assert {v: (row.rank, row.points) for v, row in hero.mastery.items()} == dict.fromkeys(hero.unlocked_vocations, (1, 0))
     assert hero.eligibility_state == "eligible" and hero.revision == 0 and hero.dice == [] and hero.equipped_skills == {}
     assert hero.unlock_routes == dict.fromkeys(hero.unlocked_vocations, "route_0")
 
 
-def test_recruits_get_the_next_number_and_a_name_from_their_class(catalog):
+def test_the_word_in_a_recruits_name_is_not_the_name_of_any_vocation(catalog):
+    """Owner decision D-35. "Hero" was proposed first, and the catalog has a vocation of that name."""
+    from battle_dice.career.service import RECRUIT_NAME
+
+    names = {catalog.name(vocation_id).lower() for vocation_id in catalog.vocations}
+    assert "hero" in names and "squire" in names, "the catalog's own names are what the word is checked against"
+    assert RECRUIT_NAME.lower() not in names and RECRUIT_NAME == "Recruit"
+
+
+def test_recruits_get_the_next_number_and_a_name_that_says_no_class(catalog):
     service = new_service(catalog)
     for number, starting_class in enumerate(["squire", "scout", "apprentice", "squire"], start=1):
         assert service.submit(recruit(f"cmd-{number}", starting_class)).accepted
     assert [(h.hero_id, h.display_name) for h in service.state.heroes.values()] == [
-        ("hero_001", "Squire 1"), ("hero_002", "Scout 2"), ("hero_003", "Apprentice 3"), ("hero_004", "Squire 4")]
+        ("hero_001", "Recruit 1"), ("hero_002", "Recruit 2"), ("hero_003", "Recruit 3"), ("hero_004", "Recruit 4")]
 
 
 def test_the_same_recruit_command_sent_again_recruits_nobody_new(catalog):
@@ -120,7 +129,7 @@ def test_recruits_are_saved_and_come_back_after_the_file_is_reopened(catalog, tm
     saved = StoredCareerService(store, PROFILE)
     assert saved.submit(recruit("cmd-1", "squire")).accepted and saved.submit(recruit("cmd-2", "apprentice")).accepted
     rows = store.conn.execute("SELECT hero_id, origin_vocation_id, active_vocation_id, display_name FROM hero ORDER BY rowid").fetchall()
-    assert rows == [("hero_001", "squire", "squire", "Squire 1"), ("hero_002", "apprentice", "apprentice", "Apprentice 2")]
+    assert rows == [("hero_001", "squire", "squire", "Recruit 1"), ("hero_002", "apprentice", "apprentice", "Recruit 2")]
     assert store.conn.execute("SELECT COUNT(*) FROM hero_vocation_unlock").fetchone()[0] == 6
     assert store.verify_event_chain(PROFILE) == 8  # per recruit: one HeroRecruited and three claims
     store.close()

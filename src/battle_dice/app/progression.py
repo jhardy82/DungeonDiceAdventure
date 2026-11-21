@@ -148,6 +148,9 @@ class Progression:
     def recruit(self, starting_class: str) -> CareerResult:
         return self._command("RecruitHero", starting_class=starting_class)
 
+    def dismiss(self, hero_id: str) -> CareerResult:
+        return self._command("DismissHero", self.state.heroes[hero_id])
+
     def claim(self, hero_id: str, vocation_id: str) -> CareerResult:
         return self._command("ClaimVocation", self.state.heroes[hero_id], target_vocation_id=vocation_id)
 

@@ -51,7 +51,7 @@ def after_battle_one(play: Play) -> None:
 def test_the_upgrade_screen_says_what_the_battle_earned(tmp_path, monkeypatch):
     play = Evolution(tmp_path)
     after_battle_one(play)
-    earned = "Mastery: Squire 1 +1, now rank 2.  Scout 2 +1, now rank 2."
+    earned = "Mastery: Recruit 1 +1, now rank 2.  Recruit 2 +1, now rank 2."
     assert play.ctrl.mastery_line() == earned
     # The status line carries it together with what to do next, so the one no longer replaces the other.
     assert play.ctrl.message == f"Battle 1 won. {earned} Choose one dice upgrade (required)."
@@ -79,7 +79,7 @@ def test_what_five_heroes_earned_is_shown_whole(tmp_path, monkeypatch, size, fon
     play = Evolution(tmp_path, recruits=("squire", "scout", "apprentice", "squire", "scout"), size=size)
     after_battle_one(play)
     full, compact = play.ctrl.mastery_line(), play.ctrl.mastery_line(compact=True)
-    assert full.count("+1") == 5 and compact == "Mastery: Squire 1 +1, Scout 2 +1, Apprentice 3 +1, Squire 4 +1, Scout 5 +1"
+    assert full.count("+1") == 5 and compact == "Mastery: Recruit 1 +1, Recruit 2 +1, Recruit 3 +1, Recruit 4 +1, Recruit 5 +1"
     drawn, shortened = record_text(monkeypatch)
     play.app.frame(0)
     shown = [text for text in drawn if text.startswith("Mastery: ")]
@@ -197,7 +197,7 @@ def test_the_career_screen_shows_what_a_change_would_do_and_the_change_does_exac
     assert preview in drawn and preview not in shortened
     play.click("career:guardian:activate")
     assert (hero.hp, hero.max_hp, hero.mana, hero.max_mana) == (hp_after, own["max_hp"], mana_after, own["max_mana"])
-    assert play.ctrl.message == (f"Squire 1 is now a Guardian and fights on as one: HP {hp_after}/{own['max_hp']}, "
+    assert play.ctrl.message == (f"Recruit 1 is now a Guardian and fights on as one: HP {hp_after}/{own['max_hp']}, "
                                  f"mana {mana_after}/{own['max_mana']}, dice Guardian d6, Guardian d4, bench die none. "
                                  "Choose the upgrade for its new dice.")
     assert play.ctrl.career_view()["change_preview"] == ""
@@ -228,16 +228,16 @@ def test_a_units_panel_names_its_vocation_when_its_name_does_not(tmp_path, monke
     play.click("up:offer:0")
     play.click("up:apply")
     play.key(pygame.K_RETURN)
-    assert play.ctrl.screen == Screen.BATTLE and unit(engine, "h01").name == "Squire 1"
+    assert play.ctrl.screen == Screen.BATTLE and unit(engine, "h01").name == "Recruit 1"
     play.to_input()
     play.hover("unit:h01")
     drawn, _ = record_text(monkeypatch)
     play.app.frame(0)
-    assert "Inspect: Squire 1, Guardian" in drawn
+    assert "Inspect: Recruit 1, Guardian" in drawn
     play.hover("unit:h02")
     drawn.clear()
     play.app.frame(0)
-    assert "Inspect: Scout 2" in drawn, "a name that says the vocation is not said twice"
+    assert "Inspect: Recruit 2, Scout" in drawn, "a recruit's name never says a class (D-35), so the panel always does"
 
 
 # --------------------------------------------------------------------------------------------
@@ -354,7 +354,7 @@ def test_an_account_too_long_for_one_line_is_set_smaller_and_one_too_long_for_tw
     def grown(until) -> str:
         words = "Mastery:"
         while not until(words):
-            words += " Squire 1 +2 with the bonus, now rank 3."
+            words += " Recruit 1 +2 with the bonus, now rank 3."
         return words
 
     for name, long in (
@@ -377,6 +377,6 @@ def test_an_account_too_long_for_one_line_is_set_smaller_and_one_too_long_for_tw
 def test_the_short_account_is_of_the_latest_battle_only(tmp_path):
     play = Evolution(tmp_path)
     play.to_the_decision()
-    assert play.ctrl.mastery_line(compact=True) == "Mastery: Squire 1 +1, Scout 2 +1"
-    assert play.ctrl.mastery_line() == "Mastery: Squire 1 +1, now rank 3.  Scout 2 +1, now rank 3."
+    assert play.ctrl.mastery_line(compact=True) == "Mastery: Recruit 1 +1, Recruit 2 +1"
+    assert play.ctrl.mastery_line() == "Mastery: Recruit 1 +1, now rank 3.  Recruit 2 +1, now rank 3."
     assert Play(tmp_path / "off", ["squire"]).ctrl.mastery_line(compact=True) == ""

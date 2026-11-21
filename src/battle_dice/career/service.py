@@ -44,6 +44,10 @@ EQUIP = "EquipInheritedSkill"
 UNEQUIP = "UnequipInheritedSkill"
 EQUIP_DIE = "EquipDie"
 RECRUIT = "RecruitHero"
+DISMISS = "DismissHero"
+#: The word a recruit's name begins with ("Recruit 3"). Owner decision D-35: a name must not say a class, because
+#: a hero can be another class the next moment. It must therefore never be the name of a vocation ("Hero" is one).
+RECRUIT_NAME = "Recruit"
 #: Owner decision of 2026-11-11 (D-27): heroes are recruited at party setup, free, up to this many.
 ROSTER_LIMIT = 12
 #: Run phases in which a run is over, so a new hero may be recruited and a new run started.
@@ -122,7 +126,7 @@ class CareerService:
         command_type, command_id = command["type"], command["command_id"]
         params: Json = command.get("params", {})
         handlers = {CLAIM: self._claim, CHANGE: self._change, PREVIEW: self._preview, EQUIP: self._equip, UNEQUIP: self._unequip,
-                    EQUIP_DIE: self._equip_die}
+                    EQUIP_DIE: self._equip_die, DISMISS: self._dismiss}
         handler = handlers.get(command_type)
         if handler is None and command_type != RECRUIT:
             raise ValueError(f"Unknown career command '{command_type}'.")
@@ -228,6 +232,8 @@ class CareerService:
         if command["state_revision"] != hero.revision:
             raise _Reject("REVISION_CONFLICT")
         run = self.state.run
+        if command_type == DISMISS and not self.between_runs():
+            raise _Reject("PHASE_LOCKED")  # heroes join and leave the roster at party setup, not inside a run
         if run is not None:
             locked = BUILD_LOCKED_PHASES if command_type in BUILD_COMMANDS else ("battle",)
             if run.phase in locked:
@@ -350,23 +356,37 @@ class CareerService:
     # Command handlers
     # ----------------------------------------------------------------------------------------
 
+    def between_runs(self) -> bool:
+        """True when no run is going on: the roster may change (a hero recruited or dismissed)."""
+        run = self.state.run
+        return run is None or run.phase in FINISHED_PHASES
+
+    def _dismiss(self, hero: HeroRecord, params: Json) -> None:
+        """The hero leaves the roster for good (owner decision D-35). What it earned stays in the history."""
+        del self.state.heroes[hero.hero_id]
+        self.state.dismissed.append(hero.hero_id)
+        self._emit("HeroDismissed", hero_id=hero.hero_id, display_name=hero.display_name, vocation_id=hero.active_vocation_id)
+
     def _recruit(self, params: Json) -> None:
-        """A new hero of a starting class. It has every starting class unlocked, as all heroes do."""
+        """A new hero of a starting class. It has every starting class unlocked, as all heroes do.
+
+        Its name does not say a class (owner decision D-35): the hero may become another the next moment.
+        """
         if params.get("catalog_version") not in (None, self.catalog.version):
             raise _Reject("CONTENT_MIGRATION_REQUIRED")
         starting = self.catalog.starting_classes()
         vocation_id = params["starting_class"]
         if vocation_id not in starting:
             raise ValueError(f"'{vocation_id}' is not a starting class; a hero is recruited as one of {', '.join(starting)}.")
-        run = self.state.run
-        if run is not None and run.phase not in FINISHED_PHASES:
+        if not self.between_runs():
             raise _Reject("PHASE_LOCKED")  # heroes are recruited at party setup, not inside a run
         heroes = self.state.heroes
         if len(heroes) >= self.roster_limit:
             raise _Reject("ROSTER_FULL", {"roster_limit": self.roster_limit, "heroes": len(heroes)})
-        number = max((int(h.rsplit("_", 1)[1]) for h in heroes if h.startswith("hero_") and h.rsplit("_", 1)[1].isdigit()), default=0) + 1
+        used = [*heroes, *self.state.dismissed]  # a dismissed hero's id and number are never given out again
+        number = max((int(h.rsplit("_", 1)[1]) for h in used if h.startswith("hero_") and h.rsplit("_", 1)[1].isdigit()), default=0) + 1
         hero_id = f"hero_{number:03d}"
-        name = f"{self.catalog.name(vocation_id)} {number}"
+        name = f"{RECRUIT_NAME} {number}"
         hero = HeroRecord(hero_id, vocation_id, origin_vocation_id=vocation_id, display_name=name)
         heroes[hero_id] = hero
         self._emit("HeroRecruited", hero_id=hero_id, vocation_id=vocation_id, display_name=name)

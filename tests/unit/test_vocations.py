@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 import importlib.resources
+import json
 import os
 import subprocess
 import sys
@@ -256,7 +257,12 @@ def test_the_controller_hands_the_catalog_to_the_engine_only_when_the_gate_is_on
     assert set(first_on["delta"]) - set(first_off["delta"]) == {"encounters", "heroes", "vocation_catalog"}
     assert first_on["delta"]["party"] == [{**first_off["delta"]["party"][0], "hero_id": "hero_001"}]
     assert first_on["delta"]["run_id"] == "run-0001-1" and first_off["delta"]["run_id"] == "run-1-1"
-    assert [dataclasses.asdict(e) for e in on.engine.events[1:]] == [dataclasses.asdict(e) for e in off.engine.events[1:]]
+    # A saved hero has a name that does not say a class (owner decision D-35); nothing else differs.
+    renamed = json.loads(json.dumps([dataclasses.asdict(e) for e in on.engine.events[1:]]).replace('"Recruit 1"', '"Squire 1"'))
+    assert renamed == json.loads(json.dumps([dataclasses.asdict(e) for e in off.engine.events[1:]]))
+    hero_name = lambda engine: next(  # noqa: E731
+        unit["name"] for e in engine.events if e.type == "battle_started" for unit in e.delta["roster"] if unit["side"] == "hero")
+    assert (hero_name(on.engine), hero_name(off.engine)) == ("Recruit 1", "Squire 1")
     # The rules engine itself still gives the same bytes for the same commands with the catalog handed to it (CE-40):
     # tests/integration/test_class_evolution_runs.py proves that on the three pinned parties.
     on.close()

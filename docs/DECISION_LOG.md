@@ -49,6 +49,7 @@ tests, and add an entry here.
 | D-32 | The demo: how it is judged, and one default | **Owner decisions, 2026-11-12, after every setting of D-31 was merged:** the owner plays the demo and judges it against the goal ("a fully configurable and playable demo"); "Confirm a pass" stays **on by default**. | Sections 7.29 and 7.30 |
 | D-33 | An Android version | **Owner decisions, 2026-11-21, after the evaluation:** a real Android app with new phone screens on the existing rules, save and controller; the screens are built with **Flet**, starting with a walking skeleton that must pass a go or no-go check; the fallback is a native Android UI (Chaquopy and Kotlin); the app works upright and sideways from the start. What the app is for (own phone, a few people, the Play Store) is not decided. | Section 7.31, `docs/android/PLAN.md` |
 | D-34 | What is fixed after the playtest by the team | **Owner decisions, 2026-11-21, on `docs/PLAYTEST_TEAM_2026-11-21.md`:** (1) every defect and every case of missing information that needs no design decision is fixed; (2) the game still picks a single legal target by itself, but says so, and a number key never removes a planned action; (3) "Abandon Run" and "Retry" ask once more, and the profile reset is confirmed by a separate button in another place; (4) both rule faults are fixed: a vocation change converts health from what the hero had when the change window opened, and an upgrade card that would change nothing is not offered. The rules version goes up and the balance is measured again. Not decided: dismissing a hero, starting classes, the effect of a slower mastery pace. | Section 7.32 |
+| D-35 | Three open playtest findings, and Android after the skeleton | **Owner decisions, 2026-11-21, asked with the ask tool:** (1) R3: a hero can be dismissed, asked once more, not while it is in the party or a run goes on; (2) R4: recruits get names that say no class ("Recruit 1"); heroes already saved keep their names; (3) R5: a vocation a hero has opened stays open when a slower Mastery pace takes the rank it needed, and the Career screen says so; (4) Android: phase 1 groundwork starts now, while the owner tries the APK; the go or no-go for the phone screens stays the owner's. Section 7.38. |
 
 ## 2. Content authored under delegation
 
@@ -2327,6 +2328,57 @@ development container, so it ran on GitHub with this pull request.
 - The app on the real phone: only the owner can install it. Start-up time on a phone is unknown.
 - The self-check runs at every start of the app. That is right for a skeleton whose purpose is
   that check; the real app will not do it.
+
+### 7.38 Dismissing a hero, names without a class, and the Mastery pace (D-35, 2026-11-21)
+
+The three playtest findings that waited for the owner (R3, R4, R5). No rule of a battle changes;
+the replay pin, the shipped content and the vocation catalog are untouched.
+
+**R3: a hero can be dismissed**
+
+- A new career command, `DismissHero`. It is accepted between runs only (as recruiting is) and
+  records a `HeroDismissed` event.
+- **The hero's row stays in the save, marked with the time of the dismissal.** Awards, item
+  history and the event log point at heroes; removing the row would have broken them or forced
+  them to be removed too. A dismissed hero is simply not loaded any more. Its id and number are
+  never given to another hero, so nothing in the history can be taken for a different hero.
+- This is the save's **first real migration** (schema 2 to 3: one column, `hero.dismissed_at`).
+  An older save is copied to `<file>.v2.bak` first, as the store has done since Phase 3, and
+  keeps every hero.
+- On the screen: **Dismiss this hero** on the Career screen, asked once more. It is off, with
+  the reason, while the hero is in the party or a run goes on. A full roster now says how to
+  make room.
+
+**R4: a recruit's name says no class**
+
+- New heroes are "Recruit 1", "Recruit 2", ... The party slot, the roster and a unit's panel in
+  battle name the class beside the name, as they did for a hero whose name did not match its
+  vocation.
+- **A correction on the way.** I had recommended "Hero 1", and the owner chose it. While looking
+  at the finished Career screen I saw that the catalog has a capstone vocation named "Hero", so
+  that name would again have read as a class. I asked again with that fact; the owner chose
+  "Recruit". A test now refuses a recruit name that is the name of any vocation.
+- Heroes already saved keep their names ("Squire 1"). Nothing is renamed in a save.
+- Without Class Evolution nothing changes: a run's heroes are still "Squire 1", "Scout 2".
+
+**R5: what a hero has opened stays open**
+
+- A slower Mastery pace re-ranks heroes from their points, so a class can stop counting as
+  mastered. A vocation claimed through it stays claimed. That was already so; now the Career
+  screen says it: "Opened at an earlier Mastery pace. Its requirement is not met at the present
+  pace, and it stays open: what a hero has opened is never taken away."
+
+**My readings, stated so they can be corrected**
+
+- "Gone for good" is what the player sees. The save keeps the dismissed hero's rows as history;
+  no screen shows them and no command reaches them.
+- A hero in the party must be removed from the party first. The game does not do both at once,
+  so that a second press can never dismiss a hero the player still sees in a slot.
+- The roster's size counts heroes that are on it; a dismissed hero frees its place.
+
+**Checked:** 1,382 tests (26 new: the rules of a dismissal, the save and its migration, the
+screens at two window sizes and three fonts). Twenty deliberate breaks of the new code were run
+against them; every one made a test fail.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 

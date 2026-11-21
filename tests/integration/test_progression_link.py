@@ -59,7 +59,7 @@ def test_the_save_is_made_on_first_use_and_found_again(tmp_path: Path):
     first.close()
     again = opened(tmp_path)
     assert [(row["hero_id"], row["name"], row["vocation_name"], row["rank"], row["points_for_next_rank"]) for row in again.roster()] == [
-        ("hero_001", "Apprentice 1", "Apprentice", 1, 1)]
+        ("hero_001", "Recruit 1", "Apprentice", 1, 1)]
     assert again.store.profile_ids() == [PROFILE_ID] and again.extra_encounters() == ["training_04"]
     again.close()
 
@@ -67,7 +67,7 @@ def test_the_save_is_made_on_first_use_and_found_again(tmp_path: Path):
 def test_a_party_entry_is_the_heros_vocation_with_its_build_snapshot(progression: Progression):
     assert progression.party_entry("hero_001", "front") == {
         "class_id": "squire", "row": "front",
-        "hero": {"hero_id": "hero_001", "name": "Squire 1", "stats": {"max_hp": 14, "max_mana": 3, "speed": 7}, "skills": []}}
+        "hero": {"hero_id": "hero_001", "name": "Recruit 1", "stats": {"max_hp": 14, "max_mana": 3, "speed": 7}, "skills": []}}
 
 
 def test_each_battle_awards_mastery_to_each_saved_hero_by_the_rules(progression: Progression, vocations):
@@ -421,7 +421,7 @@ def test_a_hero_changes_vocation_inside_a_run_and_the_save_and_the_run_agree(squ
     fighter = engine.combat.combatants["h01"]
     assert hero().active_vocation_id == "guardian" and engine.build("h01").vocation_id == "guardian"
     assert (fighter.max_hp, fighter.equipped_dice_ids) == (link.snapshot("hero_001")["stats"]["max_hp"], ["guardian_d6", "guardian_d4"])
-    assert fighter.hp == -((-hp * fighter.max_hp) // 15) and fighter.name == "Squire 1"  # a mastered Squire has 15 HP as a Squire
+    assert fighter.hp == -((-hp * fighter.max_hp) // 15) and fighter.name == "Recruit 1"  # a mastered Squire has 15 HP as a Squire
     change = [c for c in engine.command_log if c.type == cmd.CHANGE_VOCATION][-1]
     assert change.params == {"hero_id": "h01", "class_id": "guardian", "hero": link.snapshot("hero_001")}
 

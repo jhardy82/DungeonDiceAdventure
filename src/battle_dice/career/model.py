@@ -152,3 +152,6 @@ class CareerState:
     events: list[dict[str, Any]] = field(default_factory=list)
     #: Sequence number of the next progression event of this profile.
     next_event_seq: int = 0
+    #: Ids of heroes the player dismissed (owner decision D-35). They are not in ``heroes`` any more; what they
+    #: earned stays in the save's history, and their ids are never given to another hero.
+    dismissed: list[str] = field(default_factory=list)

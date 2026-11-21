@@ -145,10 +145,10 @@ def test_number_keys_recruit_heroes_into_the_party_and_they_are_saved(tmp_path):
         {"class_id": "squire", "row": "front", "hero_id": "hero_001"},
         {"class_id": "apprentice", "row": "back", "hero_id": "hero_002"},
         {"class_id": "scout", "row": "back", "hero_id": "hero_003"}]
-    assert [row["name"] for row in play.ctrl.roster_view()] == ["Squire 1", "Apprentice 2", "Scout 3"]
+    assert [row["name"] for row in play.ctrl.roster_view()] == ["Recruit 1", "Recruit 2", "Recruit 3"]
     assert all(row["in_party"] for row in play.ctrl.roster_view())
     assert play.link.store.conn.execute("SELECT COUNT(*) FROM hero").fetchone()[0] == 3
-    assert "Recruited Scout 3" in play.ctrl.message
+    assert "Recruited Recruit 3" in play.ctrl.message
 
 
 def test_a_hero_can_leave_the_party_and_come_back_from_the_roster(tmp_path):
@@ -159,7 +159,7 @@ def test_a_hero_can_leave_the_party_and_come_back_from_the_roster(tmp_path):
     play.click("roster:hero_001:add")
     assert [m["hero_id"] for m in play.ctrl.party] == ["hero_002", "hero_001"]
     play.click("slot:1:row")
-    assert play.ctrl.party[1]["row"] == "back" and "Squire 1 moves to the back row" in play.ctrl.message
+    assert play.ctrl.party[1]["row"] == "back" and "Recruit 1 moves to the back row" in play.ctrl.message
 
 
 def test_a_hero_is_in_the_party_once_however_it_is_asked_for(tmp_path):
@@ -173,7 +173,7 @@ def test_each_slot_opens_the_career_of_its_own_hero(tmp_path):
     play = Evolution(tmp_path)
     play.click("slot:1:career")
     assert play.ctrl.screen == Screen.CAREER and play.ctrl.career_hero == "hero_002"
-    assert play.ctrl.career_view()["name"] == "Scout 2" and play.ctrl.career_view()["active_vocation_id"] == "scout"
+    assert play.ctrl.career_view()["name"] == "Recruit 2" and play.ctrl.career_view()["active_vocation_id"] == "scout"
     play.click("career:back")
     play.click("roster:hero_001:career")
     assert play.ctrl.career_hero == "hero_001"
@@ -203,7 +203,7 @@ def test_the_sixth_recruit_waits_in_the_roster_and_the_thirteenth_is_refused(tmp
         play.ctrl.add_hero("squire")
     play.app.frame(0)
     assert len(play.link.state.heroes) == 12 and play.ui.widget("add:squire").enabled is False
-    assert play.ui.widget("add:squire").reason == "The roster is full (12 heroes)."
+    assert play.ui.widget("add:squire").reason == "The roster is full (12 heroes). To make room, dismiss a hero on its Career screen."
     play.ctrl.recruit("scout")
     assert len(play.link.state.heroes) == 12 and "The roster is full (12 heroes)" in play.ctrl.message and play.ctrl.message_is_error
 
@@ -214,7 +214,7 @@ def test_a_run_with_saved_heroes_starts_with_their_snapshots_and_the_third_battl
     engine = play.ctrl.engine
     assert play.ctrl.screen == Screen.BATTLE and engine.state.run_id == "run-0001-11" and engine.battle_count == 3
     assert [member.get("hero_id") for member in engine.state.party] == ["hero_001", "hero_002"]
-    assert [engine.combat.combatants[h].name for h in ("h01", "h02")] == ["Squire 1", "Scout 2"]
+    assert [engine.combat.combatants[h].name for h in ("h01", "h02")] == ["Recruit 1", "Recruit 2"]
     assert play.link.state.run.phase == "battle"
     play.ctrl.third_battle = False
     play.ctrl.abandon_to_party()  # asked once more
@@ -328,7 +328,7 @@ def test_winning_a_battle_shows_what_each_hero_earned(tmp_path):
     win_battle(play.ctrl.engine)
     play.ctrl.refresh()
     assert play.ctrl.screen == Screen.UPGRADE
-    assert play.ctrl.awards_view() == ["Squire 1 +1, now rank 2.", "Scout 2 +1, now rank 2."]
+    assert play.ctrl.awards_view() == ["Recruit 1 +1, now rank 2.", "Recruit 2 +1, now rank 2."]
     assert [row["rank"] for row in play.ctrl.roster_view()] == [2, 2]
 
 
@@ -339,7 +339,7 @@ def test_after_battle_two_the_player_may_stop_with_a_victory(tmp_path):
     assert "continue:fight" in keys and "continue:stop" in keys and play.app.render_faults == 0
     view = play.ctrl.continue_view()
     assert (view["encounter_id"], view["threat_rating"], view["battle"]) == ("training_04", 4, 2)
-    assert view["awards"] == ["Squire 1 +1, now rank 3.", "Scout 2 +1, now rank 3."]
+    assert view["awards"] == ["Recruit 1 +1, now rank 3.", "Recruit 2 +1, now rank 3."]
     play.click("continue:stop")
     assert play.ctrl.screen == Screen.OUTCOME and play.ctrl.engine.state.outcome == "victory"
     assert len(play.ctrl.engine.state.battle_records) == 2 and play.link.state.run.phase == "victory"
@@ -402,7 +402,7 @@ def test_no_text_is_cut_off_on_the_new_screens(tmp_path, monkeypatch, font, size
     play.ctrl.end_run_with_victory()
     play.app.frame(0)
     assert play.ctrl.screen == Screen.OUTCOME and play.app.render_faults == 0
-    assert "Mastery from the last battle" in drawn and "Squire 1 +0 (its vocation is mastered)." in drawn
+    assert "Mastery from the last battle" in drawn and "Recruit 1 +0 (its vocation is mastered)." in drawn
     award_lines = play.ctrl.awards_view()
     assert len(award_lines) == 5 and not set(award_lines) & set(shortened)
 
@@ -509,7 +509,7 @@ def test_class_evolution_can_be_switched_on_and_off_from_inside_the_game(tmp_pat
     play.ctrl.to_main_menu()
     play.ctrl.open_settings()
     play.ctrl.change_setting("class_evolution")
-    assert [row["name"] for row in play.ctrl.roster_view()] == ["Squire 1"]
+    assert [row["name"] for row in play.ctrl.roster_view()] == ["Recruit 1"]
 
 
 def test_every_setting_moves_to_its_next_value_is_saved_and_takes_effect(tmp_path):
@@ -551,7 +551,7 @@ def test_a_run_uses_the_settings(tmp_path):
 
     play = Configured(tmp_path, settings=Settings(class_evolution=True, third_battle=False, seed=77, demo_preset="guardian_unlocked"))
     assert [(row["name"], row["vocation_name"]) for row in play.ctrl.roster_view()] == [
-        ("Squire 1", "Guardian"), ("Scout 2", "Scout"), ("Apprentice 3", "Apprentice")]
+        ("Recruit 1", "Guardian"), ("Recruit 2", "Scout"), ("Recruit 3", "Apprentice")]
     play.ctrl.new_run()
     play.ctrl.add_saved_hero("hero_001")
     play.ctrl.add_saved_hero("hero_002")
@@ -624,7 +624,7 @@ def test_resetting_the_profile_needs_a_second_button_and_starts_again_from_the_c
     play.click("settings:reset")
     play.click("settings:reset:confirm")
     assert not play.ctrl.reset_confirm and play.ctrl.message == "A new profile was made (3 heroes)."
-    assert [(row["name"], row["rank"]) for row in play.ctrl.roster_view()] == [("Squire 1", 7), ("Scout 2", 1), ("Apprentice 3", 1)]
+    assert [(row["name"], row["rank"]) for row in play.ctrl.roster_view()] == [("Recruit 1", 7), ("Recruit 2", 1), ("Recruit 3", 1)]
     assert play.ctrl.party == [] and play.ctrl.progression.path.is_file()
 
 
@@ -781,10 +781,10 @@ def test_a_skill_is_taken_off_and_equipped_again_and_the_save_keeps_it(tmp_path)
     play.app.frame(0)
     play.key(pygame.K_k)
     play.click("skill:guardian_field_medic:unequip")
-    assert hero.equipped_skills == {} and play.ctrl.message == "Squire 1 has taken off Guardian Field Medic."
+    assert hero.equipped_skills == {} and play.ctrl.message == "Recruit 1 has taken off Guardian Field Medic."
     assert play.ui.widget("skill:guardian_field_medic:unequip") is None
     play.click("skill:guardian_field_medic:equip")
-    assert hero.equipped_skills == {0: "guardian_field_medic"} and play.ctrl.message == "Squire 1 has equipped Guardian Field Medic."
+    assert hero.equipped_skills == {0: "guardian_field_medic"} and play.ctrl.message == "Recruit 1 has equipped Guardian Field Medic."
     play.click("career:back")
     play.ctrl.add_saved_hero("hero_001")
     assert play.ctrl.progression.party_entry("hero_001", "front")["hero"]["skills"] == ["guardian_field_medic"]
@@ -817,13 +817,13 @@ def test_a_refused_skill_command_says_why(tmp_path, monkeypatch):
     medic = next(row for row in play.ctrl.skills_view()["rows"] if row["skill_id"] == "guardian_field_medic")
     assert (medic["cost"], medic["can_equip"], medic["reason"]) == (3, False, "Needs 3 capacity; 2 of 2 is free.")
     play.ctrl.equip_skill("guardian_field_medic")
-    assert play.ctrl.message == "Squire 1 has too little capacity for Guardian Field Medic." and play.ctrl.message_is_error
+    assert play.ctrl.message == "Recruit 1 has too little capacity for Guardian Field Medic." and play.ctrl.message_is_error
     assert link.change("hero_001", "guardian").accepted
     monkeypatch.setattr(type(link.career.service), "skill_has_a_face", lambda *args, **kwargs: False)
     medic = next(row for row in play.ctrl.skills_view()["rows"] if row["skill_id"] == "guardian_field_medic")
     assert medic["reason"] == "None of this hero's dice has a face the skill can work on." and not medic["can_equip"]
     play.ctrl.equip_skill("guardian_field_medic")
-    assert play.ctrl.message == "None of Squire 1's dice has a face Guardian Field Medic can work on."
+    assert play.ctrl.message == "None of Recruit 1's dice has a face Guardian Field Medic can work on."
 
 
 def test_field_medic_is_offered_on_the_die_and_revives_the_downed_ally(tmp_path, monkeypatch):
@@ -838,7 +838,7 @@ def test_field_medic_is_offered_on_the_die_and_revives_the_downed_ally(tmp_path,
     assert play.ctrl.message == "Choose a target for Heal (Esc cancels). Field Medic: revive at 5 HP (once per battle)."
     play.click("unit:h02")
     assert play.ctrl.draft == [{"die_id": "guardian_d6", "target_ids": ["h02"]}] and not play.ctrl.message_is_error
-    assert any(text.startswith("1. Heal (Field Medic) -> Scout 2") and "1 mana" in text for text in drawn), "the plan names the revival and its cost"
+    assert any(text.startswith("1. Heal (Field Medic) -> Recruit 2") and "1 mana" in text for text in drawn), "the plan names the revival and its cost"
     play.ctrl.confirm_plan()
     for _ in range(40):
         if unit(engine, "h02").state == "standing":
@@ -938,7 +938,7 @@ def test_a_guardian_chooses_its_upgrade_and_the_screen_names_its_die(tmp_path, m
     play.app.frame(0)
     assert engine.state.phase == "equipment" and "guardian_d6" in engine.state.die_overrides["h02"]
     assert play.ctrl.screen == Screen.UPGRADE and play.app.render_faults == 0, play.ctrl.error_text
-    assert any("was applied to Squire 1's Guardian d6" in text for text in drawn)
+    assert any("was applied to Recruit 1's Guardian d6" in text for text in drawn)
     assert play.ctrl.die_name("h02", "guardian_d4") == "Guardian d4" and play.ctrl.die_name("h01", "striker_d8") == "Striker d8"
     assert any("Guardian d6" in line for line in combat_log(engine)) and not any("guardian_d6" in line for line in combat_log(engine))
 
@@ -992,7 +992,7 @@ def test_before_the_upgrade_a_hero_becomes_a_guardian_from_the_upgrade_screen(tm
     assert (fighter.archetype_id, fighter.max_hp, fighter.equipped_dice_ids) == ("guardian", 18, ["guardian_d6", "guardian_d4"])
     assert fighter.hp == -((-hp * 18) // 15), "health is carried over in proportion, rounded up"
     assert play.ctrl.progression.state.heroes["hero_001"].active_vocation_id == "guardian"
-    assert play.ctrl.message.startswith("Squire 1 is now a Guardian and fights on as one: HP ") and not play.ctrl.message_is_error
+    assert play.ctrl.message.startswith("Recruit 1 is now a Guardian and fights on as one: HP ") and not play.ctrl.message_is_error
     play.key(pygame.K_ESCAPE)
     assert play.ctrl.screen == Screen.UPGRADE and (play.ctrl.upgrade_hero, play.ctrl.upgrade_die, play.ctrl.upgrade_offer) == ("h01", "guardian_d6", None)
     assert play.ui.widget("up:die:guardian_d6") is not None and play.ui.widget("up:die:iron_d6") is None
@@ -1026,7 +1026,7 @@ def test_a_hero_outside_the_party_may_change_in_that_moment_too(tmp_path):
     assert (view["open_now"], view["fighting"]) == (True, False)
     assert play.ui.widget("career:scout:activate").tooltip == "The hero fights as this vocation from the next run on."
     play.click("career:scout:activate")
-    assert play.ctrl.progression.state.heroes["hero_003"].active_vocation_id == "scout" and play.ctrl.message == "Apprentice 3 is now a Scout."
+    assert play.ctrl.progression.state.heroes["hero_003"].active_vocation_id == "scout" and play.ctrl.message == "Recruit 3 is now a Scout."
     assert len(engine.command_log) == commands, "the run is not touched"
 
 
@@ -1114,7 +1114,7 @@ def test_before_stopping_or_fighting_on_a_hero_becomes_a_guardian(tmp_path, monk
     fighter = engine.combat.combatants["h01"]
     assert (fighter.archetype_id, fighter.max_hp, fighter.equipped_dice_ids) == ("guardian", 18, ["guardian_d6", "guardian_d4"])
     assert fighter.hp == -((-hp * 18) // 15) and "h01" not in engine.state.die_overrides
-    assert play.ctrl.message == (f"Squire 1 is now a Guardian and fights on as one: HP {fighter.hp}/18, mana {fighter.mana}/{fighter.max_mana}, "
+    assert play.ctrl.message == (f"Recruit 1 is now a Guardian and fights on as one: HP {fighter.hp}/18, mana {fighter.mana}/{fighter.max_mana}, "
                                  "dice Guardian d6, Guardian d4, bench die none.")
     play.key(pygame.K_ESCAPE)
     assert play.ctrl.screen == Screen.CONTINUE and play.ctrl.continue_view()["heroes"][0]["vocation_name"] == "Guardian"

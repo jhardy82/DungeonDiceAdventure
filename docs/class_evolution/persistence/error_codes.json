@@ -15,8 +15,8 @@
     {
       "code": "PHASE_LOCKED",
       "kind": "command_rejection",
-      "meaning": "The run is in a phase that does not allow the command. Vocation and build commands are never allowed while run.phase is 'battle'.",
-      "raised_by": ["ClaimVocation", "ChangeVocation", "EquipInheritedSkill", "UnequipInheritedSkill", "EquipDie", "ConfirmBuild"]
+      "meaning": "The run is in a phase that does not allow the command. Vocation and build commands are never allowed while run.phase is 'battle'. A hero is recruited or dismissed only while no run is going on (no run, or run.phase is 'victory' or 'defeat').",
+      "raised_by": ["ClaimVocation", "ChangeVocation", "EquipInheritedSkill", "UnequipInheritedSkill", "EquipDie", "ConfirmBuild", "RecruitHero", "DismissHero"]
     },
     {
       "code": "NOT_DISCOVERED",
@@ -72,7 +72,7 @@
       "code": "REVISION_CONFLICT",
       "kind": "command_rejection",
       "meaning": "The command's state_revision is not the current revision of the row it targets (hero.revision for hero commands).",
-      "raised_by": ["ClaimVocation", "ChangeVocation", "EquipInheritedSkill", "UnequipInheritedSkill", "EquipDie", "ConfirmBuild"]
+      "raised_by": ["ClaimVocation", "ChangeVocation", "EquipInheritedSkill", "UnequipInheritedSkill", "EquipDie", "ConfirmBuild", "DismissHero"]
     },
     {
       "code": "UNSUPPORTED_SECONDARY_VOCATION",

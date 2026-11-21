@@ -177,3 +177,18 @@ Started: 2026-11-11
 - **Impacts:** Battle, upgrade, settings and outcome screens; controller; `core/build.py` and
   `core/progression.py` for the rules; five pull requests. Not decided: dismissing a hero,
   starting classes, what a slower mastery pace does to a vocation already opened.
+
+### 2026-11-21 — Owner: three open playtest findings and Android after the skeleton (D-35)
+- **Decision:** A hero can be dismissed (asked once more; not in the party, not during a run).
+  Recruits get names that say no class ("Recruit 1"); saved heroes keep their names. A vocation a
+  hero has opened stays open when a slower Mastery pace takes the rank it needed, and the Career
+  screen says so. Android phase 1 groundwork starts while the owner tries the APK.
+- **Why:** A full roster was a dead end; "Squire 1" listed as a Scout misled; a setting must not
+  take progress away. The groundwork is needed by any phone toolkit.
+- **Alternatives considered:** Leaving the roster as it is, or only raising its limit. Recruits
+  with only their own class open (a rule change). Locking the pace once used, or closing the
+  vocation again. Waiting for the phone test, or pausing Android.
+- **Trade-offs accepted:** The save gets its first real migration (schema 3). A dismissed
+  hero's rows stay in the save as history. Old and new hero names exist side by side.
+- **Impacts:** Career rules and store, controller, Career and party screens, README; the go or
+  no-go for the phone screens stays with the owner.
