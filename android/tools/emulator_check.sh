@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Phase 0 of docs/android/PLAN.md, on an Android emulator: install the APK and start the app three times:
-# upright, with a larger system font, and then turned sideways while it runs (as a person turns a phone).
-# Each start must report a passed self-check in the device log, and the app must report the layout that
-# fits: upright, upright, sideways. A screenshot and the device log of each start are kept.
+# Phase 0 of docs/android/PLAN.md, on an Android emulator: install the APK and start the app four times:
+# upright, with a larger system font, turned sideways while it runs (as a person turns a phone), and
+# started while the screen is already sideways. Each start must report a passed self-check in the device
+# log, and the app must report the layout that fits: upright, upright, sideways, sideways. A screenshot
+# and the device log of each start are kept.
 # Usage: emulator_check.sh APK OUTPUT_FOLDER
 set -uo pipefail
 apk="$1"; out="$2"; mkdir -p "$out"
@@ -50,11 +51,13 @@ head = open(sys.argv[1], "rb").read(24)
 print("%dx%d" % struct.unpack(">II", head[16:24]) if head[:4] == b"\x89PNG" and len(head) == 24 else "not readable")' "$1" 2>/dev/null || echo "not readable"
 }
 
-# start_and_check NAME LAYOUT [turn]: stops the app, starts it, waits for its self-check report, turns the
-# screen if asked, waits for the app to report LAYOUT, and keeps a screenshot and the device log.
+# start_and_check NAME LAYOUT [before|after]: stops the app, starts it, waits for its self-check report,
+# waits for the app to report LAYOUT, and keeps a screenshot and the device log. The screen is turned
+# sideways before the app starts or after it has reported, if asked, and turned back at the end.
 start_and_check() {
   local name="$1" expected="$2" turn="${3:-}" report screen started
   adb shell am force-stop "$package"
+  [ "$turn" = before ] && turn_screen 1
   adb logcat -c
   adb shell monkey -p "$package" -c android.intent.category.LAUNCHER 1 > /dev/null
   if report="$(wait_for_report)"; then
@@ -64,7 +67,7 @@ start_and_check() {
     say "$name: no self-check report within $limit seconds (see ${name}_logcat.txt)"
     no_check="$no_check $name"
   fi
-  [ -n "$turn" ] && turn_screen 1
+  [ "$turn" = after ] && turn_screen 1
   started=$SECONDS
   while :; do
     screen="$(layout_now)"
@@ -88,10 +91,11 @@ adb shell settings put system font_scale 1.3
 start_and_check 2_larger_font upright
 adb shell settings put system font_scale 1.0
 
-start_and_check 3_sideways sideways turn
+start_and_check 3_sideways sideways after
+start_and_check 4_started_sideways sideways before
 
 if [ -z "$no_check$wrong_layout" ]; then
-  say "EMULATOR CHECK OK: three starts, three passed self-checks, the layout followed the screen"; exit 0
+  say "EMULATOR CHECK OK: four starts, four passed self-checks, the layout followed the screen"; exit 0
 fi
 [ -n "$no_check" ] && say "EMULATOR CHECK FAILED: no passed self-check at:$no_check"
 [ -n "$wrong_layout" ] && say "EMULATOR CHECK FAILED: not the expected layout at:$wrong_layout"

@@ -277,13 +277,16 @@ UPRIGHT = STAMP + "BATTLE DICE SCREEN: layout=upright width=411 height=891"
 SIDEWAYS = STAMP + "BATTLE DICE SCREEN: layout=sideways width=891 height=411"
 PASSED = UPRIGHT + "\n" + STAMP + "BATTLE DICE SELF-CHECK OK: outcome=victory battles=3"
 FAILED = UPRIGHT + "\n" + STAMP + "BATTLE DICE SELF-CHECK FAILED: SelfCheckFailed: the heroes did not reach the save"
-GOOD_END = "EMULATOR CHECK OK: three starts, three passed self-checks, the layout followed the screen"
+GOOD_END = "EMULATOR CHECK OK: four starts, four passed self-checks, the layout followed the screen"
+STARTS = ("1_upright", "2_larger_font", "3_sideways", "4_started_sideways")
 
 
-def emulator_check(tmp_path, logs: list[str | None], turned: str | None = SIDEWAYS, stuck: bool = False,
+def emulator_check(tmp_path, logs: list[str | None], turned: str | None = SIDEWAYS, stuck: bool = False, follows: tuple[int, ...] = (1, 2, 3, 4),
                    packages: str = "package:com.android.chrome\npackage:dev.battledice.battle_dice_android\n"):
-    """Runs the script. ``logs`` is the device log of each start in turn (None: the app never reports);
-    ``turned`` is what the app adds to the log once the screen is sideways (None: it does not notice);
+    """Runs the script. ``logs`` is the device log of each start in turn (None: the app never reports; starts
+    that are not given pass);
+    ``turned`` is what the app adds to the log once the screen is sideways (None: it does not notice), in the
+    starts named by ``follows``;
     ``stuck`` is a device whose screen does not turn."""
     import os
     from pathlib import Path
@@ -298,10 +301,10 @@ def emulator_check(tmp_path, logs: list[str | None], turned: str | None = SIDEWA
     (state / "packages").write_text(packages, encoding="utf-8")
     if stuck:
         (state / "stuck").write_text("", encoding="utf-8")
-    for number, log in enumerate(logs, start=1):
+    for number, log in enumerate([*logs, *[PASSED] * (len(STARTS) - len(logs))], start=1):
         if log is not None:
             (state / f"log_{number}").write_text(f"other line\n{log}\n", encoding="utf-8")
-        if turned is not None:
+        if turned is not None and number in follows:
             (state / f"log_{number}_turned").write_text(f"{turned}\n", encoding="utf-8")
     script = Path(__file__).resolve().parents[2] / "android" / "tools" / "emulator_check.sh"
     env = {**os.environ, "PATH": f"{tools}{os.pathsep}{os.environ['PATH']}", "FAKE_ADB_STATE": str(state),
@@ -319,16 +322,16 @@ def test_the_emulator_check_passes_when_every_start_passes_and_the_layout_follow
     assert done.returncode == 0 and GOOD_END in done.stdout, done.stdout + done.stderr
     assert "package: dev.battledice.battle_dice_android" in done.stdout
     report = (out / "report.txt").read_text(encoding="utf-8").splitlines()
-    assert [line.split(":")[0] for line in report] == ["1_upright", "1_upright", "2_larger_font", "2_larger_font", "3_sideways", "3_sideways", "EMULATOR CHECK OK"]
-    assert all("BATTLE DICE SELF-CHECK OK" in line and line.endswith("seconds_until_report=0") for line in report[0:6:2])
+    assert [line.split(":")[0] for line in report] == [name for start in STARTS for name in (start, start)] + ["EMULATOR CHECK OK"]
+    assert all("BATTLE DICE SELF-CHECK OK" in line and line.endswith("seconds_until_report=0") for line in report[0:8:2])
     assert report[1] == "1_upright: BATTLE DICE SCREEN: layout=upright width=411 height=891 (expected upright; the screenshot is 1440x3120)"
     assert report[5] == "3_sideways: BATTLE DICE SCREEN: layout=sideways width=891 height=411 (expected sideways; the screenshot is 3120x1440)"
-    assert all((out / f"{name}.png").stat().st_size == 24 and (out / f"{name}_logcat.txt").is_file() for name in ("1_upright", "2_larger_font", "3_sideways"))
-    # The larger font is set for the second start only. The screen is turned in the third, and turned back.
+    assert report[7] == "4_started_sideways: BATTLE DICE SCREEN: layout=sideways width=891 height=411 (expected sideways; the screenshot is 3120x1440)"
+    assert all((out / f"{name}.png").stat().st_size == 24 and (out / f"{name}_logcat.txt").is_file() for name in STARTS)
+    # The larger font is set for the second start only. The screen is turned in the third and fourth, and turned back.
+    turn = lambda way: ["shell settings put system accelerometer_rotation 0", f"shell settings put system user_rotation {way}", f"shell cmd window user-rotation lock {way}"]  # noqa: E731
     assert (state / "settings").read_text(encoding="utf-8").splitlines() == [
-        "shell settings put system font_scale 1.3", "shell settings put system font_scale 1.0",
-        "shell settings put system accelerometer_rotation 0", "shell settings put system user_rotation 1", "shell cmd window user-rotation lock 1",
-        "shell settings put system accelerometer_rotation 0", "shell settings put system user_rotation 0", "shell cmd window user-rotation lock 0"]
+        "shell settings put system font_scale 1.3", "shell settings put system font_scale 1.0", *turn(1), *turn(0), *turn(1), *turn(0)]
     assert (state / "turned").read_text(encoding="utf-8").strip() == "0"
 
 
@@ -338,6 +341,7 @@ def test_the_emulator_check_passes_when_every_start_passes_and_the_layout_follow
     ([PASSED, PASSED, FAILED], "3_sideways"),
     ([FAILED, PASSED, PASSED], "1_upright"),
     ([PASSED, FAILED, FAILED], "2_larger_font 3_sideways"),
+    ([PASSED, PASSED, PASSED, FAILED], "4_started_sideways"),
 ])
 def test_the_emulator_check_fails_when_any_start_does_not_report_a_passed_self_check(tmp_path, logs, named):
     done, out, _ = emulator_check(tmp_path, logs)
@@ -353,7 +357,7 @@ def test_the_emulator_check_fails_when_the_app_never_reports(tmp_path):
     assert done.returncode == 1 and "3_sideways: no self-check report within 0 seconds (see 3_sideways_logcat.txt)" in done.stdout
     assert "EMULATOR CHECK FAILED: no passed self-check at: 3_sideways\n" in done.stdout
     assert "3_sideways: the app reported no layout (expected sideways; the screenshot is 3120x1440)" in done.stdout
-    assert "EMULATOR CHECK FAILED: not the expected layout at: 3_sideways\n" in done.stdout
+    assert "EMULATOR CHECK FAILED: not the expected layout at: 3_sideways 4_started_sideways\n" in done.stdout
 
 
 @needs_bash
@@ -361,8 +365,9 @@ def test_the_emulator_check_fails_when_the_app_stays_upright_on_a_turned_screen(
     """The second emulator run: all self-checks passed, the start named sideways was upright, and nothing said so."""
     done, out, _ = emulator_check(tmp_path, [PASSED, PASSED, PASSED], turned=None)
     assert done.returncode == 1 and "EMULATOR CHECK OK" not in done.stdout, done.stdout + done.stderr
-    assert "3_sideways: BATTLE DICE SCREEN: layout=upright width=411 height=891 (expected sideways; the screenshot is 3120x1440)" in done.stdout
-    assert done.stdout.rstrip().endswith("EMULATOR CHECK FAILED: not the expected layout at: 3_sideways") and "no passed self-check" not in done.stdout
+    for name in ("3_sideways", "4_started_sideways"):
+        assert f"{name}: BATTLE DICE SCREEN: layout=upright width=411 height=891 (expected sideways; the screenshot is 3120x1440)" in done.stdout
+    assert done.stdout.rstrip().endswith("EMULATOR CHECK FAILED: not the expected layout at: 3_sideways 4_started_sideways") and "no passed self-check" not in done.stdout
 
 
 @needs_bash
@@ -371,6 +376,14 @@ def test_the_report_shows_when_it_was_the_screen_that_did_not_turn(tmp_path):
     done, _, _ = emulator_check(tmp_path, [PASSED, PASSED, PASSED], stuck=True)
     assert done.returncode == 1
     assert "3_sideways: BATTLE DICE SCREEN: layout=upright width=411 height=891 (expected sideways; the screenshot is 1440x3120)" in done.stdout
+
+
+@needs_bash
+def test_the_emulator_check_tells_a_turn_while_running_from_a_start_on_a_turned_screen(tmp_path):
+    """An app that follows a turn but comes up upright when started sideways fails at the fourth start only."""
+    done, _, _ = emulator_check(tmp_path, [PASSED] * 4, follows=(3,))
+    assert done.returncode == 1 and done.stdout.rstrip().endswith("EMULATOR CHECK FAILED: not the expected layout at: 4_started_sideways"), done.stdout
+    assert "3_sideways: BATTLE DICE SCREEN: layout=sideways width=891 height=411 (expected sideways; the screenshot is 3120x1440)" in done.stdout
 
 
 @needs_bash
