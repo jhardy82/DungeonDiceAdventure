@@ -127,12 +127,12 @@ def draw_main_menu(ui: UI, ctrl: AppController, quit_action: Callable[[], Any]) 
 CONTROLS_TEXT = [
     ("Everywhere", "Tab / Shift+Tab or the arrow keys move a focus ring; Enter or Space then activates the ringed control. With no ring, Enter activates the screen's main button. Hotkeys and clicks never move the ring; Esc clears it. Point at or focus a control to read what it does; disabled controls explain why."),
     ("Party setup", "1 / 2 / 3 add a Squire / Apprentice / Scout.  Each hero has a Row and a Remove button.  B or Enter begins the encounter."),
-    ("Your activation", "R rolls, then R rerolls every die you did not Keep.  Z / X toggle Keep on die 1 / 2.  1 / 2 plan the rolled face of die 1 / 2; when a target is needed, press the number shown on a legal target (or click it).  O swaps the order of equal-speed actions.  C clears the plan.  Enter confirms the whole plan.  P passes."),
+    ("Your activation", "R rolls, then R rerolls every die you did not Keep.  Z / X toggle Keep on die 1 / 2.  1 / 2 plan the rolled face of die 1 / 2; when a target is needed, press the number shown on a legal target (or click it).  O swaps the order of equal-speed actions.  C clears the plan.  Enter confirms the whole plan.  P passes.  If an attack's target is gone when the attack resolves, it goes to the next enemy in the same row, then to the one with the lowest share of its HP; with no enemy left it is cancelled and costs nothing."),
     ("Enemy activation", "The enemy's action and targets are revealed first.  Each reacting hero has a numbered row: press its number, then, if it asks for an ally, the ally's number (or click the ally's button directly).  S skips the current stage (Guard, then Resource, then Interrupt); A skips every remaining stage for this enemy action."),
     ("Pacing", "Automatic steps play on a short timer.  F toggles fast mode.  Space steps immediately while the game is resolving.  M turns animation off or on (reduced motion)."),
     ("During a run", "Esc opens the menu: resume, read these controls, or abandon the run.  While a target is being chosen, Esc cancels that choice first."),
     ("Upgrade", "After Battle 1, pick a hero and a die, select one of three cards, then A applies it.  Optionally swap one die per hero or change rows, then Enter starts Battle 2."),
-    ("Reading the board", "A yellow 'Now ...' line under a face or a planned action is the amount that will really happen when it differs from the printed one (Weaken, class bonuses).  HP, SH (shield), MP (mana), CR (corruption).  PSN (Poison) / WKN (Weaken) / SPD+ (Speed Up) show total stacks and, in brackets, activations left.  Point at or focus a unit card to list its abilities, dice and every status in the centre panel.  The gauge bar fills to 100 by speed each tick; the Next row forecasts who acts."),
+    ("Reading the board", "A yellow 'Now ...' line under a face or a planned action is the amount that will really happen when something changes the printed one (Weaken, class bonuses, a maximum).  HP, SH (shield), MP (mana), CR (corruption): from CR {backlash_threshold} on, a hero loses {backlash_damage} HP at the end of each of its activations, and a '!' marks it.  PSN (Poison) / WKN (Weaken) / SPD+ (Speed Up) show total stacks and, in brackets, activations left.  Point at or focus a unit card to list its abilities, dice and every status in the centre panel.  The gauge bar fills to 100 by speed each tick; the Next row forecasts who acts."),
 ]
 
 
@@ -148,8 +148,11 @@ def draw_controls(ui: UI, ctrl: AppController, back: Callable[[], Any] | None = 
     back = back or ctrl.close_controls
     ui.text(40, 28, "Controls", 34, Theme.ACCENT, bold=True)
     y = 80.0
+    corruption = ctrl.content.balance["corruption"]
     for heading, body in CONTROLS_TEXT:
         ui.text(40, y, heading, 17, Theme.TEXT, bold=True)
+        if "{backlash_" in body:  # the numbers of the rule come from the content, which a tuning file may change
+            body = body.format(backlash_threshold=corruption["backlash_threshold"], backlash_damage=corruption["backlash_damage"])
         y = ui.paragraph(240, y, body, 1000, 15, Theme.DIM, line_height=19) + 9
     ui.button("controls:back", 40, 636, 220, 44, "Back  (Esc)", back, hotkeys=(pygame.K_b,), default=True)
     ui.escape_action = back
@@ -273,9 +276,25 @@ def _status_forms(c: dict[str, Any]) -> list[str]:
     ]
 
 
+#: How an enemy picks its ability (``core/enemy_ai.py``): the priority comes before the weights.
+ENEMY_CHOICE_TEXT = ("It first takes an ability that would bring a hero down, then one that puts a status on a hero "
+                     "who does not have it. Among the abilities that are left, a higher weight is chosen more often.")
+
+
+def corruption_text(c: dict[str, Any]) -> str:
+    """The corruption rule in words, for one hero."""
+    rule = c["corruption_rule"]
+    now = f"Corruption (CR) {c['corruption']} of at most {c['max_corruption']}"
+    cost = f"loses {rule['damage']} HP at the end of each of its activations (backlash; shields do not help)"
+    if c["corruption_backlash"]:
+        return f"{now}: at {rule['threshold']} or more the hero {cost}. That is so now, shown by the \"!\"."
+    return f"{now}: from {rule['threshold']} on, the hero {cost}."
+
+
 def _combatant_tooltip(c: dict[str, Any]) -> str:
     if c["side"] == "hero":
-        return f"{c['name']}: {c['scheduling']['label']}, speed {c['speed']}, gauge {c['gauge']}. Details are in the centre panel."
+        backlash = f" Corruption backlash: loses {c['corruption_rule']['damage']} HP after each activation." if c["corruption_backlash"] else ""
+        return f"{c['name']}: {c['scheduling']['label']}, speed {c['speed']}, gauge {c['gauge']}.{backlash} Details are in the centre panel."
     return f"{c['name']}: speed {c['speed']}, gauge {c['gauge']}, {len(c['actions'])} abilities. Details are in the centre panel."
 
 
@@ -346,7 +365,8 @@ def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float
         backlash = "!" if c.get("corruption_backlash") else ""
         ui.text(x + 50, y + 36, f"MP {c['mana']}/{c['max_mana']}", 14, Theme.MANA)
         ui.text(x + 106, y + 36, f"CR {c['corruption']}/{c['max_corruption']}{backlash}", 14, Theme.BAD if backlash else Theme.CORRUPT, bold=bool(backlash))
-        ui.text(x + w - 6, y + 36, f"React {c['reaction_charges']}", 14, Theme.TEXT if c["reaction_charges"] else Theme.FAINT, align="right")
+        charges = c["reaction_charges"] if standing else 0  # a downed hero cannot react
+        ui.text(x + w - 6, y + 36, f"React {charges}", 14, Theme.TEXT if charges else Theme.FAINT, align="right")
     else:
         ui.text(x + 50, y + 36, f"SPD {c['speed']}   {c['row'].capitalize()} row", 14, Theme.DIM)
 
@@ -354,6 +374,8 @@ def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float
     # machines, so the layout is chosen by measuring: the status text shortens first, then the
     # gauge number gives way, then the gauge bar narrows and the text shrinks. The bar never goes.
     gauge_number, bar_width, status_text, status_size, status_room = True, 36.0, "", 13, 0.0
+    if not standing and c["side"] == "enemy":
+        return  # a defeated enemy does not come back: no gauge and no statuses to read
     if c["statuses"]:
         forms = _status_forms(c)
         layouts = (
@@ -363,8 +385,9 @@ def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float
         )
         chosen = next((layout for layout in layouts if ui.text_width(layout[3], layout[4], True) <= layout[2]), layouts[-1])
         gauge_number, bar_width, status_room, status_text, status_size = chosen
-    ui.bar(x + 50, y + 56, bar_width, 8, min(c["gauge"], view["ready_threshold"]), view["ready_threshold"], Theme.GAUGE)
-    if gauge_number:
+    # A downed hero does not move on the timeline; its gauge starts over when it is revived.
+    ui.bar(x + 50, y + 56, bar_width, 8, min(c["gauge"], view["ready_threshold"]) if standing else 0, view["ready_threshold"], Theme.GAUGE)
+    if gauge_number and standing:
         ui.text(x + 90, y + 51, f"G{c['gauge']}", 13, Theme.FAINT)
     kinds = list(dict.fromkeys(status["kind"] for status in c["statuses"]))
     for position, kind in enumerate(kinds[:3]):  # badges at the character's feet; the text stays as well
@@ -418,6 +441,8 @@ def draw_inspect(ui: UI, c: dict[str, Any], view: dict[str, Any], top: float, he
          f"{c['row'].capitalize()} row{state}", Theme.TEXT)
     if c["side"] == "hero":
         para(f"MP {c['mana']}/{c['max_mana']}   CR {c['corruption']}/{c['max_corruption']}   Reaction charges {c['reaction_charges']}", Theme.TEXT)
+        if c["corruption"]:
+            para(corruption_text(c), Theme.BAD if c["corruption_backlash"] else Theme.DIM)
     if c["statuses"]:
         for status in c["statuses"]:
             plural = "" if status["remaining"] == 1 else "s"
@@ -426,7 +451,8 @@ def draw_inspect(ui: UI, c: dict[str, Any], view: dict[str, Any], top: float, he
         para("No status effects.", Theme.FAINT)
     y += 4
     if c["side"] == "enemy":
-        para("Abilities (a higher weight is chosen more often)", Theme.TEXT, bold=True)
+        para("Abilities", Theme.TEXT, bold=True)
+        para(ENEMY_CHOICE_TEXT)
         for ability in c["actions"]:
             para(f"{ability['name']} [{ability['glyph']}, weight {ability['weight']}]: {ability['text']}.")
         return
@@ -515,6 +541,11 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
     targeting = None
     drafted = {a["die_id"]: a for a in ctrl.draft}
     inspect = ctrl.inspect_die
+    preview = ctrl.plan_preview()
+    # A die that is in a legal plan shows the plan's prediction: only the plan knows a class combo,
+    # or what an earlier action leaves of the mana and the health.
+    planned_notes = {} if preview["problem"] else {entry["die_id"]: entry["forecast"] for entry in preview["ordered"]}
+    rerolls = turn["rerolls_remaining"]
     for index, die in enumerate(turn["dice"][:2]):
         x = 16 + index * 256
         face = die["face"]  # always the real result; the tumble only animates the artwork
@@ -529,7 +560,8 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
         ui.panel(x, 500, 248, 184, fill=Theme.PANEL_ALT, border=border, width=2)
         ui.text(x + 8, 505, f"Die {index + 1}: {die['die_name']}", 14, Theme.DIM, bold=True, max_width=150)
         # A die in the plan or being aimed is not marked "will reroll": the player has just chosen to use it.
-        state = "KEPT" if die["kept"] else "" if in_plan or awaiting else "will reroll"
+        # Nor when no reroll is left: then nothing rerolls.
+        state = "KEPT" if die["kept"] else "" if in_plan or awaiting or rerolls <= 0 else "will reroll"
         ui.text(x + 240, 505, state, 14, Theme.ACCENT if die["kept"] else Theme.FAINT, bold=die["kept"], align="right")
         ui.sprite(ui.assets.die_key(die["die_size"]), x + 200, 521, 44, 44)
         if tumbling:
@@ -545,7 +577,8 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
             heading_size = next((size for size in (17, 15, 13, 12) if ui.text_width(heading, size, True) <= 146), 12)
             ui.text(x + 52, 533 + (17 - heading_size) * 0.6, heading, heading_size, CATEGORY_COLORS[face["category"]], bold=True, max_width=146)
             # The amount that will really happen, when it differs from the printed one (Weaken, class bonuses).
-            note = f"Now {die['forecast']['note']}" if die["forecast"]["note"] else ""
+            forecast = planned_notes.get(die["die_id"], die["forecast"]["note"])
+            note = f"Now {forecast}" if forecast else ""
             styles = ((13, True), (12, True), (11, True), (11, False), (10, False))
             note_size, note_bold = next((style for style in styles if ui.text_width(note, *style) <= 232), styles[-1])
             one_line = ui.text_width(face["text"], 14, False) <= 232
@@ -584,7 +617,6 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
 
     # Plan column
     px0 = 530
-    preview = ctrl.plan_preview()
     ui.text(px0, 500, "Plan (resolves top to bottom)" if not preview["problem"] else "Plan (not legal yet)", 15, Theme.TEXT, bold=True)
     y = 520.0
     if not preview["ordered"] and not ctrl.draft:
@@ -601,7 +633,8 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
             ui.text(px0 + 14, y + 16, f"Now {entry['forecast']}", 12, Theme.WARN, bold=True, max_width=358)
             y += 34
         elif entry["fallback"]:
-            ui.text(px0 + 14, y + 16, entry["fallback"], 12, Theme.FAINT, max_width=358)
+            fallback_size = next((size for size in (12, 11, 10) if ui.text_width(entry["fallback"], size) <= 358), 10)
+            ui.text(px0 + 14, y + 16, entry["fallback"], fallback_size, Theme.FAINT, max_width=358)
             y += 34
         else:
             y += 18
@@ -609,8 +642,11 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
         y = ui.paragraph(px0, y, f"Not legal: {preview['problem']}", 372, 14, Theme.WARN, line_height=17, max_lines=3, bold=True)
     elif preview["ordered"]:
         ui.text(px0, y, f"Mana {preview['mana_before']} -> {preview['mana_after']}.  Unused dice are discarded.", 13, Theme.DIM, max_width=372)
+        y += 16
+    if preview["backlash"] and not preview["problem"]:
+        backlash_size = next((size for size in (13, 12, 11, 10) if ui.text_width(preview["backlash"], size, True) <= 372), 10)
+        ui.text(px0, y, preview["backlash"], backlash_size, Theme.BAD, bold=True, max_width=372)
 
-    rerolls = turn["rerolls_remaining"]
     unkept = [d for d in turn["dice"] if not d["kept"]]
     reroll_reason = "No rerolls remaining this activation." if rerolls <= 0 else "Every die is kept; unkeep one to reroll." if not unkept else None
     ui.button("plan:reroll", px0, 628, 112, 48, "Reroll", ctrl.reroll, enabled=reroll_reason is None, reason=reroll_reason,
@@ -622,8 +658,9 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
               tooltip="Lock the whole plan and its targets. It cannot be changed afterwards.")
     ui.button("plan:pass", px0 + 236, 628, 52, 48, "Pass", ctrl.pass_turn, hotkeys=(pygame.K_p,), sublabel="(P)",
               tooltip="End this activation without acting." if turn["has_legal_action"] else "No legal action is available: pass.")
-    ui.button("plan:order", px0 + 294, 628, 86, 22, "Order (O)", ctrl.swap_plan_order, enabled=len(ctrl.draft) >= 2,
-              reason="Needs two planned actions.", hotkeys=(pygame.K_o,), size=13,
+    order_reason = ctrl.order_problem()
+    ui.button("plan:order", px0 + 294, 628, 86, 22, "Order (O)", ctrl.swap_plan_order, enabled=order_reason is None,
+              reason=order_reason, hotkeys=(pygame.K_o,), size=13,
               tooltip="Swap the order of the two actions. Class rules and action speed still decide first; this breaks ties.")
     ui.button("plan:clear", px0 + 294, 654, 86, 22, "Clear (C)", ctrl.clear_plan, enabled=bool(ctrl.draft) or ctrl.targeting_die is not None,
               reason="The plan is already empty.", hotkeys=(pygame.K_c,), size=13, tooltip="Remove every planned action.")
@@ -652,7 +689,11 @@ def draw_reactions(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
     options = reaction["options"]
     ui.panel(8, 476, 1264, 214, f"Reaction window: stage {reaction['stage_number']} of 3: {stage.capitalize()}   (Guard -> Resource -> Interrupt -> enemy action)",
              border=Theme.ACCENT, width=2)
-    ui.text(20, 500, f"{intent['actor_name']} will use {intent['name']} ({intent['text']}) on {', '.join(intent['target_names'])}.", 15, Theme.TEXT, bold=True, max_width=1010)
+    # The amount that will really land, where it differs from the printed one (Weaken, a resisted interrupt).
+    now = f"  Now {intent['forecast']['note']}." if intent["forecast"]["note"] else ""
+    headline = f"{intent['actor_name']} will use {intent['name']} ({intent['text']}) on {', '.join(intent['target_names'])}.{now}"
+    headline_size = next((size for size in (15, 14, 13, 12) if ui.text_width(headline, size, True) <= 1010), 12)
+    ui.text(20, 500, headline, headline_size, Theme.TEXT, bold=True, max_width=1010)
 
     picking = ctrl.reaction_hero
     if not any(o["hero_id"] == picking and o["eligible"] and o["needs_target"] for o in options):
@@ -693,10 +734,19 @@ def draw_reactions(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
         ui.escape_action = ctrl.cancel_reaction_pick
 
     described = described or next((o for o in options if o["eligible"]), None)
+    # The right-hand column holds the description and, below it, the reactions already used on this
+    # enemy action (by their names). Both are sized by measuring, so neither is cut off.
+    room = 4 if reaction["used"] else 5
     if described is not None:
-        ui.paragraph(1050, 524, f"{described['name']}: {described['expected']}", 214, 13, Theme.DIM, line_height=15, max_lines=5)
-    used = ", ".join(f"{names[u['hero_id']]}: {u['reaction']}" for u in reaction["used"]) or "none"
-    ui.text(1050, 606, f"Used this intent: {used}", 13, Theme.DIM, max_width=214)
+        words = f"{described['name']}: {described['expected']}"
+        size = next((size for size in (13, 12, 11, 10) if len(ui.wrap_lines(words, 214, size)) <= room), 10)
+        ui.paragraph(1050, 524, words, 214, size, Theme.DIM, line_height=15, max_lines=room)
+    if reaction["used"]:
+        forms = ["Used: " + ", ".join(f"{u['name']} ({names[u['hero_id']]})" for u in reaction["used"]),
+                 "Used: " + ", ".join(u["name"] for u in reaction["used"])]
+        choices = [(form, size) for form in forms for size in (13, 12, 11, 10)]
+        used_line, used_size = next((choice for choice in choices if len(ui.wrap_lines(choice[0], 214, choice[1])) <= 2), choices[-1])
+        ui.paragraph(1050, 594, used_line, 214, used_size, Theme.DIM, line_height=15, max_lines=2)
     ui.button("react:skip", 1050, 628, 102, 48, "Skip", ctrl.skip_stage, hotkeys=(pygame.K_s,), default=True,
               sublabel="(S) this stage", tooltip="Close this stage without reacting. Stages never reopen.")
     ui.button("react:skip_all", 1158, 628, 102, 48, "Skip All", ctrl.skip_all_stages, hotkeys=(pygame.K_a,),

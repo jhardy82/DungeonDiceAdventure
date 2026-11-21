@@ -153,6 +153,7 @@ class GameApp:
 
     def draw(self) -> None:
         ui, controller = self.ui, self.controller
+        controller.expire_message()
         ui.begin(self.surface)
         if ui.text_scale > 1.0:
             # A larger text size: the frame is measured first, so that a text grows only where it has room.

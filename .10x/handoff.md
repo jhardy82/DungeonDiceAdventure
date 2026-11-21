@@ -28,9 +28,9 @@ Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.30),
 `docs/class_evolution/FDD_v0.2.md`.
 
 ### Open Questions
-- **Playtest findings (2026-11-21):** `docs/PLAYTEST_TEAM_2026-11-21.md` lists about 45 findings, seven of
-  them high and four replayed. Which are fixed, and how the rule questions are answered, is the
-  owner's decision.
+- **Playtest findings (2026-11-21):** the owner decided what is fixed (D-34; decision log section
+  7.32). Section 6 of `docs/PLAYTEST_TEAM_2026-11-21.md` lists the five batches and their state.
+  Still for the owner: dismissing a hero (R3), starting classes (R4), mastery pace (R5).
 - **Android (D-33):** phase 0 of `docs/android/PLAN.md`, the walking skeleton, is next. Its go or
   no-go check decides whether the phone screens are built with Flet.
 - **The owner's playtest (D-32):** the owner plays the demo and reports what is wrong or missing.

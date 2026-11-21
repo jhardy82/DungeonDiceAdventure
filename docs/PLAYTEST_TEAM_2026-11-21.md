@@ -190,3 +190,19 @@ These are questions for the simulator, not conclusions.
 - The command budget was too small for the strategist's three runs; one full run fitted.
 - Three testers played the end of a battle with blind key sequences to save commands. The guide
   now forbids that for anything they report on.
+
+## 6. What is fixed (owner decision D-34, 2026-11-21)
+
+The owner decided: fix every defect and every case of missing information that needs no design
+decision; keep the single-target shortcut but make it safe; ask once more before "Abandon Run",
+"Retry" and the profile reset; fix both rule faults (R1, R2). Details: `docs/DECISION_LOG.md`,
+section 7.32.
+
+| Batch | Findings | State |
+|-------|----------|-------|
+| 1. Predictions and the battle screen | D1, D4, D5, D6, D7, D10, D13, D14, D15, D16, D17, M1, M2 | Fixed |
+| 2. Keys, safeguards, reach | K1 to K6, S1, S2, A1, A2, D8, D9, M12 | Open |
+| 3. Class Evolution information | D3, D11, D12, D18, D19, M8, M10 | Open |
+| 4. Rules | R1 (Imbue), R2 and D2 (free heal) | Open |
+| 5. Other information and layout | M3 to M7, M9, M11, L1 to L7, A3, A4, S3, S4 | Open |
+| Not decided by the owner | R3 (dismiss a hero), R4 (starting classes), R5 (mastery pace) | Waiting |

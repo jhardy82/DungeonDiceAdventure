@@ -16,9 +16,19 @@ from battle_dice.core.engine import Engine
 from battle_dice.core.events import EventType, events_hash, state_hash
 from battle_dice.core.models import RunPhase
 from battle_dice.core.replay import export_run, verify
-from battle_dice.core.view import describe_event
+from battle_dice.core.view import combat_log, describe_event
 from battle_dice.sim.policies import HeuristicPolicy, play_run
-from tests.conftest import events_of, ok, packaged_content, unit, win_battle
+from tests.conftest import (
+    action,
+    begin_hero,
+    commit,
+    events_of,
+    finish_activation,
+    ok,
+    packaged_content,
+    unit,
+    win_battle,
+)
 
 GUARDIAN = {"hero_id": "hero_001", "name": "Aldric", "stats": {"max_hp": 18, "max_mana": 3, "speed": 6}}
 
@@ -85,6 +95,23 @@ def test_a_saved_hero_becomes_a_guardian_between_recovery_and_the_upgrade(catalo
     assert event.delta["hp"] == [hp, guardian.hp] and event.delta["max_hp"] == [14, 18]
     text = describe_event(event, {"h01": "Aldric"})
     assert text == f"Aldric is now a Guardian: HP {hp}/14 -> {guardian.hp}/18, mana {mana}/3 -> {guardian.mana}/3, new dice and new upgrade offers."
+
+
+def test_the_log_does_not_credit_an_earlier_bonus_to_the_new_passive(catalog):
+    """As a Squire the hero shielded itself with Steadfast. Once it is a Guardian the log must not call that Bulwark."""
+    party = [{"class_id": "squire", "row": "front", "hero": {"hero_id": "hero_001", "name": "Aldric"}},
+             {"class_id": "scout", "row": "back", "hero": {"hero_id": "hero_002"}}]
+    engine = Engine(packaged_content(), catalog)
+    ok(engine.do(cmd.START_RUN, seed=11, party=party))
+    begin_hero(engine, "h01", iron_d6=3, oath_d4=4)  # Guard
+    commit(engine, action("iron_d6", "h01"))
+    finish_activation(engine)
+    assert sum("(incl. +1 Steadfast)" in line for line in combat_log(engine)) == 1
+    win_battle(engine)
+    ok(become_guardian(engine))
+    log = combat_log(engine)
+    assert sum("Aldric gains 4 shield (incl. +1 bonus)" in line for line in log) == 1
+    assert not any("Bulwark" in line or "Steadfast" in line for line in log)
 
 
 def test_the_upgrade_is_then_chosen_on_a_guardian_die_and_the_run_goes_on(catalog):

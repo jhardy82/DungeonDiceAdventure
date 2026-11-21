@@ -47,7 +47,7 @@ class Screen:
 
 
 FALLBACK_TEXT = {
-    "single_enemy": "If the target is gone: retargets (same row, then lowest HP%, then ID); cancels if none.",
+    "single_enemy": "If its target is gone: next in its row, then lowest HP%.",
     "all_enemies": "Hits every enemy still standing; cancels if none.",
     "single_ally": "If the target becomes invalid: cancelled, no cost spent.",
     "all_allies": "Affects every ally still standing.",
@@ -131,6 +131,9 @@ class AppController:
         self.message = ""
         self.message_is_error = False
         self.message_serial = 0  # bumped on every new message, so the status bar can tell it is new
+        #: Where the message was last seen (screen, pause, settings group) and which message that was.
+        self._message_place: tuple[Any, ...] | None = None
+        self._message_seen = 0
         self.error_text = ""
         # In-run menu (Esc). While it is open nothing in the run advances.
         self.paused = False
@@ -189,6 +192,18 @@ class AppController:
     def warn(self, text: str) -> None:
         self.message, self.message_is_error = text, True
         self.message_serial += 1
+
+    def expire_message(self) -> None:
+        """Once a frame: a message belongs to the place it was given in.
+
+        When the player has moved to another screen (or opened the pause menu, or another group of
+        settings) and nothing new was said, the old message is dropped rather than left standing.
+        """
+        place = (self.screen, self.paused, self.pause_help, self.settings_tab)
+        if place != self._message_place and self.message_serial == self._message_seen:
+            self.message, self.message_is_error = "", False
+        self._message_place = place
+        self._message_seen = self.message_serial
 
     def fail(self) -> None:
         """Record the exception being handled and switch to the recoverable error screen."""
@@ -254,6 +269,10 @@ class AppController:
             self.draft = []
             self.targeting_die = None
             self.inspect_die = None
+            turn = engine.combat.turn if engine is not None and owner[0] is not None else None
+            if engine is not None and turn is not None and not turn.rolled:
+                # A new activation waits for its roll: what was said about the last one is over.
+                self.info(f"{engine.combat.combatants[turn.hero_id].name} is up. Roll the dice (R).")
         if engine is None or not engine.started or engine.state.phase != RunPhase.BATTLE \
                 or engine.combat.phase not in CombatPhase.STAGE_BY_WINDOW:
             self.reaction_hero = None
@@ -612,9 +631,20 @@ class AppController:
             self.info("Target selection cancelled.")
 
     def swap_plan_order(self) -> None:
-        if len(self.draft) >= 2:
+        if len(self.draft) >= 2 and self._guard(self.order_problem) is None:
             self.draft.reverse()
             self._guard(self._report_draft)
+
+    def order_problem(self) -> str | None:
+        """Why the Order control would change nothing, or ``None`` when it changes the order of resolution."""
+        engine = self.engine
+        if engine is None or len(self.draft) < 2:
+            return "Needs two planned actions."
+        now, problem, _ = engine.check_plan(self.draft)
+        swapped, swapped_problem, _ = engine.check_plan(list(reversed(self.draft)))
+        if problem is None and swapped_problem is None and [a.source_die_id for a in now] == [a.source_die_id for a in swapped]:
+            return "The rules fix the order of these two actions (class rule, then action speed). Swapping changes nothing."
+        return None
 
     def clear_plan(self) -> None:
         self.draft = []
@@ -631,12 +661,14 @@ class AppController:
     def plan_preview(self) -> dict[str, Any]:
         """Validated view of the draft: resolution order, costs, target fallback, or the problem."""
         engine = self.engine
-        result: dict[str, Any] = {"problem": None, "problem_code": None, "ordered": [], "mana_before": 0, "mana_after": 0}
+        result: dict[str, Any] = {"problem": None, "problem_code": None, "ordered": [], "mana_before": 0, "mana_after": 0,
+                                  "backlash": ""}
         if engine is None or engine.combat.turn is None:
             return result
         hero = engine.combat.combatants[engine.combat.turn.hero_id]
         result["mana_before"] = result["mana_after"] = hero.mana
         if not self.draft:
+            result["backlash"] = self._backlash_text(hero.corruption)
             return result
         intents, problem, code = engine.check_plan(self.draft)
         result["problem"], result["problem_code"] = problem, code
@@ -663,15 +695,22 @@ class AppController:
                 )
             return result
         mana = hero.mana
+        corruption = hero.corruption
         opening = engine.build(hero.id).schedule.opening_categories
         for position, intent in enumerate(intents):
             face = engine.intent_face(intent)
             target = engine.combat.combatants[intent.committed_target_ids[0]] if intent.committed_target_ids else hero
             combo = len(intents) == 2 and position == 1 and intents[0].category in opening
+            forecast = action_forecast(engine, hero, face, intent, target, combo, mana=mana)["note"]
             mana -= face.mana_cost
             for effect in face.effects:
-                if effect["type"] == "gain_mana" and effect.get("target", "target") == "self":
-                    mana = min(hero.max_mana, mana + face.effect_amount(effect))
+                own = effect.get("target", "target") == "self"
+                amount = face.effect_amount(effect)
+                if effect["type"] == "gain_mana" and own:
+                    mana = min(hero.max_mana, mana + amount)
+                elif effect["type"] in ("gain_corruption", "remove_corruption") and (own or hero.id in intent.committed_target_ids):
+                    change = amount if effect["type"] == "gain_corruption" else -amount
+                    corruption = max(0, min(hero.max_corruption, corruption + change))
             result["ordered"].append(
                 {
                     "die_id": intent.source_die_id,
@@ -682,11 +721,22 @@ class AppController:
                     "text": face_view(face)["text"],
                     "target_names": [engine.combat.combatants[t].name for t in intent.committed_target_ids],
                     "fallback": FALLBACK_TEXT[face.target_scope],
-                    "forecast": action_forecast(engine, hero, face, intent, target, combo)["note"],
+                    "forecast": forecast,
                 }
             )
         result["mana_after"] = mana
+        result["backlash"] = self._backlash_text(corruption)
         return result
+
+    def _backlash_text(self, corruption: int) -> str:
+        """The health the acting hero will lose to its corruption when this activation ends; else ``""``.
+
+        Short, because it shares the plan column. The rule itself is on the hero's card (inspect panel).
+        """
+        rule = self.content.balance["corruption"]
+        if corruption < rule["backlash_threshold"]:
+            return ""
+        return f"Corruption {corruption}: -{rule['backlash_damage']} HP when this activation ends."
 
     def confirm_problem(self) -> str | None:
         if self.targeting_die is not None:

@@ -2,7 +2,7 @@
 
 ## Project: Battle Dice
 **Current Phase:** Implementation (the project was already under way when this file was created)
-**Last Updated:** 2026-11-12 by the implementing engineer (owner answers of 2026-11-12)
+**Last Updated:** 2026-11-21 by the implementing engineer (owner decisions D-33 and D-34)
 **Health:** On Track
 
 **Current goal (owner, 2026-11-11):** a fully configurable and playable demo.
@@ -33,8 +33,8 @@
 - The demo's configuration (D-31), part 2b: text size (Normal, Large). Each frame is measured and a text grows only where it has room; a layout check walks 39 states under three fonts and two window sizes
 
 ### In Progress
-- Android app (D-33): phase 0, the walking skeleton with Flet (`docs/android/PLAN.md`)
-- Playtest by eight AI playtesters (2026-11-21): report in `docs/PLAYTEST_TEAM_2026-11-21.md`; the owner decides what is fixed
+- Android app (D-33): phase 0, the walking skeleton with Flet (`docs/android/PLAN.md`); starts after the playtest fixes
+- Fixes after the playtest by eight AI playtesters (D-34): batch 1 of 5 done (predictions and the battle screen); the state of each finding is in section 6 of `docs/PLAYTEST_TEAM_2026-11-21.md`
 - Every setting the owner chose in D-31 is in
 - Waiting for the owner's playtest of the demo (D-32); "Confirm a pass" on by default is confirmed
 
