@@ -2380,6 +2380,36 @@ the replay pin, the shipped content and the vocation catalog are untouched.
 screens at two window sizes and three fonts). Twenty deliberate breaks of the new code were run
 against them; every one made a test fail.
 
+### 7.39 Android, phase 1, step 1: the code is tested on the phone's Python (D-35, 2026-11-21)
+
+- The Android app embeds Python 3.14; the desktop game asks for 3.15. Until now only the
+  phone's self-check ran on 3.14 (in the Android build). A 3.15-only construct anywhere else
+  would have reached the phone unseen.
+- Now a job of its own runs the whole suite and both self-checks on 3.14 on every pull request.
+  Lint's target is 3.14, and the type check runs a second time as 3.14.
+- **My reading, stated so it can be corrected:** "Python 3.14 allowed" in the plan is done as
+  *tested on 3.14*, not as a lower `requires-python`. Lowering it would change what the desktop
+  package, the launcher and the README promise, which is the owner's stack decision (3.15) and
+  is not needed for the phone: the Android build takes the package from the source tree.
+- Measured in the development container on 3.14.6: 1,382 tests pass with warnings as errors,
+  both self-checks pass. No code had to change.
+
+**Step 2: messages worded for touch**
+
+- A controller made with `touch=True` says every message without key names, and with "tap"
+  where a desktop presses or clicks. The wording is one small module without a toolkit
+  (`app/wording.py`); the phone app asks for it; a desktop controller is unchanged.
+- **My reading:** the messages stay written once, for the desktop, and are worded for touch by
+  rule, instead of being written twice. Two wordings side by side would drift apart. The risk
+  of a rule is a message it does not cover, so a test reads every message in the source and
+  fails when one still names a key, a press or a click after wording. On its first run it found
+  one I had missed.
+- Found on the way: one of the emulator script's tests assumed that no second passes while it
+  runs. On a busy machine one does. The assertion now accepts any number of seconds.
+- 1,401 tests (19 new). Twelve deliberate breaks: ten were noticed at once, two were not (the
+  word "click" alone, and the phone layer's own wording of a desktop controller's message); a
+  test was added for each, and both are noticed now.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

@@ -32,7 +32,7 @@ section 7.31. This file is the plan that was approved, kept up to date as phases
 | Phase | What | State |
 |-------|------|-------|
 | 0. Walking skeleton | A minimal app (menu, party, one battle) built as an APK on GitHub, started in an emulator there, installed by the owner on the S25 Ultra | Built, and built and started on GitHub (see "Phase 0, as built" and "Phase 0, measured"). Open: the owner's install on the phone |
-| 1. Groundwork | Python 3.14 allowed and tested beside 3.15; controller messages without key names for touch; screen data in the pygame-free layer | After phase 0 |
+| 1. Groundwork | Python 3.14 tested beside 3.15; controller messages without key names for touch; screen data in the pygame-free layer | Started on the owner's decision of 2026-11-21 (D-35). Steps 1 and 2 are done (see "Phase 1, step by step") |
 | 2. Phone screens, shipped game | Menu, Settings, party setup, battle, upgrade, outcome, pause; each upright and sideways | The main job |
 | 3. Class Evolution on the phone | Roster, career, skills, vocation change, the third-battle decision | |
 | 4. Android behaviour | Back gesture, resuming a run after the app was closed, cutout and safe areas, icon and name | |
@@ -90,6 +90,33 @@ phone that is an unusual setting; the owner's phone can show it in a minute.
 in the run's artifact `battle-dice-android-emulator`. The development container cannot download
 artifacts, so they have not been looked at; whether the app follows the system font size is
 therefore still open (see the table below).
+
+## Phase 1, step by step
+
+Groundwork that any phone toolkit needs. It changes nothing a desktop player sees.
+
+| Step | What | State |
+|------|------|-------|
+| 1. The code runs on the phone's Python | The whole suite (1,401 tests, warnings as errors) and both self-checks run on Python 3.14 in a job of their own on every pull request. Lint treats 3.14 as the oldest Python the code must run on, and the type check runs a second time as 3.14 | Done |
+| 2. Messages without key names | A controller made with `touch=True` words everything it says for a finger: "Roll the dice (R)." becomes "Roll the dice.", "Press again to ..." becomes "Tap again to ...", "press its number or click it" becomes "tap it" (`src/battle_dice/app/wording.py`). The phone app asks for it. A desktop controller says its messages as written | Done |
+| 3. Screen data outside pygame | What each desktop screen works out while drawing (rows, labels, reasons) moves into the pygame-free layer, screen by screen, as the phone screens need it | With phase 2 |
+
+- **What "tested beside 3.15" means.** The desktop game still asks for Python 3.15
+  (`requires-python`, the launcher, the README): that is the owner's stack decision and is not
+  changed. The code is kept runnable on 3.14 and proven so by the tests, because the Android
+  app embeds 3.14. The 3.14 job runs from the source tree, as the Android build takes the
+  package from the source tree too.
+- **Measured before the job was added:** on Python 3.14.6 in the development container all
+  1,382 tests of that moment passed with warnings as errors (290 seconds), both self-checks
+  passed, and lint and the type check were clean when told the code is for 3.14. Nothing in the
+  code had to change.
+- **How step 2 is kept true.** A test reads every message in the source of the controller and
+  the other toolkit-free modules, and fails when one still names a key, a press or a click after
+  it was worded for touch. On its first run it found a message I had missed (the help for
+  typing a seed: "Enter sets it, Esc cancels."). A second test plays a whole battle by taps and
+  collects everything the touch controller says.
+- **Not covered by step 2:** the labels of buttons. Those belong to each front end: the desktop
+  screens write "Roll  (R)", the phone screens write "Roll".
 
 ## Go or no-go after phase 0
 

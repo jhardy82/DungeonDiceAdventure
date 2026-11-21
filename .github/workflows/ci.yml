@@ -9,6 +9,30 @@ permissions:
   contents: read
 
 jobs:
+  test-on-the-phones-python:
+    # The Android app embeds Python 3.14 (Flet's newest; docs/android/PLAN.md). The desktop game asks for 3.15.
+    # The same suite runs here on 3.14, from the source tree: the package itself still says requires-python >= 3.15.
+    name: Test on Python 3.14 (the Python inside the Android app)
+    runs-on: ubuntu-latest
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      PYTHONUTF8: "1"
+      PYTHONPATH: src
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install what the game and its tests need (not the package: it asks for 3.15)
+        run: python -m pip install "pygame-ce>=2.5.8" "jsonschema>=4.20" "pytest>=8"
+      - name: Test, warnings as errors
+        run: python -m pytest -W error
+      - name: Both self-checks
+        run: |
+          python -m battle_dice --smoke-test
+          python -m battle_dice --smoke-test --feature class_evolution_v1
+
   test:
     name: Lint and test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -32,6 +56,9 @@ jobs:
         run: python -m ruff check src tests tools packaging
       - name: Type-check the whole package, the tools and the tests
         run: python -m mypy src/battle_dice tools tests
+      - name: Type-check once more as Python 3.14 (the Python inside the Android app)
+        # Catches a use of something only 3.15 has, before the phone meets it. See docs/android/PLAN.md, phase 1.
+        run: python -m mypy --python-version 3.14 src/battle_dice tools tests
       - name: Test, with a coverage floor for the rules engine, content loader and random numbers
         # PRD target: at least 80% line coverage. Measured 97%; the floor is set at 90% so a real drop fails.
         # Warnings are errors: a deprecation or a resource leak fails the build instead of scrolling past.

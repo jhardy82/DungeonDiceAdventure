@@ -36,7 +36,7 @@
 
 ### In Progress
 - Android app (D-33): phase 0, the walking skeleton with Flet, is built, and was built and started on GitHub's machines (APK 107.6 MB, target API 36, 16 KB pages, self-check passed at four starts on an emulator, upright and sideways). Open: the owner's install on the phone, a look at the emulator screenshots, and the go or no-go decision (`docs/android/PLAN.md`, "Phase 0, measured")
-- D-35 (owner, 2026-11-21): dismissing a hero, recruit names without a class, and the Mastery pace note are built (decision log 7.38); Android phase 1 groundwork is next
+- D-35 (owner, 2026-11-21): dismissing a hero, recruit names without a class, and the Mastery pace note are built (decision log 7.38); Android phase 1 groundwork: steps 1 (tests on Python 3.14) and 2 (messages worded for touch) are built; step 3 (screen data outside pygame) goes with the phone screens
 - Every setting the owner chose in D-31 is in
 - Waiting for the owner's playtest of the demo (D-32); "Confirm a pass" on by default is confirmed
 

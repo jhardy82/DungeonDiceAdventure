@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from battle_dice import settings as settings_module
+from battle_dice.app.wording import touch_wording
 from battle_dice.content.loader import Content, load_content
 from battle_dice.core import commands as cmd
 from battle_dice.core import planning
@@ -104,7 +105,10 @@ class AppController:
         save_dir: str | Path | None = None,
         settings: Settings | None = None,
         settings_path: str | Path | None = None,
+        touch: bool = False,
     ):
+        #: True on a device without keys or a pointer: every message is worded for a finger (``app/wording.py``).
+        self.touch = touch
         self.content = content if content is not None else load_content()
         #: The player's settings. Without a path a change lasts for this session only.
         self.settings: Settings = settings if settings is not None else Settings()
@@ -189,13 +193,17 @@ class AppController:
     # Feedback helpers
     # ----------------------------------------------------------------------------------------
 
+    def worded(self, text: str) -> str:
+        """The text as this device's player reads it: without key names on a touch device."""
+        return touch_wording(text) if self.touch else text
+
     def info(self, text: str) -> None:
-        self.message, self.message_is_error = text, False
+        self.message, self.message_is_error = self.worded(text), False
         self.message_serial += 1
         self._asked = None  # something else happened: a "press again" is over
 
     def warn(self, text: str) -> None:
-        self.message, self.message_is_error = text, True
+        self.message, self.message_is_error = self.worded(text), True
         self.message_serial += 1
         self._asked = None
 
@@ -335,7 +343,7 @@ class AppController:
             label, hint = f"Dice seed: {self.fixed_seed}", "set by a launch flag"
         else:
             label, hint = f"Dice seed: {self.fixed_seed}", "press D for a random seed"
-        return {"label": label, "hint": hint, "entering": self.seed_entry is not None, "seed": self.fixed_seed,
+        return {"label": label, "hint": self.worded(hint), "entering": self.seed_entry is not None, "seed": self.fixed_seed,
                 "reason": "Set by a launch flag for this session." if self._seed_from_flag else None}
 
     def toggle_seed(self) -> None:
@@ -1080,7 +1088,7 @@ class AppController:
         stats = summarize(engine.events)
         tips = []
         if stats["rerolls_used"] == 0 and stats["hero_activations"] > 0:
-            tips.append("Tip: no reroll was used. Reroll (R) rerolls every die you have not kept, twice per activation, for free.")
+            tips.append(self.worded("Tip: no reroll was used. Reroll (R) rerolls every die you have not kept, twice per activation, for free."))
         offered = any(e.type == EventType.REACTION_STAGE_OPENED for e in engine.events)
         if stats["reactions_used"] == 0 and offered:
             tips.append("Tip: no reaction was used. Interpose, Grounding and Disrupt answer enemy actions before they land.")
