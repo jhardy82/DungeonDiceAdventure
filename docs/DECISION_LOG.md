@@ -2297,7 +2297,8 @@ development container, so it ran on GitHub with this pull request.
   the report showed the cause at once: the screenshot was upright (1440 x 3120), so the
   emulator's display had not turned, and the app had laid out for the screen it was given.
   The second run's case was the same. Why that emulator keeps the display upright there is not
-  known. The fourth start now does what a hand does: the screen is free to turn and the motion
+  known. (Known since pull request 45, section 7.40: the tool that started the app turned it
+  back.) The fourth start now does what a hand does: the screen is free to turn and the motion
   sensor is told the device is sideways, then the app starts. The sixth run passed all four
   starts (sideways: 891 x 411 dp, screenshot 3120 x 1440).
 - Not shown, and said so in the plan: an app started on a screen locked sideways.
@@ -2472,6 +2473,37 @@ rules version); reaction keys by the hero's place.
 deliberate breaks of the new code: 36 were noticed at once. Of the five that were not, four got
 a test of their own and are noticed now; the fifth showed a condition of mine that changed
 nothing, and the condition was removed.
+
+**The emulator check failed once on this pull request, and its cause explains two older faults.**
+
+- What happened: all four starts passed the self-check; the fourth (device held sideways before
+  the app starts) was laid out upright, and the script's rotation facts showed "auto-rotate: 0"
+  although the script had waited until the device said the screen was free.
+- Cause, read in Android's source (release 15, which the emulator runs): the script started the
+  app with the `monkey` tool. `monkey` ends every run by forcing the screen upright and then
+  releasing the rotation lock (`Monkey.java`: "Release the rotation lock if it's still held and
+  restore the original orientation"). And when a locked screen comes back upright, the system
+  bar locks it upright again a moment later (`RotationButtonController.onRotationWatcherChanged`).
+  In the fourth start the screen was sideways when `monkey` ran, so both happened, and the
+  system bar's lock came last. Whether it comes last depends on timing: hence two passes
+  before this failure.
+- What that explains besides: in phase 0 (section 7.37) an app started on a screen locked
+  sideways came up upright, and I wrote that the emulator's reason was not known. It was
+  `monkey` forcing the screen upright. The fault of pull request 44 (section 7.39) was the
+  system bar's lock after the script's own rotation lock; that reading stands.
+- How sure: the two pieces of Android's behaviour are read from its source. That they are what
+  happened in this run is reasoned from the job's log (the times, "auto-rotate: 0, user
+  rotation: 0"). The device's own record of who locked the rotation was not seen, because the
+  script did not print it.
+- What was done: the app is started with `am start` on the screen the launcher would open,
+  which starts it and does nothing else. On a wrong layout the script now prints the device's
+  rotation lock history (the last eight changes, each with its caller), so the next fault of
+  this kind names its cause in the report. Tests: the script's stand-in device now does what
+  `monkey` does; a test runs the script with `monkey` put back and it fails as the job did;
+  another covers a device that does not name the app's start screen (1,453 tests now). Seven
+  deliberate breaks of the changed lines: all noticed.
+- Still not shown: an app started on a screen locked sideways. It has not been tried since the
+  cause was found.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 

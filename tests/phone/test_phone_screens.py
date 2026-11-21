@@ -261,7 +261,12 @@ case "$*" in
   "install -r "*) echo Success ;;
   "shell pm list packages -3") cat "$state/packages" ;;
   "shell am force-stop "*|"logcat -c") ;;
-  "shell monkey "*) echo $(( start + 1 )) > "$state/starts" ;;
+  "shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "*) cat "$state/activity" ;;
+  "shell am start -n dev.battledice.battle_dice_android/.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER")
+    echo "Starting: Intent { act=android.intent.action.MAIN }"; echo $(( start + 1 )) > "$state/starts" ;;
+  # What monkey does besides starting the app (Monkey.java): it forces the screen upright and sets it free;
+  # the system bar, seeing a locked screen come upright, then locks it upright once more.
+  "shell monkey "*) echo $(( start + 1 )) > "$state/starts"; echo 0 > "$state/turned"; echo 0 > "$state/auto"; touch "$state/stuck" ;;
   "logcat -d")
     cat "$state/log_$start" 2>/dev/null || true
     if [ "$(cat "$state/turned")" = 1 ]; then cat "$state/log_${start}_turned" 2>/dev/null || true; fi ;;
@@ -278,7 +283,7 @@ case "$*" in
   "shell settings put "*|"shell cmd window user-rotation "*) echo "$*" >> "$state/settings" ;;
   "shell settings get system accelerometer_rotation") cat "$state/auto" ;;
   "shell settings get system "*) echo 0 ;;
-  "shell dumpsys window displays") printf '  mDisplayRotation=ROTATION_0\n  size of the display\n  mLastOrientation=-1\n' ;;
+  "shell dumpsys window displays") printf '  mDisplayRotation=ROTATION_0\n  size of the display\n  mLastOrientation=-1\n      23:04:41.500: mode=USER_ROTATION_LOCKED, rotation=ROTATION_0, caller=MonkeyRotationEven#injectEvent\n      23:04:41.600: mode=USER_ROTATION_FREE, rotation=ROTATION_0, caller=MonkeyRotationEven#injectEvent\n' ;;
   *) echo "the stand-in for adb does not know: $*" >&2; exit 9 ;;
 esac
 """
@@ -293,12 +298,15 @@ STARTS = ("1_upright", "2_larger_font", "3_sideways", "4_started_sideways")
 
 def emulator_check(tmp_path, logs: list[str | None], turned: str | None = SIDEWAYS, stuck: bool = False, follows: tuple[int, ...] = (1, 2, 3, 4),
                    takes_it_back: bool = False, settle: str = "0",
-                   packages: str = "package:com.android.chrome\npackage:dev.battledice.battle_dice_android\n"):
+                   packages: str = "package:com.android.chrome\npackage:dev.battledice.battle_dice_android\n",
+                   activity: str = "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\ndev.battledice.battle_dice_android/.MainActivity\n",
+                   script_text=None):
     """Runs the script. ``logs`` is the device log of each start in turn (None: the app never reports; starts
     that are not given pass);
     ``turned`` is what the app adds to the log once the screen is sideways (None: it does not notice), in the
     starts named by ``follows``;
-    ``stuck`` is a device whose screen does not turn."""
+    ``stuck`` is a device whose screen does not turn; ``activity`` is what the device answers when asked for
+    the app's start screen; ``script_text`` changes the script before it runs (to show what a fault would do)."""
     import os
     from pathlib import Path
 
@@ -313,6 +321,7 @@ def emulator_check(tmp_path, logs: list[str | None], turned: str | None = SIDEWA
     if takes_it_back:
         (state / "takes_it_back").write_text("", encoding="utf-8")
     (state / "packages").write_text(packages, encoding="utf-8")
+    (state / "activity").write_text(activity, encoding="utf-8")
     if stuck:
         (state / "stuck").write_text("", encoding="utf-8")
     for number, log in enumerate([*logs, *[PASSED] * (len(STARTS) - len(logs))], start=1):
@@ -321,6 +330,10 @@ def emulator_check(tmp_path, logs: list[str | None], turned: str | None = SIDEWA
         if turned is not None and number in follows:
             (state / f"log_{number}_turned").write_text(f"{turned}\n", encoding="utf-8")
     script = Path(__file__).resolve().parents[2] / "android" / "tools" / "emulator_check.sh"
+    if script_text is not None:
+        changed = tmp_path / "emulator_check.sh"
+        changed.write_text(script_text(script.read_text(encoding="utf-8")), encoding="utf-8", newline="\n")
+        script = changed
     env = {**os.environ, "PATH": f"{tools}{os.pathsep}{os.environ['PATH']}", "FAKE_ADB_STATE": str(state),
            "EMULATOR_CHECK_PAUSE": "0", "EMULATOR_CHECK_POLL": "0", "EMULATOR_CHECK_LIMIT": "0", "EMULATOR_CHECK_SETTLE": settle}
     done = subprocess.run(["bash", str(script), "app.apk", str(out)], env=env, capture_output=True, text=True, check=False, timeout=60)
@@ -334,7 +347,8 @@ needs_bash = pytest.mark.skipif(sys.platform == "win32", reason="the script runs
 def test_the_emulator_check_passes_when_every_start_passes_and_the_layout_follows_the_screen(tmp_path):
     done, out, state = emulator_check(tmp_path, [PASSED, PASSED, PASSED])
     assert done.returncode == 0 and GOOD_END in done.stdout, done.stdout + done.stderr
-    assert "package: dev.battledice.battle_dice_android" in done.stdout
+    assert "package: dev.battledice.battle_dice_android\nstart screen: dev.battledice.battle_dice_android/.MainActivity\n" in done.stdout
+    assert "does not know" not in done.stderr and "Starting: Intent" not in done.stdout, done.stderr
     report = (out / "report.txt").read_text(encoding="utf-8").splitlines()
     assert [line.split(":")[0] for line in report] == [name for start in STARTS for name in (start, start)] + ["EMULATOR CHECK OK"]
     # (The seconds are whatever the machine took: a busy one may need one or two even with nothing to wait for.)
@@ -397,7 +411,10 @@ def test_the_report_shows_when_it_was_the_screen_that_did_not_turn(tmp_path):
     assert "3_sideways: BATTLE DICE SCREEN: layout=upright width=411 height=891 (expected sideways; the screenshot is 1440x3120)" in done.stdout
     # What the device says about its rotation follows each wrong layout, in the job's log and in the report.
     # (At the third start the screen is locked, at the fourth it is free to turn: the facts say which.)
-    display = "    mDisplayRotation=ROTATION_0\n    mLastOrientation=-1\n"
+    # Then who locked or freed the rotation last, each with its caller: the line that names the culprit.
+    display = ("    mDisplayRotation=ROTATION_0\n    mLastOrientation=-1\n"
+               "    lock history: 23:04:41.500: mode=USER_ROTATION_LOCKED, rotation=ROTATION_0, caller=MonkeyRotationEven#injectEvent\n"
+               "    lock history: 23:04:41.600: mode=USER_ROTATION_FREE, rotation=ROTATION_0, caller=MonkeyRotationEven#injectEvent\n")
     assert "    auto-rotate: 0, user rotation: 0\n" + display in done.stdout and "    auto-rotate: 1, user rotation: 0\n" + display in done.stdout
     assert done.stdout.count(display) == 2 and "size of the display" not in done.stdout
 
@@ -433,3 +450,27 @@ def test_the_emulator_check_fails_when_an_upright_start_is_laid_out_sideways(tmp
 def test_the_emulator_check_fails_when_the_app_is_not_installed(tmp_path):
     done, _, _ = emulator_check(tmp_path, [PASSED, PASSED, PASSED], packages="package:com.android.chrome\n")
     assert done.returncode == 1 and "EMULATOR CHECK FAILED: the app's package was not found after the install" in done.stdout
+
+
+@needs_bash
+def test_the_emulator_check_fails_when_the_apps_start_screen_is_not_found(tmp_path):
+    done, _, state = emulator_check(tmp_path, [PASSED] * 4, activity="No activity found\n")
+    assert done.returncode == 1 and done.stdout.rstrip().endswith("EMULATOR CHECK FAILED: the app's start screen was not found after the install")
+    assert "No activity found" in done.stdout, "what the device answered is shown"
+    assert (state / "starts").read_text(encoding="utf-8").strip() == "0"
+
+
+@needs_bash
+def test_starting_the_app_with_monkey_would_turn_the_screen_under_the_check(tmp_path):
+    """Pull request 45: the fourth start came up upright with "auto-rotate: 0", although the script had seen
+    the screen free. Monkey, which started the app then, ends every run by forcing the screen upright and
+    setting it free, and the system bar locks an upright screen that was locked a moment ago. The stand-in
+    does the same, so this shows the fault the script had, and that the script as it is does not have it."""
+    with_monkey = lambda text: text.replace(  # noqa: E731
+        'adb shell am start -n "$activity" -a android.intent.action.MAIN -c android.intent.category.LAUNCHER',
+        'adb shell monkey -p "$package" -c android.intent.category.LAUNCHER 1')
+    done, _, _ = emulator_check(tmp_path, [PASSED] * 4, script_text=with_monkey)
+    assert 'adb shell monkey -p "$package"' in (tmp_path / "emulator_check.sh").read_text(encoding="utf-8"), "the change was made"
+    assert done.returncode == 1 and "EMULATOR CHECK FAILED: not the expected layout at: 3_sideways 4_started_sideways" in done.stdout
+    assert "4_started_sideways: BATTLE DICE SCREEN: layout=upright width=411 height=891 (expected sideways; the screenshot is 1440x3120)\n    auto-rotate: 0, user rotation: 0\n" in done.stdout
+    assert "caller=MonkeyRotationEven#injectEvent" in done.stdout

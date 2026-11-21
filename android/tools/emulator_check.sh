@@ -19,6 +19,16 @@ if [ -z "$package" ]; then
   echo "EMULATOR CHECK FAILED: the app's package was not found after the install"; exit 1
 fi
 echo "package: $package"
+# The screen the launcher would open. The app is started with "am start", which starts it and nothing more.
+# It was started with "monkey" before. That tool ends every run by forcing the screen upright and releasing
+# the rotation lock again (Monkey.java, "Release the rotation lock if it's still held and restore the
+# original orientation"), and so it turned the screen under this check: see hold_device below.
+activity="$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$package" | tr -d '\r' | grep -m1 "^$package/" || true)"
+if [ -z "$activity" ]; then
+  adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$package"
+  echo "EMULATOR CHECK FAILED: the app's start screen was not found after the install"; exit 1
+fi
+echo "start screen: $activity"
 : > "$out/report.txt"
 no_check=""; wrong_layout=""
 say() { echo "$1" | tee -a "$out/report.txt"; }
@@ -31,13 +41,17 @@ turn_screen() {
 }
 
 # hold_device 1 (sideways) or 0 (upright): what the device's motion sensor feels, with the screen free to
-# turn by itself. A screen locked sideways before an app starts stayed upright on the build's emulator
-# (pull request 42, runs 2 and 5: the screenshots were upright), so the fourth start is done this way.
+# turn by itself, as a phone in a hand. The fourth start is done this way.
 #
-# The screen is set free through the window manager, and the script waits until the device says so. A
-# rotation lock that has just ended (the third start's) switches auto-rotate off once more a moment later:
-# in pull request 44 the fourth start then found "auto-rotate: 0" and an upright screen, after two runs in
-# which it had not.
+# The screen is set free through the window manager, and the script waits until the device says so. When a
+# locked screen turns back upright, Android's system bar locks it upright once more a moment later
+# (RotationButtonController.onRotationWatcherChanged), which can come after the script has set it free.
+# Two faults came from that, both with "auto-rotate: 0" and an upright screen at the fourth start:
+#   - pull request 44: the lock was the third start's own, just ended. Hence the wait below.
+#   - pull request 45: the lock was monkey's (see above). The screen was sideways by then, monkey forced it
+#     upright and set it free, and the system bar's lock came last. Hence "am start". (Read from Android's
+#     source and the job's log. The device's own lock history was not seen: rotation_facts prints it now.)
+# Monkey is also why a screen locked sideways before the start came up upright (pull request 42, runs 2, 5).
 hold_device() {
   local started=$SECONDS
   adb shell cmd window user-rotation free > /dev/null 2>&1 || true
@@ -55,7 +69,9 @@ hold_device() {
 # What the device says about its screen's rotation: printed when a layout is not the expected one.
 rotation_facts() {
   echo "    auto-rotate: $(adb shell settings get system accelerometer_rotation | tr -d '\r'), user rotation: $(adb shell settings get system user_rotation | tr -d '\r')"
-  adb shell dumpsys window displays | tr -d '\r' | grep -i -m8 -E "rotation|orientation" | sed 's/^ */    /' || true
+  adb shell dumpsys window displays | tr -d '\r' | grep -v "caller=" | grep -i -m8 -E "rotation|orientation" | sed 's/^ */    /' || true
+  # Who locked or freed the rotation last, and when (Android keeps the last eight, each with its caller).
+  adb shell dumpsys window displays | tr -d '\r' | grep "caller=" | tail -n 8 | sed 's/^ */    lock history: /' || true
 }
 
 # Waits for the app's report line and prints it with the seconds it took.
@@ -88,7 +104,7 @@ start_and_check() {
   adb shell am force-stop "$package"
   if [ "$turn" = held ]; then hold_device 1; sleep "$pause"; fi
   adb logcat -c
-  adb shell monkey -p "$package" -c android.intent.category.LAUNCHER 1 > /dev/null
+  adb shell am start -n "$activity" -a android.intent.action.MAIN -c android.intent.category.LAUNCHER > /dev/null
   if report="$(wait_for_report)"; then
     say "$name: $report"
     echo "$report" | grep -q 'BATTLE DICE SELF-CHECK OK' || no_check="$no_check $name"
