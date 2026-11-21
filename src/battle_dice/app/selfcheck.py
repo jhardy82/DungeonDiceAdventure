@@ -7,6 +7,7 @@ controller and the save work on that platform. The run is played by the simulate
 
 from __future__ import annotations
 
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -19,19 +20,41 @@ from battle_dice.sim.policies import HeuristicPolicy
 PARTY = ("squire", "apprentice", "scout")
 #: More steps than any run takes; a run that does not end is a fault, not a long run.
 STEP_LIMIT = 20000
+#: The file that marks a folder as the self-check's own. Only a folder with it is ever emptied.
+MARKER = "battle_dice_selfcheck"
+#: What the self-check writes inside its folder, and removes before the next check.
+OWN = ("logs", "saves")
 
 
 class SelfCheckFailed(RuntimeError):
     """The self-check found a fault. The message says which."""
 
 
+def make_ready(folder: Path) -> None:
+    """Give the check an empty start in ``folder``: what an earlier check left there is removed.
+
+    The check starts from a new save each time, so it gives the same answer on the first start of an app and
+    on every later one, and its files do not pile up. Only a folder that carries the self-check's marker is
+    emptied; one that holds a save or logs without it is somebody else's and is refused.
+    """
+    marker = folder / MARKER
+    left = [name for name in OWN if (folder / name).exists()]
+    if left and not marker.is_file():
+        raise SelfCheckFailed(f"{folder} holds {' and '.join(left)} that are not the self-check's. Give the self-check a folder of its own.")
+    for name in left:
+        shutil.rmtree(folder / name)
+    folder.mkdir(parents=True, exist_ok=True)
+    marker.write_text("The Battle Dice self-check keeps its files here. They are replaced at every check.\n", encoding="utf-8")
+
+
 def run(folder: Path | str, seed: int = 1) -> dict[str, Any]:
     """Play a run with saved heroes inside ``folder`` and read the save again. Returns what was found.
 
     Raises :class:`SelfCheckFailed` with the reason when anything is not as it must be. Nothing outside
-    ``folder`` is read or written.
+    ``folder`` is read or written. ``folder`` is the check's own: see :func:`make_ready`.
     """
     folder = Path(folder)
+    make_ready(folder)
     controller = AppController(fixed_seed=seed, log_dir=folder / "logs", features=[CLASS_EVOLUTION], save_dir=folder / "saves")
     try:
         link = controller.progression

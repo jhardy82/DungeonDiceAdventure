@@ -52,6 +52,7 @@ def main(page: ft.Page) -> None:
     folder = storage()
     controller = AppController(log_dir=folder / "logs")
     report = {"line": "Self-check running ..."}
+    told: dict[str, tuple | None] = {"screen": None}
 
     def tap(action_id: str):
         def handler(_event) -> None:
@@ -79,6 +80,10 @@ def main(page: ft.Page) -> None:
     def draw() -> None:
         view = phone.screen(controller)
         wide = (page.width or 0) > (page.height or 0)  # sideways: what is shown left, what can be done right
+        size = ("sideways" if wide else "upright", round(page.width or 0), round(page.height or 0))
+        if size[1] and size != told["screen"]:  # for the device log: which layout the app chose, and for what room
+            told["screen"] = size
+            print(f"BATTLE DICE SCREEN: layout={size[0]} width={size[1]} height={size[2]}", flush=True)
         shown: list[ft.Control] = [ft.Text(view["title"], size=22, weight=ft.FontWeight.BOLD, color="#f2c14e")]
         if view["message"]:
             shown.append(ft.Text(view["message"], size=15, color="#f08a70" if view["is_error"] else "#d7dbe6"))

@@ -145,6 +145,40 @@ def test_the_screen_free_self_check_plays_a_run_and_reads_the_save_back(tmp_path
     assert line.startswith("BATTLE DICE SELF-CHECK OK: outcome=") and "save_read_back=True" in line
 
 
+def test_the_self_check_gives_the_same_answer_on_every_start(tmp_path):
+    """Found on the emulator: the app's second start reported a failed check, because the first one's heroes
+    were still in the save. A check must start from nothing each time, and must not pile up files."""
+    first = selfcheck.run(tmp_path / "check")
+    logs = sorted(path.name for path in (tmp_path / "check" / "logs").rglob("*") if path.is_file())
+    second = selfcheck.run(tmp_path / "check")
+    assert second == first and second["heroes_saved"] == 3
+    assert sorted(path.name for path in (tmp_path / "check" / "logs").rglob("*") if path.is_file()) == logs, "the files do not pile up"
+
+
+def test_a_check_that_was_cut_short_does_not_spoil_the_next_one(tmp_path, monkeypatch):
+    """A phone app can be closed while the check runs. What that leaves behind is cleared too."""
+    with monkeypatch.context() as patch:
+        patch.setattr(selfcheck, "STEP_LIMIT", 5)
+        with pytest.raises(selfcheck.SelfCheckFailed, match="the run did not finish"):
+            selfcheck.run(tmp_path)
+    assert selfcheck.run(tmp_path)["heroes_saved"] == 3
+
+
+def test_the_self_check_never_empties_a_folder_that_is_not_its_own(tmp_path):
+    """It removes what an earlier check left. A player's save must never be taken for that."""
+    game = AppController(log_dir=tmp_path / "logs", features=[selfcheck.CLASS_EVOLUTION], save_dir=tmp_path / "saves")
+    try:
+        game.new_run()
+        game.add_hero("squire")
+    finally:
+        game.close()
+    save = tmp_path / "saves" / "profile.sqlite"
+    before = save.read_bytes()
+    with pytest.raises(selfcheck.SelfCheckFailed, match="not the self-check's. Give the self-check a folder of its own"):
+        selfcheck.run(tmp_path)
+    assert save.read_bytes() == before and not (tmp_path / selfcheck.MARKER).exists()
+
+
 def test_neither_the_self_check_nor_the_phone_screens_load_pygame(tmp_path):
     """The phone has no pygame. A fresh interpreter proves that nothing here asks for it."""
     code = (
@@ -212,3 +246,90 @@ def test_the_apk_check_reads_size_processor_types_and_page_alignment(tmp_path, c
     assert tool.main([str(good)]) == 0 and "pages_16k=yes" in capsys.readouterr().out
     assert tool.main([str(bad)]) == 0 and "pages_16k=NO" in capsys.readouterr().out
     assert tool.main([]) == 2
+
+
+# --------------------------------------------------------------------------------------------
+# The emulator script (android/tools/emulator_check.sh), run against a stand-in for adb
+# --------------------------------------------------------------------------------------------
+FAKE_ADB = """#!/usr/bin/env bash
+state="$FAKE_ADB_STATE"
+case "$*" in
+  "install -r "*) echo Success ;;
+  "shell pm list packages -3") cat "$state/packages" ;;
+  "shell am force-stop "*|"logcat -c") ;;
+  "shell monkey "*) echo $(( $(cat "$state/starts") + 1 )) > "$state/starts" ;;
+  "logcat -d") cat "$state/log_$(cat "$state/starts")" 2>/dev/null || true ;;
+  "exec-out screencap -p") printf PICTURE ;;
+  "shell settings put "*) echo "$*" >> "$state/settings" ;;
+  *) echo "the stand-in for adb does not know: $*" >&2; exit 9 ;;
+esac
+"""
+PASSED = ("11-21 07:47:37.100  2563  2840 I flet.python: BATTLE DICE SCREEN: layout=upright width=412 height=915\n"
+          "11-21 07:47:37.900  2563  2840 I flet.python: BATTLE DICE SCREEN: layout=sideways width=915 height=412\n"
+          "11-21 07:47:38.870  2563  2840 I flet.python: BATTLE DICE SELF-CHECK OK: outcome=victory battles=3")
+FAILED = "11-21 07:48:20.508  4201  4263 I flet.python: BATTLE DICE SELF-CHECK FAILED: SelfCheckFailed: the heroes did not reach the save"
+
+
+def emulator_check(tmp_path, logs: list[str | None], packages: str = "package:com.android.chrome\npackage:dev.battledice.battle_dice_android\n"):
+    """Runs the script; ``logs`` is the device log of each start in turn (None: the app never reports)."""
+    import os
+    from pathlib import Path
+
+    state, tools, out = tmp_path / "state", tmp_path / "tools", tmp_path / "out"
+    state.mkdir()
+    tools.mkdir()
+    (tools / "adb").write_text(FAKE_ADB, encoding="utf-8", newline="\n")
+    (tools / "adb").chmod(0o755)
+    (state / "starts").write_text("0\n", encoding="utf-8")
+    (state / "packages").write_text(packages, encoding="utf-8")
+    for number, log in enumerate(logs, start=1):
+        if log is not None:
+            (state / f"log_{number}").write_text(f"other line\n{log}\n", encoding="utf-8")
+    script = Path(__file__).resolve().parents[2] / "android" / "tools" / "emulator_check.sh"
+    env = {**os.environ, "PATH": f"{tools}{os.pathsep}{os.environ['PATH']}", "FAKE_ADB_STATE": str(state),
+           "EMULATOR_CHECK_PAUSE": "0", "EMULATOR_CHECK_POLL": "0", "EMULATOR_CHECK_LIMIT": "0"}
+    done = subprocess.run(["bash", str(script), "app.apk", str(out)], env=env, capture_output=True, text=True, check=False, timeout=60)
+    return done, out, state
+
+
+needs_bash = pytest.mark.skipif(sys.platform == "win32", reason="the script runs on the Linux build machine")
+
+
+@needs_bash
+def test_the_emulator_check_passes_when_every_start_reports_a_passed_self_check(tmp_path):
+    done, out, state = emulator_check(tmp_path, [PASSED, PASSED, PASSED])
+    assert done.returncode == 0 and "EMULATOR CHECK OK: three starts, three passed self-checks" in done.stdout, done.stdout + done.stderr
+    assert "package: dev.battledice.battle_dice_android" in done.stdout
+    report = (out / "report.txt").read_text(encoding="utf-8").splitlines()
+    assert [line.split(":")[0] for line in report] == ["1_upright", "1_upright", "2_larger_font", "2_larger_font", "3_sideways", "3_sideways", "EMULATOR CHECK OK"]
+    assert all("BATTLE DICE SELF-CHECK OK" in line and line.endswith("seconds_until_report=0") for line in report[0:6:2])
+    assert report[1] == "1_upright: BATTLE DICE SCREEN: layout=sideways width=915 height=412", "the last layout the app reported in that start"
+    assert all((out / f"{name}.png").read_bytes() == b"PICTURE" for name in ("1_upright", "2_larger_font", "3_sideways"))
+    # The larger font is set for the second start only, and the screen is turned for the third and turned back.
+    assert (state / "settings").read_text(encoding="utf-8").splitlines() == [
+        "shell settings put system font_scale 1.3", "shell settings put system font_scale 1.0",
+        "shell settings put system accelerometer_rotation 0", "shell settings put system user_rotation 1", "shell settings put system user_rotation 0"]
+
+
+@needs_bash
+@pytest.mark.parametrize(("logs", "named"), [
+    ([PASSED, FAILED, PASSED], "2_larger_font"),       # what the first emulator run did, and the script called it passed
+    ([PASSED, PASSED, FAILED], "3_sideways"),
+    ([FAILED, PASSED, PASSED], "1_upright"),
+    ([PASSED, PASSED, None], "3_sideways"),            # the app never reports
+    ([PASSED, FAILED, None], "2_larger_font 3_sideways"),
+])
+def test_the_emulator_check_fails_when_any_start_does_not_report_a_passed_self_check(tmp_path, logs, named):
+    done, out, _ = emulator_check(tmp_path, logs)
+    assert done.returncode == 1 and f"EMULATOR CHECK FAILED: no passed self-check at: {named}" in done.stdout, done.stdout + done.stderr
+    assert "EMULATOR CHECK OK" not in done.stdout
+    assert f"EMULATOR CHECK FAILED: no passed self-check at: {named}" in (out / "report.txt").read_text(encoding="utf-8")
+    assert (out / "3_sideways.png").is_file(), "the screenshots are kept also when a start fails: they are the evidence"
+    if logs[2] != PASSED:
+        assert "3_sideways: the app reported no layout" in done.stdout
+
+
+@needs_bash
+def test_the_emulator_check_fails_when_the_app_is_not_installed(tmp_path):
+    done, _, _ = emulator_check(tmp_path, [PASSED, PASSED, PASSED], packages="package:com.android.chrome\n")
+    assert done.returncode == 1 and "EMULATOR CHECK FAILED: the app's package was not found after the install" in done.stdout
