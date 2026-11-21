@@ -129,6 +129,8 @@ def test_retry_after_a_finished_run_starts_clean(tmp_path):
     controller = finished_run(tmp_path)
     first = controller.engine
     assert first.state.upgrades, "the first run applied its mandatory upgrade"
+    controller.retry_same_party()  # asked once more: the result is still there
+    assert controller.engine is first and controller.screen == Screen.OUTCOME and "Press Retry again" in controller.message
     controller.retry_same_party()
     fresh = controller.engine
     assert fresh is not first and controller.screen == Screen.BATTLE

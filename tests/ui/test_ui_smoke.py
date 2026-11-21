@@ -192,6 +192,8 @@ def test_full_victory_run_through_every_screen(tmp_path, size, keyboard):
     assert driver.ctrl.log_path.read_text(encoding="utf-8").count("\n") == len(driver.ctrl.engine.events) + 1
     assert colours(driver.app.surface) > 6
 
+    driver.press("out:retry")  # asked once more: the result stays until Retry is pressed again
+    assert driver.ctrl.screen == Screen.OUTCOME
     driver.press("out:retry")
     assert driver.ctrl.screen == Screen.BATTLE
     assert driver.ctrl.engine.state.encounter_index == 0 and driver.ctrl.engine.state.upgrades == []

@@ -144,6 +144,8 @@ class Widget:
     tooltip: str | None
     hotkeys: tuple[int, ...]
     default: bool = False
+    #: What the hotkey does when that is not what a click does (a die's number key never removes it from the plan).
+    key_action: Callable[[], Any] | None = None
 
 
 class UI:
@@ -687,7 +689,7 @@ class UI:
         self, key: str, x: float, y: float, w: float, h: float, label: str, action: Callable[[], Any] | None,
         enabled: bool = True, reason: str | None = None, tooltip: str | None = None,
         hotkeys: tuple[int, ...] = (), selected: bool = False, default: bool = False, size: int = 16,
-        sublabel: str | None = None,
+        sublabel: str | None = None, key_action: Callable[[], Any] | None = None,
     ) -> Widget:
         assert self.surface is not None
         rect = self.r(x, y, w, h)
@@ -696,6 +698,7 @@ class UI:
         elif self.trace is not None:
             self.trace.boxes.append(rect)
         widget = self.register(key, rect, action, enabled, reason, tooltip, hotkeys, default)
+        widget.key_action = key_action
         if not enabled:
             fill, text_color = Theme.BUTTON_DISABLED, Theme.FAINT
         elif selected:
@@ -798,7 +801,10 @@ class UI:
         for widget in self.widgets:
             if key in widget.hotkeys:
                 self.focus_key = None  # a hotkey is a direct command, not a move of the focus ring
-                self.activate(widget)
+                if widget.key_action is not None and widget.enabled:
+                    widget.key_action()
+                else:
+                    self.activate(widget)
                 return True
         return False
 

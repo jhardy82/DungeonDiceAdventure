@@ -126,9 +126,15 @@ Every screen works with the mouse or with the keyboard alone.
 - **Hotkeys** act at once (the table below). **Enter** activates the screen's main button:
   Roll, Confirm, Skip Stage, Begin, Start Battle 2.
 - **Tab / Shift+Tab or the arrow keys** move a focus ring from control to control. While a
-  control has the ring, Enter or Space activates that control instead. Hotkeys and clicks never
-  move the ring; Esc clears it.
-- **Esc** goes back or cancels. During a run it opens a menu: resume, controls, or abandon the run.
+  control has the ring, Enter or Space activates that control instead. A hotkey or a click takes
+  the ring away.
+- **Esc** goes back or cancels. During a run it opens a menu: resume, controls, settings, or
+  abandon the run.
+- **What cannot be undone is asked for once more:** abandoning a run and Retry after a run need a
+  second press. Deleting the saved profile is confirmed by a separate button.
+- **A number key plans a die and never takes it out of the plan.** Removing is the die's Remove
+  button, or `C`. A single legal enemy is aimed at without asking, and the status line says so.
+  An ally's number key is its place in the party ("Scout 2" is `2`).
 - Point at or focus a control to read what it does; a disabled control shows why it is unavailable.
 - Point at or focus a **unit card** to list that unit in the centre panel: every enemy ability,
   every status and what it does, and a hero's dice, reaction and passive.
@@ -136,13 +142,13 @@ Every screen works with the mouse or with the keyboard alone.
 | Where | Keys |
 |-------|------|
 | Main menu | `N` new run, `C` controls, `Q` quit |
-| Party setup | `1` `2` `3` add Squire / Apprentice / Scout, `B` or `Enter` begin |
+| Party setup | `1` `2` `3` add Squire / Apprentice / Scout, `B` or `Enter` begin, `D` dice seed (typed, or clicked on a number pad) |
 | Hero activation | `R` roll, then reroll unkept; `Z` `X` keep die 1 / 2; `1` `2` plan die 1 / 2; number keys pick a numbered target; `O` swap tie order; `C` clear; `Enter` confirm; `P` pass |
 | Reaction window | a row's number uses that hero's reaction; if it asks for an ally, press the ally's number next; `S` skip stage; `A` skip every remaining stage for this enemy action |
-| Pacing | `F` fast mode, `Space` step now while resolving, `M` animation on / off |
+| Pacing | `F` battle speed, `M` motion on / off (both also buttons at the top of a battle, and both kept as settings); `Space` step now while resolving |
 | During a run | `Esc` menu (cancels a target choice first) |
 | Upgrade | `1` `2` `3` select a card, `A` apply, `Enter` start Battle 2 |
-| Outcome | `R` retry same party, `M` modify party |
+| Outcome | `R` retry same party (press twice), `M` modify party |
 
 The number row and the numeric keypad both work for number keys.
 
@@ -161,7 +167,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1236 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
+python -m pytest                 # 1256 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -334,8 +340,8 @@ yet. Of the 40 acceptance cases 37 run as tests (`docs/DECISION_LOG.md`, section
 
 Both runs start in **Main menu, Settings (S)**. In the group **3. Class Evolution** switch
 Class Evolution on. In the group **4. Demo and testing** choose what a **new profile starts
-as**. Back in group 3 press **Reset the saved profile** twice, so the profile is made with that
-start. Esc returns to the main menu; **New Run (N)** opens the party setup.
+as**. Back in group 3 press **Reset the saved profile**, then **Delete every saved hero** on the
+right, so the profile is made with that start. Esc returns to the main menu; **New Run (N)** opens the party setup.
 
 **Run 1: Field Medic and the third battle** (start: *A Guardian with Field Medic*)
 
@@ -367,13 +373,13 @@ at once and takes effect at once.
 | 1. Display and comfort | Window size | 960x540, 1280x720 (default), 1600x900, 1920x1080 | The window can also be dragged to any size |
 | | Text size | Normal (default), Large | Large draws text about 15% larger wherever the whole text still fits. The layout stays as it is, so a text with no room keeps its normal size; nothing is cut off to make room |
 | | High contrast | Off (default), On | White text on black, bright borders, no picture behind the battle. Every text colour has at least 7:1 contrast |
-| | Motion and flashes | On (default), Off | Reduced motion |
-| | Battle speed at start | Normal (default), Fast | How fast a battle plays when it begins. F still switches during a battle |
+| | Motion and flashes | On (default), Off | Reduced motion. `M` and the button at the top of a battle change this setting too |
+| | Battle speed | Normal (default), Fast | How fast a battle plays. `F` and the button at the top of a battle change this setting too |
 | 2. Play aids | Confirm a pass | On (default), Off | Pass asks once more when a die could still act |
 | | Help text delay | None (default), Short, Long | How long the pointer rests on a control before its help shows. Why a control is off always shows at once |
 | | Controls | (opens the help) | Mouse and keyboard controls, and how a turn works |
 | 3. Class Evolution | Class Evolution | Off (default), On | Saved heroes, mastery, vocations and the third battle. Off is the game as shipped, with no save file |
-| | Saved profile | Reset the saved profile | Deletes every saved hero and starts again from the chosen start. Asks twice |
+| | Saved profile | Reset the saved profile | Deletes every saved hero and starts again from the chosen start. A second button, **Delete every saved hero**, has to confirm it; the first button again cancels |
 | 4. Demo and testing | Mastery pace | Normal (default), Fast, Very fast | How many points a rank needs. Fast asks for about half; Very fast for one point a rank |
 | | New profile starts as | Fresh (default); A Squire one win from mastery; A Guardian at rank 1; A Guardian with Field Medic (mastered, the skill equipped) | What a new or reset profile holds. Lets the evolution be shown in minutes |
 | | Roster size | 6, 12 (default), 24 | How many heroes a profile may hold (1 to 50 in the file) |
@@ -385,8 +391,9 @@ at once and takes effect at once.
 - **From the pause menu** the run waits. Groups 1 and 2 apply at once; groups 3 and 4 and both
   resets are locked until the run is over, because they would close the save.
 - **The dice seed is chosen when you start a run**, not here: on the party setup, **Dice seed
-  (D)** is random by default. Press D, type digits and press Enter to fix a seed; press D again
-  for a random one. The same seed, party and choices give the same run.
+  (D)** is random by default. Press D (or click it), type digits or click them on the number
+  pad that opens, and press Enter (or **Set**) to fix a seed; press D again for a random one.
+  The same seed, party and choices give the same run.
 - The settings are kept in `settings.json`: in the working folder when run from source, in
   `%LOCALAPPDATA%\BattleDice` for the packaged build. `--settings FILE` or the environment
   variable `BATTLE_DICE_SETTINGS` uses another file. The file is plain JSON and may be edited

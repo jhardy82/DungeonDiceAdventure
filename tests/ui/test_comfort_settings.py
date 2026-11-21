@@ -147,16 +147,14 @@ def test_the_battle_speed_setting_is_the_speed_a_battle_starts_with(tmp_path):
     play.key(pygame.K_s)
     play.click("settings:battle_speed")
     play.app.frame(0)
-    assert play.saved()["battle_speed"] == "fast" and play.app.fast is True and play.ctrl.message == "Battle speed at start: Fast."
+    assert play.saved()["battle_speed"] == "fast" and play.app.fast is True and play.ctrl.message == "Battle speed: Fast."
     play.click("settings:animation")  # another setting does not touch the speed
-    play.app.fast = False             # nor does it undo what F chose during a battle
     play.click("settings:animation")
     play.app.frame(0)
-    assert play.app.fast is False
-    play.click("settings:battle_speed")
+    assert play.app.fast is True
     play.click("settings:battle_speed")
     play.app.frame(0)
-    assert play.app.fast is True and play.saved()["battle_speed"] == "fast"
+    assert play.app.fast is False and play.saved()["battle_speed"] == "normal"
 
 
 # --------------------------------------------------------------------------------------------

@@ -217,6 +217,8 @@ def test_a_run_with_saved_heroes_starts_with_their_snapshots_and_the_third_battl
     assert [engine.combat.combatants[h].name for h in ("h01", "h02")] == ["Squire 1", "Scout 2"]
     assert play.link.state.run.phase == "battle"
     play.ctrl.third_battle = False
+    play.ctrl.abandon_to_party()  # asked once more
+    assert play.link.state.run.phase == "battle"
     play.ctrl.abandon_to_party()
     play.app.frame(0)
     assert play.link.state.run.phase == "defeat"  # the abandoned run is closed in the save
@@ -229,6 +231,7 @@ def test_leaving_a_run_frees_the_roster_again(tmp_path):
     play.click("party:begin")
     play.ctrl.recruit("scout")
     assert "between runs" in play.ctrl.message and len(play.link.state.heroes) == 2
+    play.ctrl.abandon_to_menu()
     play.ctrl.abandon_to_menu()
     play.ctrl.new_run()
     play.ctrl.recruit("scout")
@@ -591,7 +594,7 @@ def test_a_launch_flag_wins_over_the_settings_file_and_cannot_be_switched_off_in
     assert play.ctrl.seed_entry is None and play.ctrl.fixed_seed == 9 and play.ctrl.message_is_error
 
 
-def test_resetting_the_profile_asks_twice_and_starts_again_from_the_chosen_start(tmp_path):
+def test_resetting_the_profile_needs_a_second_button_and_starts_again_from_the_chosen_start(tmp_path):
     from battle_dice.settings import Settings
 
     play = Configured(tmp_path, settings=Settings(class_evolution=True))
@@ -601,14 +604,25 @@ def test_resetting_the_profile_asks_twice_and_starts_again_from_the_chosen_start
     play.ctrl.open_settings()
     play.ctrl.select_settings_tab("evolution")
     play.app.frame(0)
+    assert play.ui.widget("settings:reset:confirm") is None, "the button that deletes is not there until it is asked for"
     play.click("settings:reset")
-    assert play.ctrl.reset_confirm and len(play.ctrl.roster_view()) == 2 and "Press Reset again" in play.ctrl.message
+    assert play.ctrl.reset_confirm and len(play.ctrl.roster_view()) == 2 and "Confirm with the button on the right" in play.ctrl.message
+    first, second = play.ui.widget("settings:reset"), play.ui.widget("settings:reset:confirm")
+    assert second is not None and not first.rect.colliderect(second.rect), "the confirmation is somewhere else"
+    assert second.rect.left - first.rect.right > first.rect.width, "and far from the first button"
+    play.click("settings:reset")  # the same button again: a double-click keeps the heroes (playtest S2)
+    assert not play.ctrl.reset_confirm and len(play.ctrl.roster_view()) == 2 and "Nothing was deleted" in play.ctrl.message
+    assert play.ui.widget("settings:reset:confirm") is None
+    play.ctrl.confirm_reset_profile()  # not asked for: nothing happens
+    assert len(play.ctrl.roster_view()) == 2
+    play.click("settings:reset")
     play.click("settings:tab:demo")  # anything else cancels the question
     play.click("settings:demo_preset")
     assert not play.ctrl.reset_confirm and len(play.ctrl.roster_view()) == 2
     play.click("settings:tab:evolution")
+    assert play.ui.widget("settings:reset:confirm") is None
     play.click("settings:reset")
-    play.click("settings:reset")
+    play.click("settings:reset:confirm")
     assert not play.ctrl.reset_confirm and play.ctrl.message == "A new profile was made (3 heroes)."
     assert [(row["name"], row["rank"]) for row in play.ctrl.roster_view()] == [("Squire 1", 7), ("Scout 2", 1), ("Apprentice 3", 1)]
     assert play.ctrl.party == [] and play.ctrl.progression.path.is_file()
@@ -658,7 +672,8 @@ def test_no_text_is_cut_off_on_the_settings_screen_and_the_main_menu(tmp_path, m
     play.app.frame(0)
     # Paths are as long as the machine makes them; everything the game itself words must fit.
     worded = [text for text in shortened if not text.startswith(("Saved in ", "Save file: "))]
-    assert "Press again to delete every hero" in drawn and "Press again: all settings to defaults" in drawn and worded == [], worded
+    assert {"Keep the heroes (cancel)", "Delete every saved hero", "This cannot be undone:", "Press again: all settings to defaults"} <= set(drawn)
+    assert worded == [], worded
     assert all(f"{n}. {title}" in drawn for n, (_group, title) in enumerate(play.ctrl.SETTINGS_GROUPS, start=1))
     # The New Run screen with its seed control, at rest and while a seed of full length is typed.
     play.ctrl.close_settings()

@@ -112,7 +112,7 @@ def draw_main_menu(ui: UI, ctrl: AppController, quit_action: Callable[[], Any]) 
     ui.button("menu:controls", 490, 362, 300, 52, "Controls  (C)", ctrl.show_controls, hotkeys=(pygame.K_c,), size=22,
               tooltip="Mouse and keyboard controls, and how a turn works.")
     ui.button("menu:settings", 490, 424, 300, 52, "Settings  (S)", ctrl.open_settings, hotkeys=(pygame.K_s,), size=22,
-              tooltip="Class Evolution, the dice seed, animation, window size and the saved profile.")
+              tooltip="Display and comfort, play aids, Class Evolution and the saved profile.")
     ui.button("menu:quit", 490, 486, 300, 52, "Quit  (Q)", quit_action, hotkeys=(pygame.K_q,), size=22, tooltip="Close the game.")
     ui.escape_action = quit_action
     ui.text(640, 566, "Tab / arrow keys move focus.  Enter or Space activates.  Every screen works with mouse or keyboard.", 15, Theme.FAINT, align="center")
@@ -125,12 +125,12 @@ def draw_main_menu(ui: UI, ctrl: AppController, quit_action: Callable[[], Any]) 
 
 
 CONTROLS_TEXT = [
-    ("Everywhere", "Tab / Shift+Tab or the arrow keys move a focus ring; Enter or Space then activates the ringed control. With no ring, Enter activates the screen's main button. Hotkeys and clicks never move the ring; Esc clears it. Point at or focus a control to read what it does; disabled controls explain why."),
+    ("Everywhere", "Tab / Shift+Tab or the arrow keys move a focus ring; Enter or Space then activates the ringed control. With no ring, Enter activates the screen's main button. A hotkey or a click takes the ring away. Esc goes back, or cancels a choice that is open. Point at or focus a control to read what it does; disabled controls explain why."),
     ("Party setup", "1 / 2 / 3 add a Squire / Apprentice / Scout.  Each hero has a Row and a Remove button.  B or Enter begins the encounter."),
-    ("Your activation", "R rolls, then R rerolls every die you did not Keep.  Z / X toggle Keep on die 1 / 2.  1 / 2 plan the rolled face of die 1 / 2; when a target is needed, press the number shown on a legal target (or click it).  O swaps the order of equal-speed actions.  C clears the plan.  Enter confirms the whole plan.  P passes.  If an attack's target is gone when the attack resolves, it goes to the next enemy in the same row, then to the one with the lowest share of its HP; with no enemy left it is cancelled and costs nothing."),
+    ("Your activation", "R rolls, then R rerolls every die you did not Keep.  Z / X toggle Keep on die 1 / 2.  1 / 2 plan the rolled face of die 1 / 2; when a target is needed, press the number shown on a legal target (or click it). A single legal enemy is aimed at without asking, and the status line says so. An ally's number is its place in the party. A number key never takes an action out of the plan: use the die's Remove button, or C.  O swaps the order of equal-speed actions.  C clears the plan.  Enter confirms the whole plan.  P passes.  If an attack's target is gone when the attack resolves, it goes to the next enemy in the same row, then to the one with the lowest share of its HP; with no enemy left it is cancelled and costs nothing."),
     ("Enemy activation", "The enemy's action and targets are revealed first.  Each reacting hero has a numbered row: press its number, then, if it asks for an ally, the ally's number (or click the ally's button directly).  S skips the current stage (Guard, then Resource, then Interrupt); A skips every remaining stage for this enemy action."),
-    ("Pacing", "Automatic steps play on a short timer.  F toggles fast mode.  Space steps immediately while the game is resolving.  M turns animation off or on (reduced motion)."),
-    ("During a run", "Esc opens the menu: resume, read these controls, or abandon the run.  While a target is being chosen, Esc cancels that choice first."),
+    ("Pacing", "Automatic steps play on a short timer.  F changes the battle speed.  Space steps immediately while the game is resolving.  M turns motion and flashes off or on.  Both are also buttons at the top of a battle, and both are settings: what you choose is kept."),
+    ("During a run", "Esc opens the menu: resume, read these controls, change settings, or abandon the run.  While a target is being chosen, Esc cancels that choice first.  Abandoning a run, and Retry after a run, ask once more: press again to do it."),
     ("Upgrade", "After Battle 1, pick a hero and a die, select one of three cards, then A applies it.  Optionally swap one die per hero or change rows, then Enter starts Battle 2."),
     ("Reading the board", "A yellow 'Now ...' line under a face or a planned action is the amount that will really happen when something changes the printed one (Weaken, class bonuses, a maximum).  HP, SH (shield), MP (mana), CR (corruption): from CR {backlash_threshold} on, a hero loses {backlash_damage} HP at the end of each of its activations, and a '!' marks it.  PSN (Poison) / WKN (Weaken) / SPD+ (Speed Up) show total stacks and, in brackets, activations left.  Point at or focus a unit card to list its abilities, dice and every status in the centre panel.  The gauge bar fills to 100 by speed each tick; the Next row forecasts who acts."),
 ]
@@ -139,9 +139,31 @@ CONTROLS_TEXT = [
 def draw_seed_control(ui: UI, ctrl: AppController) -> None:
     """New Run screen, top right: the dice seed of the next run, random or typed (owner decision D-31)."""
     view = ctrl.seed_view()
+    # The longest seed has 20 digits: the label is set smaller before it is ever cut off.
+    size = next((size for size in (15, 14, 13, 12) if ui.text_width(view["label"], size, True) <= 290), 12)
     ui.button("party:seed", 960, 8, 304, 46, view["label"], ctrl.toggle_seed, enabled=view["reason"] is None, reason=view["reason"],
-              selected=view["entering"], hotkeys=() if view["entering"] else (pygame.K_d,), sublabel=view["hint"], size=15,
+              selected=view["entering"], hotkeys=() if view["entering"] else (pygame.K_d,), sublabel=view["hint"], size=size,
               tooltip="The same seed, party and choices give the same run. A finished run shows its seed.")
+
+
+def draw_seed_pad(ui: UI, ctrl: AppController) -> None:
+    """While a seed is being typed: the same keys as buttons, so the mouse alone can set a seed.
+
+    Drawn last on the New Run screen, on top of what is under it, and gone when the entry ends.
+    """
+    if ctrl.seed_entry is None:
+        return
+    ui.panel(956, 56, 312, 126, fill=Theme.PANEL_DEEP, border=Theme.ACCENT, width=2)
+    ui.register("seed:pad", ui.r(956, 56, 312, 126), None, tooltip="Type the seed with these buttons or with the keyboard.")
+    for position, digit in enumerate("1234567890"):
+        ui.button(f"seed:{digit}", 964 + (position % 5) * 60, 62 + (position // 5) * 38, 56, 34, digit, partial(ctrl.seed_key, digit), size=17,
+                  tooltip=f"Add the digit {digit} to the seed.")
+    ui.button("seed:backspace", 964, 138, 96, 36, "Delete", partial(ctrl.seed_key, "backspace"), size=14, sublabel="(Backspace)",
+              tooltip="Take the last digit away.")
+    ui.button("seed:enter", 1064, 138, 96, 36, "Set", partial(ctrl.seed_key, "enter"), size=14, sublabel="(Enter)",
+              tooltip="Use this seed for every run until you change it. With no digit: a new seed each run.")
+    ui.button("seed:escape", 1164, 138, 96, 36, "Cancel", partial(ctrl.seed_key, "escape"), size=14, sublabel="(Esc)",
+              tooltip="Leave the seed as it was.")
 
 
 def draw_controls(ui: UI, ctrl: AppController, back: Callable[[], Any] | None = None) -> None:
@@ -242,6 +264,7 @@ def draw_party_setup(ui: UI, ctrl: AppController) -> None:
     y += 22
     for die in info["bench"]:
         y = draw_die_faces(ui, x, y, 770, die) + 6
+    draw_seed_pad(ui, ctrl)
     status_bar(ui, ctrl)
 
 
@@ -396,11 +419,26 @@ def draw_combatant_card(ui: UI, ctrl: AppController, c: dict[str, Any], x: float
         ui.text(x + w - 6, y + 51, status_text, status_size, Theme.WARN, bold=True, align="right", max_width=status_room)
 
 
+def party_number(combatant_id: str) -> int | None:
+    """A hero's place in the party (1 to 5), which is also the number its name ends in; ``None`` for an enemy."""
+    return int(combatant_id[1:]) if combatant_id[:1] == "h" and combatant_id[1:].isdigit() else None
+
+
+def target_numbers_of(target_ids: list[str]) -> dict[str, int]:
+    """The number key of each legal target.
+
+    An ally's key is its place in the party, so "Scout 2" is key 2 whoever else can be targeted
+    (playtest K4: with a hero down, the keys had moved away from the names). Enemies are numbered
+    in the order they are listed.
+    """
+    places = [party_number(cid) for cid in target_ids]
+    if target_ids and all(place is not None for place in places):
+        return {cid: place for cid, place in zip(target_ids, places, strict=True) if place is not None}
+    return {cid: number for number, cid in enumerate(target_ids, start=1)}
+
+
 def draw_formation(ui: UI, ctrl: AppController, view: dict[str, Any], targeting: dict[str, Any] | None) -> None:
-    target_numbers: dict[str, int] = {}
-    if targeting is not None:
-        for number, cid in enumerate(targeting["eligible_target_ids"], start=1):
-            target_numbers[cid] = number
+    target_numbers = target_numbers_of(targeting["eligible_target_ids"]) if targeting is not None else {}
     columns = {
         ("hero", "back"): (12, "Heroes: back row"),
         ("hero", "front"): (244, "Heroes: front row"),
@@ -506,15 +544,23 @@ def draw_center(ui: UI, ctrl: AppController, view: dict[str, Any], inspect: dict
         y += 16
 
 
-def draw_header(ui: UI, ctrl: AppController, view: dict[str, Any], fast: bool) -> None:
+def draw_header(ui: UI, ctrl: AppController, view: dict[str, Any], fast: bool,
+                on_speed: Callable[[], Any] | None = None, on_motion: Callable[[], Any] | None = None) -> None:
     names = {c["id"]: c["name"] for c in view["combatants"]}
     archetypes = {c["id"]: c["archetype_id"] for c in view["combatants"]}
     ui.panel(0, 0, 1280, 40, fill=Theme.BAR, border=Theme.BAR)
     ui.text(12, 9, f"Battle {view['battle']} of {view['battle_count']}", 20, Theme.ACCENT, bold=True)
     actor = names.get(view["active_combatant_id"] or "", "nobody")
-    ui.text(200, 12, f"Tick {view['timeline_tick']}    Phase: {PHASE_LABELS.get(view['combat_phase'], view['combat_phase'])}    Acting: {actor}",
-            16, Theme.TEXT, max_width=760)
-    ui.text(1166, 12, f"Seed {view['seed']}   {'FAST' if fast else 'normal'} (F)", 14, Theme.FAINT, align="right")
+    state = f"Tick {view['timeline_tick']}    Phase: {PHASE_LABELS.get(view['combat_phase'], view['combat_phase'])}    Acting: {actor}"
+    seed = f"Seed {view['seed']}"
+    room = 944 - ui.text_width(seed, 14) - 12 - 200  # the seed sits right of it
+    ui.text(200, 12, state, next((size for size in (16, 15, 14, 13) if ui.text_width(state, size) <= room), 13), Theme.TEXT, max_width=room)
+    ui.text(944, 12, seed, 14, Theme.FAINT, align="right")
+    # Speed and motion: the F and M keys as buttons, so the mouse alone reaches them (playtest A2).
+    ui.button("battle:speed", 952, 6, 108, 28, "Fast (F)" if fast else "Normal (F)", on_speed, selected=fast, size=13,
+              tooltip="Battle speed: how fast the automatic steps play. Click or press F to change it. It is kept as a setting.")
+    ui.button("battle:motion", 1064, 6, 108, 28, "Motion on (M)" if ui.anim.enabled else "Motion off (M)", on_motion, size=13,
+              tooltip="Motion and flashes in battle. Click or press M to change it. It is kept as a setting.")
     ui.text(12, 52, "Next:", 15, Theme.DIM, bold=True)
     x = 62.0
     with ui.group():  # the names of the row have one size
@@ -609,11 +655,15 @@ def draw_planner(ui: UI, ctrl: AppController, view: dict[str, Any]) -> dict[str,
                   partial(ctrl.toggle_keep, die["die_id"]), selected=die["kept"], hotkeys=(keep_key,),
                   sublabel=f"({'ZX'[index]})", tooltip="Kept dice are not rerolled. You can unkeep before a later reroll.")
         use_hotkeys = () if ctrl.targeting_die is not None else (NUMBER_KEYS[index],)
+        # The number key plans the die and never removes it; removing is this button's click, or Clear (C).
+        # While a target is being chosen the numbers belong to the targets, so the way out is Esc.
+        use_help = (f"Take {face['name']} out of the plan (click). The number key never removes." if in_plan
+                    else "Stop choosing a target." if awaiting else f"Plan {face['name']}: {face['text']}." if die["selectable"] else None)
         ui.button(f"die:{die['die_id']}:use", x + 128, 628, 112, 48, "Remove" if in_plan else "Cancel" if awaiting else "Use",
                   partial(ctrl.use_die, die["die_id"]) if not awaiting else ctrl.cancel_targeting,
                   enabled=die["selectable"] or in_plan, reason=die["reason"], selected=in_plan or awaiting,
-                  hotkeys=use_hotkeys, sublabel=f"({index + 1})",
-                  tooltip=f"Plan {face['name']}: {face['text']}." if die["selectable"] else None)
+                  hotkeys=use_hotkeys, sublabel="(click)" if in_plan else "(Esc)" if awaiting else f"({index + 1})",
+                  tooltip=use_help, key_action=partial(ctrl.use_die_key, die["die_id"]))
 
     # Plan column
     px0 = 530
@@ -717,10 +767,12 @@ def draw_reactions(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
         if not option["eligible"]:
             ui.text(366, y + 6, f"Unavailable: {option['reason']}", 13, Theme.WARN, max_width=664)
         elif targets:
+            ally_numbers = target_numbers_of(targets)
             for position, target_id in enumerate(targets, start=1):
                 target_key = f"react:{hero_id}:{target_id}"
-                target_hotkeys = (NUMBER_KEYS[position - 1],) if selected and position <= len(NUMBER_KEYS) else ()
-                label = f"{position}. {names[target_id]}" if selected else names[target_id]
+                number = ally_numbers[target_id]
+                target_hotkeys = (NUMBER_KEYS[number - 1],) if selected and number <= len(NUMBER_KEYS) else ()
+                label = f"{number}. {names[target_id]}" if selected else names[target_id]
                 ui.button(target_key, 366 + (position - 1) * 134, y, 130, 28, label,
                           partial(ctrl.use_reaction, hero_id, target_id), hotkeys=target_hotkeys, size=13,
                           tooltip=f"{option['name']} on {names[target_id]}. {option['expected']} Cost: {option['mana_cost']} mana, 1 charge.")
@@ -754,11 +806,12 @@ def draw_reactions(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
               tooltip="Do not react to this enemy action at all: every remaining stage is skipped without asking.")
 
 
-def draw_battle(ui: UI, ctrl: AppController, fast: bool) -> None:
+def draw_battle(ui: UI, ctrl: AppController, fast: bool,
+                on_speed: Callable[[], Any] | None = None, on_motion: Callable[[], Any] | None = None) -> None:
     view = ctrl.view()
     inspect = inspected_combatant(ui, view)
     ui.backdrop(0, 80, 1280, 394)
-    draw_header(ui, ctrl, view, fast)
+    draw_header(ui, ctrl, view, fast, on_speed, on_motion)
     ui.escape_action = ctrl.open_pause  # the planner and the reaction panel replace this while choosing a target
     targeting = None
     waiting = view["needs_input"]
@@ -771,7 +824,7 @@ def draw_battle(ui: UI, ctrl: AppController, fast: bool) -> None:
     else:
         ui.panel(8, 476, 1264, 214, "Resolving")
         ui.text(640, 560, PHASE_LABELS.get(view["combat_phase"], view["combat_phase"]) + " ...", 24, Theme.DIM, bold=True, align="center")
-        ui.text(640, 600, "Space steps immediately.  F toggles fast mode.  M toggles animation.  Esc opens the menu.", 15, Theme.FAINT, align="center")
+        ui.text(640, 600, "Space steps immediately.  F changes the speed.  M switches motion.  Esc opens the menu.", 15, Theme.FAINT, align="center")
     draw_formation(ui, ctrl, view, targeting)
     draw_center(ui, ctrl, view, inspect)
     for floater, progress in ui.anim.active_floaters():
@@ -798,10 +851,13 @@ def draw_pause(ui: UI, ctrl: AppController) -> None:
               tooltip="Mouse and keyboard controls, and how a turn works.")
     ui.button("pause:settings", 470, 374, 340, 52, "Settings  (S)", ctrl.open_settings, hotkeys=(pygame.K_s,), size=20,
               tooltip="Display, comfort and play aids. The run waits; what would end it cannot be changed from here.")
-    ui.button("pause:party", 470, 436, 340, 52, "Abandon Run: Change Party", ctrl.abandon_to_party, size=18,
-              tooltip="Give up this run and return to party setup. The run is not saved and writes no event log.")
-    ui.button("pause:menu", 470, 498, 340, 52, "Abandon Run: Main Menu", ctrl.abandon_to_menu, size=18,
-              tooltip="Give up this run and return to the main menu. The run is not saved and writes no event log.")
+    again = "Press again to abandon the run"
+    ui.button("pause:party", 470, 436, 340, 52, again if ctrl.asked("abandon:party") else "Abandon Run: Change Party", ctrl.abandon_to_party,
+              size=18, selected=ctrl.asked("abandon:party"),
+              tooltip="Give up this run and return to party setup. The run is not saved and writes no event log. Asked once more.")
+    ui.button("pause:menu", 470, 498, 340, 52, again if ctrl.asked("abandon:menu") else "Abandon Run: Main Menu", ctrl.abandon_to_menu,
+              size=18, selected=ctrl.asked("abandon:menu"),
+              tooltip="Give up this run and return to the main menu. The run is not saved and writes no event log. Asked once more.")
     ui.escape_action = ctrl.resume
     status_bar(ui, ctrl)
 
@@ -969,8 +1025,9 @@ def draw_outcome(ui: UI, ctrl: AppController) -> None:
     log_text = f"Event log: {outcome['log_path']}" if outcome["log_path"] else f"Event log not written: {outcome['log_error'] or 'unknown reason'}"
     ui.text(640, 522, log_text, 13, Theme.FAINT, align="center", max_width=1200)
     ui.text(640, 542, f"Seed {outcome['seed']} (use --seed to replay the same dice).", 13, Theme.FAINT, align="center")
-    ui.button("out:retry", 250, 580, 250, 60, "Retry Same Party  (R)", ctrl.retry_same_party, hotkeys=(pygame.K_r,), default=True, size=18,
-              tooltip="Start a new run at Battle 1 with the same heroes and rows. No upgrade carries over.")
+    ui.button("out:retry", 250, 580, 250, 60, "Press again: new run  (R)" if ctrl.asked("retry") else "Retry Same Party  (R)",
+              ctrl.retry_same_party, hotkeys=(pygame.K_r,), default=True, size=18, selected=ctrl.asked("retry"),
+              tooltip="Start a new run at Battle 1 with the same heroes and rows. No upgrade carries over. Asked once more.")
     ui.button("out:modify", 515, 580, 250, 60, "Modify Party  (M)", ctrl.modify_party, hotkeys=(pygame.K_m,), size=18,
               tooltip="Return to party setup, then start a new run at Battle 1.")
     ui.button("out:menu", 780, 580, 250, 60, "Main Menu  (Esc)", ctrl.to_main_menu, size=18, tooltip="Return to the main menu.")
@@ -1055,6 +1112,7 @@ def draw_roster_setup(ui: UI, ctrl: AppController) -> None:
                   partial(ctrl.add_hero, class_id), enabled=not roster_full,
                   reason=f"The roster is full ({limit} heroes).", hotkeys=(NUMBER_KEYS[position],),
                   tooltip=f"Recruit a new {name}. It joins the party if there is room. Recruiting is free.")
+    draw_seed_pad(ui, ctrl)
     status_bar(ui, ctrl)
 
 
@@ -1236,16 +1294,22 @@ def draw_settings(ui: UI, ctrl: AppController) -> None:
         evolution = ctrl.progression is not None
         ui.panel(16, y, 1248, 54, fill=Theme.PANEL_ALT)
         ui.text(30, y + 17, "Saved profile", 17, Theme.TEXT, bold=True, max_width=210)
-        label = "Press again to delete every hero" if ctrl.reset_confirm else "Reset the saved profile"
+        label = "Keep the heroes (cancel)" if ctrl.reset_confirm else "Reset the saved profile"
         reason = ctrl.RUN_LOCKED if ctrl.settings_in_run else "There is no profile while Class Evolution is off."
         ui.button("settings:reset", 250, y + 6, 330, 42, label, ctrl.reset_profile, enabled=evolution and not ctrl.settings_in_run, reason=reason,
-                  size=15, tooltip="Delete the save and start a new profile from the start chosen under Demo and testing. Asked twice.")
-        if evolution:
+                  size=15, tooltip="Delete the save and start a new profile from the start chosen under Demo and testing. "
+                                   "A second button, on the right, has to confirm it.")
+        if evolution and ctrl.reset_confirm:
+            # The confirmation is another button in another place: a double-click cannot delete the heroes.
+            ui.text(596, y + 19, "This cannot be undone:", 14, Theme.WARN, bold=True, max_width=320)
+            ui.button("settings:reset:confirm", 934, y + 6, 318, 42, "Delete every saved hero", ctrl.confirm_reset_profile, size=15,
+                      tooltip="Delete the save now and start a new profile. This cannot be undone.")
+        elif evolution:
             # One line with its label: a path has no spaces to wrap at, and a long one (Windows) is cut as a whole.
             ui.text(596, y + 19, f"Save file: {ctrl.progression.path}", 13, Theme.FAINT, max_width=656)
         else:
-            ui.paragraph(596, y + 9, "Deletes every saved hero and starts a new profile. Asked twice.", 656, 13, Theme.FAINT, line_height=17,
-                         max_lines=2)
+            ui.paragraph(596, y + 9, "Deletes every saved hero and starts a new profile. A second button has to confirm it.", 656, 13,
+                         Theme.FAINT, line_height=17, max_lines=2)
     elif ctrl.settings_tab == "demo":
         ui.text(24, y + 8, "These four are aids for showing and testing Class Evolution. They do not change the rules of a battle.", 14, Theme.FAINT,
                 max_width=1230)

@@ -35,6 +35,7 @@ class GameApp:
         self.running = True
         self.fast = self.controller.settings.battle_speed == "fast"
         self._speed_seen = self.controller.settings.battle_speed
+        self._size_seen = self.controller.settings.size()
         self._timer = 0.0
         self.render_faults = 0  # frames whose drawing raised; the smoke test requires this to stay 0
         self.headless = headless
@@ -86,17 +87,25 @@ class GameApp:
             return
         if event.type == pygame.KEYDOWN and self.controller.screen == Screen.BATTLE and not self.controller.paused:
             if event.key == pygame.K_f:
-                self.fast = not self.fast
-                self.controller.info("Fast mode on." if self.fast else "Fast mode off.")
+                self.toggle_speed()
                 return
             if event.key == pygame.K_m:
-                self.ui.anim.enabled = not self.ui.anim.enabled
-                self.controller.info("Animation on." if self.ui.anim.enabled else "Animation off (reduced motion).")
+                self.toggle_motion()
                 return
             if event.key == pygame.K_SPACE and not self.controller.waiting_for_player():
                 self._timer = 1e9  # step on the next update
                 return
         self.ui.handle_event(event)
+
+    def toggle_speed(self) -> None:
+        """F, or the button at the top of a battle: the battle speed. It is the setting itself, so Settings agrees."""
+        self.controller.change_setting("battle_speed")
+        self._follow_settings()
+
+    def toggle_motion(self) -> None:
+        """M, or the button at the top of a battle: motion and flashes. It is the setting itself."""
+        self.controller.change_setting("animation")
+        self._follow_settings()
 
     # -- update and draw ---------------------------------------------------------------------
 
@@ -119,8 +128,10 @@ class GameApp:
             self._speed_seen = controller.settings.battle_speed
             self.fast = self._speed_seen == "fast"
         size = controller.settings.size()
-        if size != self.surface.get_size():
-            self.surface = self._set_mode(size)
+        if size != self._size_seen:  # only the window size setting resizes the window, not any setting
+            self._size_seen = size
+            if size != self.surface.get_size():
+                self.surface = self._set_mode(size)
 
     def update(self, dt_ms: float) -> None:
         controller = self.controller
@@ -183,7 +194,7 @@ class GameApp:
             elif controller.paused and screen in (Screen.BATTLE, Screen.UPGRADE):
                 screens.draw_pause(ui, controller)
             elif screen == Screen.BATTLE:
-                screens.draw_battle(ui, controller, self.fast)
+                screens.draw_battle(ui, controller, self.fast, self.toggle_speed, self.toggle_motion)
             elif screen == Screen.UPGRADE:
                 screens.draw_upgrade(ui, controller)
             elif screen == Screen.OUTCOME:
