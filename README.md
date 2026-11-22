@@ -170,7 +170,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1453 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
+python -m pytest                 # 1484 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -337,6 +337,10 @@ What changes with the gate on:
   nothing can be changed.
 - **After Battle 2** you may end the run with a victory or fight a third battle. Losing it
   loses the run; mastery already earned is kept.
+- **Mastery points.** A won battle gives each hero 1 point, and 1 more when the hero did its
+  vocation's bonus challenge in that battle. The Career screen says what the challenge is
+  ("Mastery"), and the line after a battle says what earned the bonus. The outcome screen
+  adds up the whole run.
 - **The save file** is `saves/profile.sqlite` beside the `logs` folder (the per-user application
   data folder for the packaged build). `--save-dir FOLDER` or `BATTLE_DICE_SAVE_DIR` puts it
   elsewhere. Delete the file to start over.

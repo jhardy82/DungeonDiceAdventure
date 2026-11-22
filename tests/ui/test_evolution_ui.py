@@ -253,9 +253,9 @@ def test_the_career_screen_lists_every_public_vocation_and_two_anonymous_entries
     by_id = {row["vocation_id"]: row for row in view["rows"] if row["kind"] == "vocation"}
     assert by_id["squire"]["status"] == "Active: rank 1, 0/1 to the next" and not by_id["squire"]["can_activate"]
     assert by_id["scout"]["status"] == "Unlocked: rank 1, 0/1 to the next" and by_id["scout"]["can_activate"]
-    assert (by_id["guardian"]["status"], by_id["guardian"]["needs"]) == ("Locked", "Needs: master Squire (now rank 1).")
+    assert (by_id["guardian"]["status"], by_id["guardian"]["needs"]) == ("Locked", "Needs: master Squire (rank 8; now rank 1).")
     claim = play.ui.widget("career:guardian:claim")
-    assert claim.enabled is False and claim.reason == "Needs: master Squire (now rank 1)."
+    assert claim.enabled is False and claim.reason == "Needs: master Squire (rank 8; now rank 1)."
     assert play.ui.widget("career:squire:activate").reason == "This is the active vocation."
     text = " ".join(str(value) for row in view["rows"] for value in row.values())
     assert "Trickster" not in text and "Dragon" not in text  # a hidden vocation shows nothing but ???
@@ -292,7 +292,7 @@ def test_selecting_a_locked_vocation_spells_out_what_it_needs(tmp_path, monkeypa
     view = play.ctrl.career_view()
     needs = view["selected_needs"]
     # The Champion is in the catalog but the rules cannot run it yet: the screen says so, and what it would need.
-    assert needs.startswith("Not in this version yet. Needs: master Guardian (now rank 0); master Duelist") and needs in drawn
+    assert needs.startswith("Not in this version yet. Needs: master Guardian (rank 8; now rank 0); master Duelist") and needs in drawn
     champion = next(row for row in view["rows"] if row.get("vocation_id") == "champion")
     assert (champion["status"], champion["playable"], champion["can_claim"]) == ("Coming later", False, False)
     assert play.ui.widget("career:champion:claim").enabled is False and play.app.render_faults == 0
@@ -402,8 +402,9 @@ def test_no_text_is_cut_off_on_the_new_screens(tmp_path, monkeypatch, font, size
     play.ctrl.end_run_with_victory()
     play.app.frame(0)
     assert play.ctrl.screen == Screen.OUTCOME and play.app.render_faults == 0
-    assert "Mastery from the last battle" in drawn and "Recruit 1 +0 (its vocation is mastered)." in drawn
-    award_lines = play.ctrl.awards_view()
+    # The outcome screen gives the whole run (each battle's share was shown after it): a mastered hero earned nothing.
+    assert "Mastery from this run" in drawn and "Recruit 1 +0 in 2 battles (its vocation is mastered), rank 8." in drawn
+    award_lines = play.ctrl.run_awards_view()
     assert len(award_lines) == 5 and not set(award_lines) & set(shortened)
 
 

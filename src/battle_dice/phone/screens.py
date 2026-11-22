@@ -16,6 +16,7 @@ from typing import Any
 
 from battle_dice.app.controller import AppController, Screen
 from battle_dice.app.wording import touch_wording  # a controller made for a desktop is worded for touch here
+from battle_dice.core.view import battle_title
 
 Json = dict[str, Any]
 #: Steps the game may take on its own before it must wait for the player again.
@@ -107,7 +108,7 @@ def _unit(c: Json, active: str | None, tap: Json | None) -> Json:
 def _battle(controller: AppController) -> Json:
     view = controller.view()
     turn, reaction = view.get("hero_turn"), view.get("reaction")
-    out = _base(controller, "battle", f"Battle {view['battle']} of {view['battle_count']}")
+    out = _base(controller, "battle", battle_title(view))
     targeting = controller.targeting_die
     option = next((die for die in turn["dice"] if die["die_id"] == targeting), None) if turn and targeting else None
     eligible = set(option["eligible_target_ids"]) if option else set()

@@ -179,6 +179,12 @@ def action_forecast(
     return {"damage": damage, "shield": shield, "weaken": weaken, "note": "; ".join(notes)}
 
 
+def battle_title(view: dict[str, Any]) -> str:
+    """"Battle 1 of 2". A battle the player may decline is counted once it is being fought: "Battle 3 of 3"."""
+    required = view["battle_count"] - view["optional_battles"]
+    return f"Battle {view['battle']} of {max(required, view['battle'])}"
+
+
 def with_article(noun: str) -> str:
     """The noun with "a" or "an" before it: "a Squire", "an Apprentice"."""
     return f"{'an' if noun[:1].lower() in 'aeiou' else 'a'} {noun}"
@@ -432,6 +438,8 @@ def snapshot(engine: Engine) -> dict[str, Any]:
         "run_outcome": state.outcome,
         "battle": state.encounter_index + 1,
         "battle_count": engine.battle_count,
+        #: How many of them the player may decline (the third battle of a run with saved heroes).
+        "optional_battles": engine.battle_count - engine.shipped_battle_count,
         "combat_phase": combat.phase,
         "timeline_tick": combat.timeline_tick,
         "ready_threshold": balance["timeline"]["ready_threshold"],
@@ -459,9 +467,7 @@ def snapshot(engine: Engine) -> dict[str, Any]:
                 "stage_number": combat.stage_index + 1,
                 "options": reactions.stage_options(engine, combat.reaction_stage),
                 # The stages of this enemy action that were passed over because no hero could react in them.
-                "passed": [e.delta["stage"] for e in engine.events
-                           if e.type == EventType.REACTION_STAGE_SKIPPED and combat.committed_intent is not None
-                           and e.intent_id == combat.committed_intent.id and e.delta["reason"] == "no eligible reaction"],
+                "passed": _stages_passed(engine),
                 "used": [
                     {"hero_id": r.reacting_hero_id, "reaction": r.effect, "stage": r.reaction_stage,
                      "name": engine.build(r.reacting_hero_id).reaction["name"]}
@@ -471,6 +477,25 @@ def snapshot(engine: Engine) -> dict[str, Any]:
     if state.phase in (RunPhase.UPGRADE, RunPhase.EQUIPMENT):
         snap["upgrade"] = upgrade_view(engine)
     return snap
+
+
+def _stages_passed(engine: Engine) -> list[str]:
+    """The reaction stages of the enemy action under way in which no hero could react, in order.
+
+    Read back from the end of the log to where this action was chosen: what lies between is this action's.
+    (The notes were collected by the action's id before. An id says which action of its *battle* it is, and
+    the numbers start again in every battle: a whole-run playtest found Battle 1's stages in the prompts of
+    Battles 2 and 3.)
+    """
+    if engine.combat.committed_intent is None:
+        return []
+    passed: list[str] = []
+    for event in reversed(engine.events):
+        if event.type == EventType.INTENT_SELECTED:
+            break
+        if event.type == EventType.REACTION_STAGE_SKIPPED and event.delta["reason"] == "no eligible reaction":
+            passed.append(event.delta["stage"])
+    return passed[::-1]
 
 
 # --------------------------------------------------------------------------------------------

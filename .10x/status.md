@@ -2,7 +2,7 @@
 
 ## Project: Battle Dice
 **Current Phase:** Implementation (the project was already under way when this file was created)
-**Last Updated:** 2026-11-21 by the implementing engineer (owner decisions D-33 and D-34)
+**Last Updated:** 2026-11-22 by the implementing engineer (a fifth playtester's whole runs; decision log 7.41)
 **Health:** On Track
 
 **Current goal (owner, 2026-11-11):** a fully configurable and playable demo.
@@ -38,6 +38,8 @@
 - Android app (D-33): phase 0, the walking skeleton with Flet, is built, and was built and started on GitHub's machines (APK 107.6 MB, target API 36, 16 KB pages, self-check passed at four starts on an emulator, upright and sideways). Open: the owner's install on the phone, a look at the emulator screenshots, and the go or no-go decision (`docs/android/PLAN.md`, "Phase 0, measured")
 - D-35 (owner, 2026-11-21): dismissing a hero, recruit names without a class, and the Mastery pace note are built (decision log 7.38); Android phase 1 groundwork: steps 1 (tests on Python 3.14) and 2 (messages worded for touch) are built; step 3 (screen data outside pygame) goes with the phone screens
 - Second playtest round by four AI players (2026-11-21): no blocker; the "press again" safeguards rebuilt so a question ends when the player does anything else; 28 of 34 findings fixed, 6 left with a reason (3 of them are questions for the owner) (`docs/PLAYTEST_TEAM_2026-11-21.md`, section 7; decision log 7.40)
+- A fifth AI playtester played two whole runs (2026-11-21), one with the third battle: no blocker; 12 findings, 11 fixed. The one defect: an enemy action's number starts again in each battle, and the reaction prompt and the second-reaction question took it for the run's (decision log 7.41; playtest report section 8)
+- The Android emulator check failed once on pull request 45 by its own doing: the `monkey` tool that started the app turns the screen. The app is started with `am start` now (decision log 7.40; `docs/android/PLAN.md`, run 9)
 - Every setting the owner chose in D-31 is in
 - Waiting for the owner's playtest of the demo (D-32); "Confirm a pass" on by default is confirmed
 
