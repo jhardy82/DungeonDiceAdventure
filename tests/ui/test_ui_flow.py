@@ -557,7 +557,8 @@ def test_status_summary_on_a_card_groups_stacks_and_never_overlaps_the_gauge(tmp
     view = next(c for c in play.ctrl.view()["combatants"] if c["id"] == "h01")
     forms = screens._status_forms(view)
     assert forms[0] == "PSN x3 (1-2)  WKN x2 (1-2)  SPD+ x2 (2)"  # fixed order, whatever order they were applied in
-    assert forms[2] == "P3(1-2) W2(1-2) S2(2)"  # the widest summary the rules allow
+    assert forms[1] == "PSN x3(1-2) WKN x2(1-2) SPD+ x2(2)"  # the same notation as the first: only the spaces go
+    assert forms[2] == "P3(1-2) W2(1-2) S2(2)"  # the widest summary the rules allow: nothing longer fits every font
     drawn, shortened = record_text(monkeypatch)
     play.app.frame(0)
     shown = [text for text in drawn if text in forms]

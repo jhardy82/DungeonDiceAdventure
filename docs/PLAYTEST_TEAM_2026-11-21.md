@@ -306,3 +306,63 @@ to 309, both battles (`rules 1.1.2`, content `1.3.1`).
 Blocker, no High). 28 are fixed, one of them in part (KB-7). 6 are left with a reason (ST-2,
 ST-3, ST-9, KB-4, KB-6, BR-8).
 
+## 8. A fifth playtester: two whole runs (2026-11-21)
+
+Section 7.1 ended with what the second round had not covered: no playtester had finished a battle.
+A fifth one ("finisher") was sent to play whole runs on the same build, after the fixes of section 7.
+
+### 8.1 Method and coverage
+
+- **Run 1, as shipped:** Battle 1 won, the upgrade screen, Battle 2 won, the outcome screen. 217 actions.
+- **Run 2, Class Evolution:** Battle 1, the upgrade screen with Career, Battle 2, the stop-or-fight
+  screen, **the third battle chosen and won**, the outcome screen, the roster. 302 actions. In a
+  separate session the other branch (End Run: Victory) was taken to its outcome screen.
+- Seed 500, a Squire and two Scouts, 1280 x 720, default settings. About 166 driver commands.
+  Every finding was reproduced in a fresh session, apart from two Low ones that are plain from the text.
+- **A shortcut the playtester named:** in Run 2 the first two battles were replayed from Run 1's key
+  list and checked at each stop against Run 1's health, mana and statuses (they matched exactly).
+  Only Battle 3 of Run 2 was read turn by turn.
+- **What held:** no error screen, no drawing fault, no text cut off. Every prediction that was checked
+  came true. All eleven numbers of the outcome screen were right in three outcome screens, checked
+  against the playtester's own count. Recovery, the upgrade card, the upgraded die in Battle 2, the
+  swap that asks first, and the mastery lines agreed with one another and with the roster afterwards.
+- **Not covered:** a defeat and its outcome screen (a lone Scout that passed every turn was still at
+  full health after 45 actions, and the attempt was stopped); a confirmed die swap; a completed
+  Retry; a change of vocation; the Apprentice; parties other than three; 960 x 540; Settings.
+
+### 8.2 Findings and what was done
+
+12 findings: no Blocker, no High, 4 Medium, 8 Low. Each was checked in the code before it was fixed.
+
+| ID | Finding | State |
+|----|---------|-------|
+| F1 (Medium) | **The reaction prompt's header carried "no hero could react" notes of earlier enemy actions**, piled them up ("Guard and Resource and Guard and Resource"), and showed them at a Guard stage that offered a reaction. It was the first thing on screen in Battles 2 and 3 | **Fixed. A defect with one cause:** an enemy action's id counts the actions of one battle and starts again in the next. The header collected the notes by that id over the whole run. It now reads back only to where this action was chosen |
+| (found by reading) | The same cause in a second place: the "a reaction was just used on this enemy action, press again" question remembered the *id* of the action. A later battle's or a new run's action with the same number then had its first reaction asked for twice | Fixed: the question asks the rules, which keep the reactions of one enemy action. A test reproduces it with a second run of the same dice |
+| F2 (Medium) | The upgrade screen never said that its three cards belong to the selected hero's selected die. The playtester chose the run's one upgrade without knowing that every other die had three more | Fixed: the panel is titled "Upgrade cards: Squire 1, Iron d6", the step reads "choose one upgrade for one die", and a line says that every die of every hero has its own three |
+| F3 (Medium) | "learned Scout Marksman" was announced as a reward, on the screen where the player decides whether to risk a harder battle. The skill cannot be equipped and does nothing in this version | Fixed: "learned Scout Marksman (no effect in this version yet)". The note goes by itself when the rules learn the skill |
+| F4 (Medium) | "+2 with the bonus" was explained nowhere | Fixed: the line says what earned it ("with the bonus (a Status die with an Attack die)"), and the Career screen has a Mastery line for each vocation that can be played: "1 point for a won battle. 1 more when ..." |
+| F5 | "Both battles won." after three won battles | Fixed: "All three battles won." |
+| F6 | "It lasts through Battle 2" for an upgrade that was still there in Battle 3 | Fixed: "It lasts until the run ends." |
+| F7 | With Class Evolution on, the menu said "Two battles, one upgrade" while the battle bar said "Battle 1 of 3" for a third battle that is optional | Fixed: the menu says "Two battles and an optional third"; the bar counts the battles that must be fought ("Battle 1 of 2") and the optional one once it is being fought ("Battle 3 of 3"). The phone screens take the title from the same place |
+| F8 | "Needs: master Scout (now rank 3)" did not say what "master" means when the Career screen was opened from the upgrade screen | Fixed: "master Scout (rank 8; now rank 3)", wherever it is read |
+| F9 | Statuses on a unit card were written three ways: "PSN x1 (2)", "PSN 1(2) WKN 1(2)", "P1(2) W1(2) S2(1)" | **Fixed in part.** One and two statuses are now written the same way ("PSN x1(2) WKN x1(2)"). The shortest form, used when three kinds are on one unit, stays: with the "x" it does not fit the card in the widest font at 960 x 540 (tried, measured by the layout test) |
+| F10 | A second reaction on one enemy action needs two presses, and only the status bar said so | Fixed: the button reads "Press again: Disrupt", an ally button "Press again", as the swap and the retry do |
+| F11 | What recovery gave a hero was only in the status bar while the hero was pointed at | Fixed: on the hero's button, "HP 12/14 (was 7)", or "(+5)" where a font leaves less room |
+| F12 | The victory screen showed mastery for the last battle only, and no tips | Fixed for mastery: "Mastery from this run", one line per hero with the total, what came from bonuses, the ranks and the skills. **Tips are as designed:** they appear when a whole mechanic went unused (no reroll, no reaction), and the playtester had used both |
+
+### 8.3 Impressions, kept as impressions
+
+One party, one seed. None of these was changed; each is for the owner.
+
+| Impression | What is known |
+|------------|---------------|
+| The third battle, announced as harder (threat 4 of 5), was the easiest of the three for this party: 26 activations against 30 and 33, and 2 health lost | Checked in the content: for three heroes its enemies have 36 health in all (two Blight Captains at 13, a Hex Adept at 10) against 45 in Battle 2, and they hit harder (4 instead of 3). Its table was tuned by a simulated player for parties with a Guardian (Checkpoint 1, accepted by the owner). This party had none |
+| Enemies used Dirty Trick, Poison Dart and War Cry far more than damage; no hero was ever in danger | The second report of this (ST-3 in section 7.3). Measured there: with three heroes, 17% of enemy actions are attacks |
+| Many reaction prompts: 8 reactions used in Run 1, 13 in Run 2 | ST-9 in section 7.3, with the pacing question |
+
+**Tally of the fifth playtester:** 12 findings. 11 fixed (F9 in part), 1 half of F12 as designed.
+One more fault of the same cause as F1 was found by reading and fixed.
+
+**A consequence of the fixes, handled with them:** the mastery lines are longer now. With five
+heroes they could have run out of the two mastery panels, so both panels size their text by
+measuring. The largest case is drawn by a test in every font at both window sizes.

@@ -16,7 +16,7 @@ import pygame
 from battle_dice import RULES_VERSION
 from battle_dice.app.controller import AppController
 from battle_dice.core.models import CombatPhase
-from battle_dice.core.view import with_article
+from battle_dice.core.view import battle_title, with_article
 from battle_dice.features import describe as describe_features
 from battle_dice.ui.toolkit import UI, Theme
 
@@ -107,7 +107,7 @@ def draw_main_menu(ui: UI, ctrl: AppController, quit_action: Callable[[], Any]) 
     for position, size in enumerate((4, 6, 8)):
         ui.sprite(ui.assets.die_key(size), 574 + position * 46, 254, 40, 40)
     ui.text(640, 150, "BATTLE DICE", 64, Theme.ACCENT, bold=True, align="center")
-    ui.text(640, 232, "A turn-based tactical dice RPG. Two battles, one upgrade, every die face visible.", 18, Theme.DIM, align="center")
+    ui.text(640, 232, ctrl.tagline(), 18, Theme.DIM, align="center", max_width=1200)
     ui.button("menu:new", 490, 300, 300, 52, "New Run  (N)", ctrl.new_run, hotkeys=(pygame.K_n,), default=True, size=22,
               tooltip="Configure a party of 1 to 5 heroes and start Battle 1.")
     ui.button("menu:controls", 490, 362, 300, 52, "Controls  (C)", ctrl.show_controls, hotkeys=(pygame.K_c,), size=22,
@@ -313,6 +313,9 @@ def _status_forms(c: dict[str, Any]) -> list[str]:
 
     Stacks are summed per kind; the bracket is the remaining activations (a range when the
     stacks expire at different times). The inspect panel lists every stack in full.
+    The first two are written the same way, "name xstacks (left)", and differ in spaces only (a whole-run
+    playtest read three notations as three meanings). The last drops the "x" and all but a letter of the name:
+    with three kinds on one unit nothing longer fits the card in the widest font.
     """
     groups: dict[str, dict[str, Any]] = {}
     for status in sorted(c["statuses"], key=lambda s: STATUS_ORDER.index(s["kind"]) if s["kind"] in STATUS_ORDER else len(STATUS_ORDER)):
@@ -326,7 +329,7 @@ def _status_forms(c: dict[str, Any]) -> list[str]:
 
     return [
         "  ".join(f"{g['glyph']} x{g['stacks']} ({left(g)})" for g in groups.values()),
-        " ".join(f"{g['glyph']} {g['stacks']}({left(g)})" for g in groups.values()),
+        " ".join(f"{g['glyph']} x{g['stacks']}({left(g)})" for g in groups.values()),
         " ".join(f"{g['glyph'][0]}{g['stacks']}({left(g)})" for g in groups.values()),
     ]
 
@@ -592,7 +595,7 @@ def draw_header(ui: UI, ctrl: AppController, view: dict[str, Any], fast: bool,
     names = {c["id"]: c["name"] for c in view["combatants"]}
     archetypes = {c["id"]: c["archetype_id"] for c in view["combatants"]}
     ui.panel(0, 0, 1280, 40, fill=Theme.BAR, border=Theme.BAR)
-    ui.text(12, 9, f"Battle {view['battle']} of {view['battle_count']}", 20, Theme.ACCENT, bold=True)
+    ui.text(12, 9, battle_title(view), 20, Theme.ACCENT, bold=True)
     actor = names.get(view["active_combatant_id"] or "", "nobody")
     state = f"Tick {view['timeline_tick']}    Phase: {PHASE_LABELS.get(view['combat_phase'], view['combat_phase'])}    Acting: {actor}"
     seed = f"Seed {view['seed']}"
@@ -813,9 +816,10 @@ def draw_reactions(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
         selected = picking == hero_id
         row_hotkeys = (NUMBER_KEYS[number - 1],) if picking is None and number <= len(NUMBER_KEYS) else ()
         follow_up = " Then choose the ally." if len(targets) > 1 else ""
-        ui.button(row_key, 20, y, 228, 28, f"{number}. {option['name']} ({option['hero_name']})",
+        again = ctrl.asked(row_key)  # a further reaction on this enemy action waits for its second press
+        ui.button(row_key, 20, y, 228, 28, f"Press again: {option['name']}" if again else f"{number}. {option['name']} ({option['hero_name']})",
                   partial(ctrl.pick_reaction, hero_id, option["needs_target"], targets),
-                  enabled=option["eligible"], reason=option["reason"], hotkeys=row_hotkeys, selected=selected, size=14,
+                  enabled=option["eligible"], reason=option["reason"], hotkeys=row_hotkeys, selected=selected or again, size=14,
                   tooltip=f"{option['expected']} Cost: {option['mana_cost']} mana, 1 charge.{follow_up}")
         # Cost only: the reaction charge is on the hero's card ("React 1") and in the tooltip.
         ui.text(254, y + 7, f"costs {option['mana_cost']} mana", 12, Theme.DIM, max_width=108)
@@ -829,8 +833,9 @@ def draw_reactions(ui: UI, ctrl: AppController, view: dict[str, Any]) -> None:
                 number = ally_numbers[target_id]
                 target_hotkeys = (NUMBER_KEYS[number - 1],) if selected and number <= len(NUMBER_KEYS) else ()
                 label = f"{number}. {names[target_id]}" if selected else names[target_id]
-                ui.button(target_key, 366 + (position - 1) * 134, y, 130, 28, label,
+                ui.button(target_key, 366 + (position - 1) * 134, y, 130, 28, "Press again" if ctrl.asked(target_key) else label,
                           partial(ctrl.choose_reaction_target, hero_id, target_id), hotkeys=target_hotkeys, size=13,
+                          selected=ctrl.asked(target_key),
                           tooltip=f"{option['name']} on {names[target_id]}. {option['expected']} Cost: {option['mana_cost']} mana, 1 charge.")
                 hot = hot or ui.is_hot(target_key)
         else:
@@ -928,7 +933,7 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
     chosen = upgrade["upgrade_chosen"]
     ui.text(20, 12, "Recovery and Upgrade", 28, Theme.ACCENT, bold=True)
     ui.sprite("chest", 378, 8, 40, 40)
-    step = "Step 2 of 2: optional swap and rows, then start Battle 2." if chosen else "Step 1 of 2: choose one dice upgrade (required)."
+    step = "Step 2 of 2: optional swap and rows, then start Battle 2." if chosen else "Step 1 of 2: choose one upgrade for one die (required)."
     earned = ctrl.mastery_line()
     if earned:  # Class Evolution: what the won battle gave each saved hero stays on this screen (playtest D3)
         ui.text(420, 9, step, 17, Theme.TEXT, bold=True)
@@ -955,9 +960,16 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
         c = by_id[hero["hero_id"]]
         y: float = 84 + index * 76
         selected = hero["hero_id"] == ctrl.upgrade_hero
+        # What recovery gave is on the button, not only in its tooltip (whole-run playtest F11). The room is one
+        # short line and fonts differ, so the longest wording that fits is taken; the plain numbers are the last resort.
+        before = recovered.get(hero["hero_id"], (c["hp"], c["hp"]))[0]
+        hp, rest = f"HP {c['hp']}/{c['max_hp']}", (f"MP {c['mana']}", f"CR {c['corruption']}")
+        wordings = [f"{hp} (was {before})  {'  '.join(rest)}", f"{hp} (+{c['hp'] - before})  {'  '.join(rest)}",
+                    f"{hp} (+{c['hp'] - before}) {' '.join(rest)}"] if before != c["hp"] else []
+        plain = f"{hp}  {'  '.join(rest)}"
         ui.button(f"up:hero:{hero['hero_id']}", 20, y, 196, 68, hero["hero_name"],
                   partial(ctrl.select_upgrade_hero, hero["hero_id"]), selected=selected,
-                  sublabel=f"HP {c['hp']}/{c['max_hp']}  MP {c['mana']}  CR {c['corruption']}",
+                  sublabel=next((words for words in wordings if ui.text_width(words, 13) <= 186), plain),
                   tooltip=f"Show this hero's dice. Recovery: {recovered.get(hero['hero_id'], (c['hp'], c['hp']))[0]} -> "
                           f"{recovered.get(hero['hero_id'], (c['hp'], c['hp']))[1]} HP; mana refilled, shields and statuses cleared, corruption kept.")
         ui.button(f"up:row:{hero['hero_id']}", 222, y, 82, 68, c["row"].capitalize(),
@@ -972,7 +984,7 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
         ui.button(f"up:die:{die['id']}", 20, 512 + index * 56, 284, 48, label,
                   partial(ctrl.select_upgrade_die, die["id"]), selected=die["id"] == ctrl.upgrade_die,
                   sublabel=f"d{die['size']}  v{die['definition_version']}" + ("  locked against swapping" if entry["locked"] else ""),
-                  tooltip="Show the three upgrade cards for this die.")
+                  tooltip="Show the three upgrade cards for this die. Every die has its own three.")
 
     saved_hero = ctrl.saved_hero_of(hero_view["hero_id"])
     if saved_hero is not None:  # Class Evolution: before the upgrade is chosen, a saved hero may take another vocation
@@ -981,13 +993,17 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
                   tooltip="Open this hero's career. Before the upgrade is chosen it may claim a vocation or change to one.")
 
     # Offer cards
-    ui.panel(322, 56, 610, 628, "Upgrade cards" if not chosen else "Upgrade applied")
+    # The three cards are those of one die of one hero. Every other die has its own three, and the one upgrade
+    # of the run is chosen among all of them: the title says whose cards these are (whole-run playtest F2).
+    shown_die = next((e for e in hero_view["equipped"] if e["die"]["id"] == ctrl.upgrade_die), hero_view["equipped"][0])["die"]["name"]
+    cards_title = f"Upgrade cards: {hero_view['hero_name']}, {shown_die}"
+    ui.panel(322, 56, 610, 628, (cards_title if ui.text_width(cards_title, 15, True) <= 594 else "Upgrade cards") if not chosen else "Upgrade applied")
     offers = ctrl.current_offers() if not chosen else []
     if chosen:
         record = upgrade["upgrades"][0]
         ui.paragraph(336, 90, f"{record['kind'].capitalize()} was applied to {by_id[record['hero_id']]['name']}'s {ctrl.die_name(record['hero_id'], record['die_id'])} "
                      f"(face {record['face_index'] + 1}, version {record['from_version']} -> {record['to_version']}). "
-                     "It lasts through Battle 2 and is removed when the run ends.", 580, 16, Theme.TEXT, line_height=21)
+                     "It lasts until the run ends.", 580, 16, Theme.TEXT, line_height=21)
         die_entry = next((e for e in hero_view["equipped"] if e["die"]["id"] == ctrl.upgrade_die), hero_view["equipped"][0])
         draw_die_faces(ui, 336, 180, 580, die_entry["die"])
     for index, offer in enumerate(offers[:3]):
@@ -1012,6 +1028,8 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
             draw_die_faces(ui, 336, 474, 580, preview["after"], highlight_face=selected_offer["face_index"], max_rows=6)
         elif offers:
             ui.text(336, 318, "Select a card to compare the die before and after.", 15, Theme.FAINT)
+            ui.paragraph(336, 342, "These are this die's cards. Every die of every hero has its own three: choose a hero and a die on the left.",
+                         580, 14, Theme.FAINT, line_height=18, max_lines=2)
         problem = ctrl.apply_problem()
         ui.button("up:apply", 336, 624, 300, 50, "Apply Upgrade  (A)", ctrl.apply_upgrade, enabled=problem is None, reason=problem,
                   hotkeys=(pygame.K_a,), default=problem is None, size=18,
@@ -1049,6 +1067,27 @@ def draw_upgrade(ui: UI, ctrl: AppController) -> None:
 # Outcome and error
 # --------------------------------------------------------------------------------------------
 
+def award_size(ui: UI, lines: list[str], width: float, room: float) -> int:
+    """The largest text size at which every award line is whole and all of them fit ``room``.
+
+    A line can carry a bonus, a new rank and a skill, a party has up to five heroes, and fonts differ a lot
+    in width: so the size is found by measuring. At the smallest size the lines of the demo's largest case fit
+    in every font the tests know.
+    """
+    return next((size for size in (14, 13, 12, 11, 10) if awards_height(ui, lines, width, size) <= room), 10)
+
+
+def awards_height(ui: UI, lines: list[str], width: float, size: int) -> float:
+    return sum(len(ui.wrap_lines(line, width, size)) * (size + 3) + 8 for line in lines)
+
+
+def draw_awards(ui: UI, x: float, y: float, width: float, room: float, lines: list[str]) -> None:
+    """Mastery lines in a panel, one paragraph per hero, as large as they all fit."""
+    size = award_size(ui, lines, width, room)
+    for line in lines:
+        y = ui.paragraph(x, y, line, width, size, Theme.TEXT, line_height=size + 3) + 8
+
+
 STAT_LABELS = [
     ("activations", "Activations"),
     ("timeline_ticks", "Timeline ticks"),
@@ -1069,7 +1108,8 @@ def draw_outcome(ui: UI, ctrl: AppController) -> None:
     victory = outcome["outcome"] == "victory"
     ui.text(640, 40, "VICTORY" if victory else "DEFEAT", 60, Theme.GOOD if victory else Theme.BAD, bold=True, align="center")
     if victory:
-        summary = "Both battles won. The run is complete."
+        won = len(outcome["battle_records"])
+        summary = f"{ {2: 'Both battles', 3: 'All three battles'}.get(won, f'All {won} battles')} won. The run is complete."
     else:
         lost = " The upgrade is lost." if outcome["upgrades"] else ""
         summary = f"No hero was left standing in Battle {outcome['battle_reached']}. The run is over.{lost}"
@@ -1090,12 +1130,10 @@ def draw_outcome(ui: UI, ctrl: AppController) -> None:
         ui.text(360, y, label, 16, Theme.DIM)
         ui.text(920, y, str(outcome["stats"][key]), 16, Theme.TEXT, bold=True, align="right")
         y += 26
-    awards = ctrl.awards_view()
-    if awards:  # Class Evolution: what each saved hero earned in the last battle of the run
-        ui.panel(952, 180, 312, 330, "Mastery from the last battle")
-        award_y = 208.0
-        for award in awards[:5]:
-            award_y = ui.paragraph(966, award_y, award, 286, 14, Theme.TEXT, line_height=17, max_lines=3) + 8
+    awards = ctrl.run_awards_view()
+    if awards:  # Class Evolution: what each saved hero earned in the whole run (each battle's share was shown after it)
+        ui.panel(952, 180, 312, 330, "Mastery from this run")
+        draw_awards(ui, 966, 208, 286, 294, awards[:5])
     log_text = (path_text(ui, "Event log: ", outcome["log_path"], 13, 1200) if outcome["log_path"]
                 else f"Event log not written: {outcome['log_error'] or 'unknown reason'}")
     ui.text(640, 522, log_text, 13, Theme.FAINT, align="center", max_width=1200)
@@ -1288,7 +1326,10 @@ def draw_career(ui: UI, ctrl: AppController) -> None:
             ("Schedule", f"{info['scheduling']['label']}: {info['scheduling']['summary']}"),
             ("Passive", f"{info['passive']['name']}: {info['passive']['summary']}"),
             ("Reaction", f"{info['reaction_def']['name']} ({info['reaction_def']['mana_cost']} mana): {info['reaction_def']['summary']}"),
+            ("Mastery", view["bonus"]),
         ):
+            if not body:
+                continue
             ui.text(x, y, label, 14, Theme.ACCENT, bold=True)
             y = ui.paragraph(x + 76, y, body, 372, 14, Theme.DIM, line_height=17, max_lines=4) + 5
     for die in info["dice"]:
@@ -1354,8 +1395,7 @@ def draw_continue(ui: UI, ctrl: AppController) -> None:
     y = 200.0
     if not view["awards"]:
         ui.text(656, y, "No saved hero fought this battle.", 14, Theme.DIM, max_width=370)
-    for line in view["awards"][:5]:
-        y = ui.paragraph(656, y, line, 370, 14, Theme.TEXT, line_height=17, max_lines=3) + 8
+    draw_awards(ui, 656, y, 370, 264, view["awards"][:5])
 
     ui.button("continue:fight", 300, 500, 320, 64, "Fight On  (F)", ctrl.fight_on, hotkeys=(pygame.K_f,), size=20,
               tooltip="Start the third battle. Winning it wins the run; losing it loses the run.")

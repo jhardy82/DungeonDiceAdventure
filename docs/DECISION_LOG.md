@@ -2505,6 +2505,68 @@ nothing, and the condition was removed.
 - Still not shown: an app started on a screen locked sideways. It has not been tried since the
   cause was found.
 
+### 7.41 A fifth playtester plays two whole runs (2026-11-21)
+
+The second round (7.40) said plainly what it had not shown: no playtester had finished a battle.
+A fifth one played two whole runs on that build, one of them with Class Evolution and the third
+battle. Its report and every finding are in `docs/PLAYTEST_TEAM_2026-11-21.md`, section 8.
+
+- **Result:** both runs reached the outcome screen. No blocker, no error screen, no cut-off text.
+  Every prediction checked came true and all outcome numbers were right. 12 findings, 4 Medium
+  and 8 Low: 11 fixed (one in part), half of one as designed.
+- **The one defect, and its cause (F1).** The reaction prompt showed "no hero could react" notes
+  of earlier battles. An enemy action's id is "action number N of this battle" and starts again in
+  every battle (section 8 lists that as a known limit for log readers). The header collected its
+  notes by that id over the whole run. It now reads back from the end of the log to where the
+  action was chosen.
+- **The same cause, found by reading and not by the playtester.** The controller kept the id of
+  the action a reaction had been used on, to ask "press again" for a further one. A later
+  battle's or a new run's action with the same number had its *first* reaction asked for twice.
+  The rules already keep the reactions of one enemy action; the controller asks them now and
+  keeps nothing. I looked for other readers of that id: the bonus-challenge evidence reads one
+  battle's events and is not affected.
+- **Why no test had caught F1.** Every test of the prompt's header played Battle 1. The new test
+  plays the playtester's run (seed 500) with the scripted player through both battles and checks
+  every prompt; it also asserts that the run really meets an action number twice, so that it
+  cannot pass by no longer testing anything.
+- **Readings of mine, stated so they can be corrected:**
+  - The battle bar says "Battle 1 of 2" in a run that offers a third battle, and "Battle 3 of 3"
+    once it is fought. "of 3" from the start promised a battle the player may decline.
+  - The outcome screen now shows the mastery of the whole run and not of the last battle. Each
+    battle's share is shown right after it; the end of a run is where a total is wanted.
+  - A bonus challenge is worded for the player in the controller ("a Status die with an Attack
+    die"), not taken from the catalog, whose summaries are written for the rules ("A successful
+    Status -> Attack two-die sequence resolved fully."). A test keeps the worded challenges equal
+    to the ones the evidence counts, and requires words for every vocation that can be played.
+- **Fixed in part (F9):** statuses on a card. One and two statuses share one notation now. With
+  three kinds on one unit the shortest form stays without the "x": the longer one was cut off in
+  the widest font at 960 x 540, which the layout test showed on the first try.
+- **Not changed:** tips on the outcome screen appear when a mechanic went unused; the playtester
+  had used both, so none was due. Three impressions (the third battle easier than the second for
+  a party without a Guardian; enemies that seldom attack; many reaction prompts) are recorded
+  with what is known and left for the owner.
+- **Existing tests changed on purpose:** the requirement text ("rank 8; now rank 1"), the outcome
+  panel's title and lines (the whole run), the second status form.
+
+- **A layout risk of my own making, found before anyone met it.** The award lines grew with these
+  fixes. With five heroes who each have a bonus, a new rank and a skill to report, they no longer
+  fitted the two mastery panels at a fixed size. The panels now size their text by measuring, as
+  the upgrade screen's line already did, and a skill is named once with one note between several.
+  A test draws that largest case in every font at both window sizes and checks where the last
+  line ends.
+- **A mishap with the deliberate breaks, recorded.** I stopped a slow run of them part-way. The
+  process had not ended when I checked two seconds later, and it left one broken line in the
+  controller. The next test run failed on exactly that line; I restored it and read the whole
+  source diff before going on. A stopped run is now checked by its process, not by a pause.
+
+**Checked:** 1,484 tests pass with warnings as errors (31 new), coverage 97.54%, lint and both type
+checks clean, the replay pin and the content unchanged, both self-checks and both Class Evolution
+checkers pass; the new tests and the phone tests also pass on Python 3.14. 47 deliberate breaks of
+the new code are all noticed. Six were not at first: two were one condition of mine that changed
+nothing (reading stops where the action was chosen, so asking for its id as well added nothing),
+and it was removed; four got a test (a stage the player skipped, a skill learned in an earlier
+battle, and the room of each of the two mastery panels).
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one

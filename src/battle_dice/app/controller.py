@@ -15,7 +15,7 @@ import time
 import traceback
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from battle_dice import settings as settings_module
 from battle_dice.app.wording import touch_wording
@@ -153,8 +153,6 @@ class AppController:
         self._question_sources: tuple[str | None, ...] = (None,)
         self._question_serial = -1
         self._question_ms = 0.0
-        #: The enemy action a reaction was already used on: a further reaction then needs a second press.
-        self._reacted_to: str | None = None
         self.error_text = ""
         # In-run menu (Esc). While it is open nothing in the run advances.
         self.paused = False
@@ -908,16 +906,23 @@ class AppController:
         engine = self.engine
         if engine is None or engine.combat.committed_intent is None:
             return
-        intent_id = engine.combat.committed_intent.id
         name = engine.build(hero_id).reaction["name"]
         on = f" on {engine.combat.combatants[target_id].name}" if target_id in engine.combat.combatants else ""
         if only and on:
             on += ", the only ally it can be used on"
         if self._guard(self._send, cmd.USE_REACTION, hero_id=hero_id, target_id=target_id):
-            self._reacted_to = intent_id
             said = f"{name} used{on}."
             self.info(said)
             self._reaction_opened(said + " ")
+
+    def _reacted_already(self) -> bool:
+        """Whether a reaction was already used on the enemy action under way.
+
+        Asked of the rules, which keep the reactions of one enemy action. (The controller kept the action's id
+        for this before. An id counts the actions of one battle, so a later battle's action with the same number
+        was taken for the one reacted to, and its first reaction was asked for twice.)
+        """
+        return self.engine is not None and bool(self.engine.combat.reactions_used)
 
     def pick_reaction(self, hero_id: str, needs_target: bool, target_ids: list[str]) -> None:
         """A reaction row, by its number or a click: use it at once when nothing is left to choose.
@@ -929,7 +934,7 @@ class AppController:
         engine = self.engine
         intent = engine.combat.committed_intent if engine is not None else None
         one_press = not needs_target or len(target_ids) == 1
-        if one_press and engine is not None and intent is not None and self._reacted_to == intent.id:
+        if one_press and engine is not None and intent is not None and self._reacted_already():
             name = engine.build(hero_id).reaction["name"]
             if not self._ask_once(f"react:{hero_id}", f"A reaction was just used on this enemy action. Press again to use {name} as well."):
                 return
@@ -948,7 +953,7 @@ class AppController:
         on its own right after another reaction on the same enemy action it is asked for once more, as a row is."""
         engine = self.engine
         intent = engine.combat.committed_intent if engine is not None else None
-        if engine is not None and intent is not None and self.reaction_hero != hero_id and self._reacted_to == intent.id:
+        if engine is not None and intent is not None and self.reaction_hero != hero_id and self._reacted_already():
             name = engine.build(hero_id).reaction["name"]
             ally = engine.combat.combatants[target_id].name if target_id in engine.combat.combatants else "that ally"
             if not self._ask_once(f"react:{hero_id}:{target_id}",
@@ -1271,18 +1276,47 @@ class AppController:
         if awards:
             self.info("Mastery: " + "  ".join(self.award_line(a) for a in awards))
 
-    @staticmethod
-    def award_line(award: dict[str, Any]) -> str:
+    #: A vocation's bonus challenge in the player's words: a short name for an award line, and the whole condition
+    #: as ``career/evidence.py`` counts it. (The catalog's own summaries are written for the rules, not for a player.)
+    BONUS_CHALLENGES: ClassVar[dict[str, tuple[str, str]]] = {
+        "protect_ally": ("it shielded an ally", "a shield from this hero's Defense die takes damage for another ally"),
+        "prevent_3_damage": ("its shields took 3 damage for an ally", "shields this hero gave another ally, by a Defense die or by its "
+                                                                     "reaction, take 3 or more damage from one enemy action"),
+        "resource_into_action": ("a Resource die with another", "this hero plays a Resource die and a die of another kind in one activation"),
+        "status_into_attack": ("a Status die with an Attack die", "this hero plays a Status die and an Attack die in one activation"),
+        "mark_and_strike": ("a Status die with an Attack die", "this hero plays a Status die and an Attack die in one activation"),
+    }
+    #: Said of a skill a hero has learned and the rules of battle do not know yet.
+    SKILL_WAITING = "no effect in this version yet"
+
+    @classmethod
+    def _learned_text(cls, awards: list[dict[str, Any]]) -> str:
+        """", learned X" for the skills these awards taught; ``""`` for none.
+
+        Skills the rules do not know yet come last and carry one note between them:
+        ", learned X; Y and Z (no effect in this version yet)".
+        """
+        learned = list(dict.fromkeys(name for award in awards for name in award["skills_learned"]))
+        waiting = [name for name in learned if any(name in award.get("skills_waiting", ()) for award in awards)]
+        groups = [", ".join(name for name in learned if name not in waiting), f"{' and '.join(waiting)} ({cls.SKILL_WAITING})" if waiting else ""]
+        return f", learned {'; '.join(group for group in groups if group)}" if learned else ""
+
+    @classmethod
+    def award_line(cls, award: dict[str, Any]) -> str:
         """One hero's award for one battle, in words."""
         points = award["base_points"] + award["challenge_points"]
         if points:
-            bonus = " with the bonus" if award["challenge_points"] else ""
+            bonus = ""
+            if award["challenge_points"]:  # the bonus says what earned it, where the challenge has player words
+                why = cls.BONUS_CHALLENGES.get(award.get("challenge_id", ""))
+                bonus = f" with the bonus ({why[0]})" if why else " with the bonus"
             rank = f", now rank {award['rank_after']}" if award["rank_after"] != award["rank_before"] else ""
-            learned = f", learned {', '.join(award['skills_learned'])}" if award["skills_learned"] else ""
-            return f"{award['name']} +{points}{bonus}{rank}{learned}."
-        reasons = {"UNDER_THREAT_CAP": "this battle is too easy for its rank", "ENCOUNTER_NOT_WON": "the battle was lost",
-                   "ALREADY_MASTERED": "its vocation is mastered"}
-        return f"{award['name']} +0 ({reasons.get(award['denial_reason'], 'nothing to earn')})."
+            return f"{award['name']} +{points}{bonus}{rank}{cls._learned_text([award])}."
+        return f"{award['name']} +0 ({cls.NO_POINTS.get(award['denial_reason'], 'nothing to earn')})."
+
+    #: Why a battle gave a hero no mastery point.
+    NO_POINTS: ClassVar[dict[str, str]] = {"UNDER_THREAT_CAP": "this battle is too easy for its rank", "ENCOUNTER_NOT_WON": "the battle was lost",
+                                           "ALREADY_MASTERED": "its vocation is mastered"}
 
     def awards_view(self, battle: int | None = None) -> list[str]:
         """The award lines of one battle of this run (the latest by default), for the screens."""
@@ -1291,6 +1325,40 @@ class AppController:
             return []
         wanted = battle if battle is not None else link.last_awards[-1]["battle"]
         return [self.award_line(a) for a in link.last_awards if a["battle"] == wanted]
+
+    def run_awards_view(self) -> list[str]:
+        """What each saved hero earned in the whole run so far, one line per hero, for the outcome screen."""
+        link = self.progression
+        if link is None or not link.last_awards:
+            return []
+        lines = []
+        for hero_id in dict.fromkeys(a["hero_id"] for a in link.last_awards):
+            mine = [a for a in link.last_awards if a["hero_id"] == hero_id]
+            points = sum(a["base_points"] + a["challenge_points"] for a in mine)
+            bonuses = sum(a["challenge_points"] for a in mine)
+            battles = len({a["battle"] for a in mine})
+            earned = f"+{points} in {battles} battle{'s' if battles != 1 else ''}" + (f" ({bonuses} from bonuses)" if bonuses else "")
+            # The rank is the active vocation's. A hero that changed vocation inside the run has awards for two.
+            last = mine[-1]
+            if not points:  # nothing in the whole run: the reason of the last battle says why
+                earned += f" ({self.NO_POINTS.get(last['denial_reason'], 'nothing to earn')})"
+            start = next(a for a in mine if a["vocation_id"] == last["vocation_id"])["rank_before"]
+            rank = f", rank {start} -> {last['rank_after']}" if last["rank_after"] != start else f", rank {last['rank_after']}"
+            lines.append(f"{last['name']} {earned}{rank}{self._learned_text(mine)}.")
+        return lines
+
+    def bonus_text(self, vocation_id: str) -> str:
+        """What earns a vocation's bonus mastery point, as a sentence; ``""`` with Class Evolution off."""
+        link = self.progression
+        if link is None:
+            return ""
+        why = self.BONUS_CHALLENGES.get(link.bonus_challenge(vocation_id))
+        return f"1 point for a won battle. 1 more when {why[1]}." if why else "1 point for a won battle."
+
+    def tagline(self) -> str:
+        """The main menu's line under the title: what a run is, as it is set up now."""
+        third = self.progression is not None and self.third_battle and bool(self.progression.extra_encounters())
+        return f"A turn-based tactical dice RPG. {'Two battles and an optional third' if third else 'Two battles'}, one upgrade, every die face visible."
 
     def dice_as_listed(self, run_hero: str) -> list[str]:
         """The names of a fighting hero's dice in the order the battle lists them: the larger die first."""
@@ -1522,6 +1590,7 @@ class AppController:
         return {"hero_id": hero_id, "name": hero.display_name or hero_id, "active_vocation_id": hero.active_vocation_id,
                 "own_stats": own, "stat_bonus": {stat: amount for stat, amount in bonus.items() if amount}, "change_preview": change,
                 "rows": rows, "selected": selected, "selected_needs": chosen["needs"], "selected_note": chosen.get("note", ""), "in_run": in_run,
+                "bonus": self.bonus_text(selected) if chosen.get("playable") else "",
                 "dismiss_problem": self.dismiss_problem(hero_id),
                 "open_now": open_now, "locked": locked, "fighting": in_run and link.run_hero(hero_id) is not None,
                 "deciding": self.engine is not None and self.engine.state.phase == RunPhase.CONTINUE}
@@ -1550,7 +1619,7 @@ class AppController:
             lacking = []
             for unmet in route.unmet:
                 if unmet["op"] == "MASTERY_AT_LEAST":
-                    lacking.append(f"master {link.catalog.name(unmet['vocation_id'])} (now rank {unmet['current_rank']})")
+                    lacking.append(f"master {link.catalog.name(unmet['vocation_id'])} (rank {link.mastered_rank}; now rank {unmet['current_rank']})")
                 elif unmet["op"] == "MASTERED_COUNT_AT_LEAST":
                     lacking.append(f"master {unmet['minimum']} {unmet['group']} vocations (now {unmet['current_count']})")
                 else:

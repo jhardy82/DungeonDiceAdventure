@@ -191,6 +191,13 @@ class Progression:
     # Skills
     # ----------------------------------------------------------------------------------------
 
+    #: The rank at which a vocation is mastered.
+    mastered_rank = MASTERED_RANK
+
+    def bonus_challenge(self, vocation_id: str) -> str:
+        """The id of a vocation's bonus challenge."""
+        return str(self.catalog.vocations[vocation_id]["bonus_challenge_id"])
+
     def skills(self, hero_id: str) -> Json:
         """The skills a hero has learned, which are equipped, and for each other one why it can or cannot be."""
         hero, service = self.state.heroes[hero_id], self.career.service
@@ -355,6 +362,10 @@ class Progression:
                 "denial_reason": award.denial_reason if award else ("ALREADY_MASTERED" if before[0] >= MASTERED_RANK else None),
                 "rank_before": before[0], "rank_after": row.rank, "points_after": row.points,
                 "skills_learned": [str(self.catalog.skills[s]["name"]) for s in self.state.heroes[hero_id].learned_skills if s not in before[2]],
+                # Those of them the rules of battle do not know yet: learned, and without effect in this version.
+                "skills_waiting": [str(self.catalog.skills[s]["name"]) for s in self.state.heroes[hero_id].learned_skills
+                                   if s not in before[2] and s not in battle_skills.KNOWN],
+                "challenge_id": challenge_id,
                 "duplicate": result.duplicate,
             })
         return report
