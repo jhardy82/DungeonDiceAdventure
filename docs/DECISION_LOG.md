@@ -50,6 +50,7 @@ tests, and add an entry here.
 | D-33 | An Android version | **Owner decisions, 2026-11-21, after the evaluation:** a real Android app with new phone screens on the existing rules, save and controller; the screens are built with **Flet**, starting with a walking skeleton that must pass a go or no-go check; the fallback is a native Android UI (Chaquopy and Kotlin); the app works upright and sideways from the start. What the app is for (own phone, a few people, the Play Store) is not decided. | Section 7.31, `docs/android/PLAN.md` |
 | D-34 | What is fixed after the playtest by the team | **Owner decisions, 2026-11-21, on `docs/PLAYTEST_TEAM_2026-11-21.md`:** (1) every defect and every case of missing information that needs no design decision is fixed; (2) the game still picks a single legal target by itself, but says so, and a number key never removes a planned action; (3) "Abandon Run" and "Retry" ask once more, and the profile reset is confirmed by a separate button in another place; (4) both rule faults are fixed: a vocation change converts health from what the hero had when the change window opened, and an upgrade card that would change nothing is not offered. The rules version goes up and the balance is measured again. Not decided: dismissing a hero, starting classes, the effect of a slower mastery pace. | Section 7.32 |
 | D-35 | Three open playtest findings, and Android after the skeleton | **Owner decisions, 2026-11-21, asked with the ask tool:** (1) R3: a hero can be dismissed, asked once more, not while it is in the party or a run goes on; (2) R4: recruits get names that say no class ("Recruit 1"); heroes already saved keep their names; (3) R5: a vocation a hero has opened stays open when a slower Mastery pace takes the rank it needed, and the Career screen says so; (4) Android: phase 1 groundwork starts now, while the owner tries the APK; the go or no-go for the phone screens stays the owner's. Section 7.38. |
+| D-36 | What the second and the whole-run playtests left open | **Owner decisions, 2026-11-22, asked with the ask tool:** (1) the demo is **not played yet**; the goal stays open (D-32); (2) both balance impressions are **measured with the simulator and brought back with numbers and options**: the third battle for parties with and without a Guardian, and how often enemies attack; nothing changes until the owner chooses; (3) the reason for "no hero could react" goes into the event log **with the next rules change**, not as a rules version of its own; (4) reaction rows **stay numbered from 1** in each stage. | Section 7.42 |
 
 ## 2. Content authored under delegation
 
@@ -2566,6 +2567,105 @@ the new code are all noticed. Six were not at first: two were one condition of m
 nothing (reading stops where the action was chosen, so asking for its id as well added nothing),
 and it was removed; four got a test (a stage the player skipped, a skill learned in an earlier
 battle, and the room of each of the two mastery panels).
+
+### 7.42 Two balance questions, measured (D-36, 2026-11-22)
+
+The AI playtests left two impressions, each from one party and one seed. The owner asked for both
+to be measured and brought back with options (D-36). Nothing in the game was changed.
+
+**How it was measured**
+
+- The informed simulated player; every party of the three starting classes, sizes 1 to 5 (55
+  parties); the party order of the stored reference.
+- The tool is in the repository: `tools/balance_questions.py`, with tests. It changes how enemies
+  choose only inside its own process while it measures.
+- **Two checks that the tool measures the game:** with today's rule it gives the stored reference
+  exactly (seeds 300 to 339: 1,703 wins of 2,200, and each party size to the decimal); for
+  parties with a Guardian it gives the third-battle table of section 7.16 exactly, on both seed
+  blocks.
+
+**Question 1: is the third battle too easy without a Guardian?**
+
+The playtester's impression: for a Squire and two Scouts it was the easiest of the three.
+
+Share of battles won, of the runs that entered them (seeds 300 to 339 and 400 to 439, 7,200 runs):
+
+| Party size | With one Guardian: Battle 2 / Battle 3 | No Guardian: Battle 2 / Battle 3 | No Guardian, no Squire: Battle 3 |
+|-----------:|---------------------------------------:|---------------------------------:|---------------------------------:|
+| 1 | 97.5% / 76.9% | 84.9% / 45.5% | 30.1% |
+| 2 | 88.9% / 76.6% | 74.2% / 68.8% | 53.0% |
+| 3 | 79.5% / 75.8% | 80.0% / 67.1% | 61.7% |
+| 4 | 82.5% / 74.7% | 76.2% / 68.5% | 61.9% |
+| 5 | 75.2% / 75.4% | 78.8% / 73.0% | 74.7% |
+
+- **The impression does not hold in general.** Without a Guardian the third battle is won less
+  often than Battle 2 at every party size, and less often than with a Guardian at every size.
+- **It does hold for that party.** A Squire with two Scouts wins Battle 3 in 74 of 76 runs (97%),
+  and Battle 2 in 76 of 80 (95%). Scout-heavy parties are the strong ones of the base game too.
+- **Why it felt easy:** the third battle is short. A won third battle takes 32 activations for
+  three heroes against 53 for a won Battle 2, and costs less health (17 against 24). Its enemies
+  have less health and hit harder: it is decided sooner, either way.
+- With a Guardian it is inside the owner's band of 70 to 85% at every size (D-27), as accepted
+  in D-28.
+- A player who always fights on wins 53% of runs without a Guardian (stopping after Battle 2:
+  78%), and 60% with one (80%).
+
+*Options:* (a) leave it: it is the harder battle it says it is, optional, and in the band for the
+parties it was tuned for; (b) make it last longer (more enemy health, weaker hits), which would
+have to be tuned again per party size; (c) tune it for parties without a Guardian, which puts
+parties with one above the band. **My recommendation: (a).**
+
+**Question 2: should enemies attack more often?**
+
+- **Why they seldom do (read in `core/enemy_ai.py`):** an ability that puts a status on a hero who
+  has none is always chosen before an attack; only a blow that would bring a hero down comes
+  first. A status lasts two activations and there are several heroes, so an enemy nearly always
+  finds a hero to weaken or poison. Attacks are 49% of enemy abilities against one hero, 25%
+  against two, 16% against three, 20% against four, 14% against five.
+- **That rule is what holds the difficulty.** Tried in the simulator (seeds 300 to 339, 2,200
+  runs each; "won" is the whole run):
+
+| Variant | Attacks | Won: 1 hero | 2 | 3 | 4 | 5 | All |
+|---------|--------:|------------:|--:|--:|--:|--:|----:|
+| A. Today | 18% | 79.2% | 73.8% | 79.0% | 76.5% | 78.1% | 77.4% |
+| B. No preference: every legal ability by its weight | 70% | 31.7% | 5.4% | 6.0% | 4.0% | 0.7% | 4.8% |
+| C. A status comes first only while no hero in reach has it | 49% | 79.2% | 36.7% | 24.8% | 18.8% | 6.5% | 20.5% |
+| F. As today, but not twice running: after a status ability the weights decide | 43% | 79.2% | 33.3% | 26.5% | 24.5% | 11.4% | 23.8% |
+| B with every enemy attack 1 weaker | 68% | 95.8% | 62.1% | 55.2% | 54.2% | 31.1% | 48.7% |
+| C with every enemy attack 1 weaker | 47% | 100.0% | 90.0% | 83.5% | 82.3% | 58.5% | 75.2% |
+| F with every enemy attack 1 weaker | 39% | 100.0% | 87.5% | 87.0% | 90.0% | 71.0% | 82.5% |
+
+- **What the table says:** letting enemies attack more makes the game far harder at once (from
+  77% to between 5% and 24%). One point less on every enemy attack over-corrects for one hero
+  (100%) and under-corrects for five (31 to 71%). No single number brings every party size back
+  into 70 to 85%: it needs a new enemy table per party size, the kind of work the balance set of
+  content 1.3.0 was (section 7.8).
+- **What it would touch:** how enemies choose is a rule (PRD sections 7.1 and 14.4), so a new rules
+  version and a new replay pin; the enemy tables are content, so a new content version. The
+  reason for "no hero could react" would go in with it (D-36, point 3).
+- **What is not known:** whether a person finds the game better with more attacks and fewer
+  statuses. Both impressions came from AI players. Battles would be shorter (variant F with weaker
+  attacks: 116 activations a run against 125 today).
+
+*Options:* (a) leave it; (b) decide after the owner has played, since the question is about how
+it feels; (c) take the "not twice running" rule (F) and tune a new enemy table per party size to
+70 to 85%, as one piece of work with its own measurements. **My recommendation: (b).**
+
+**Found on the way, and not changed: the order of the heroes in a party matters.** With the same
+classes, a party with its Squire first won more often than one with its Apprentice first at two
+heroes (77.1% against 73.8%), and less often at five (74.6% against 78.1%); over all sizes
+1,677 against 1,703 wins of 2,200. One cause, read in the code: when several heroes are equally
+good targets, most enemy abilities take the first one in the party. The player sets that order
+when adding heroes and nothing says so.
+One sample of 40 seeds per party; not measured further.
+
+**Checked:** the tool has eight tests: today's rule is the game seed for seed; a variant is put
+back whatever happens; each rule changes the share of attacks as it says; "not twice running" is
+checked at the moments it decides; the tables count only runs that entered a battle. 1,492 tests
+in all pass with warnings as errors, coverage 97.54%, lint and both type checks clean, the replay
+pin and the content unchanged. 15 deliberate breaks of the tool are all noticed. Three were not at
+first: two got a test, and the third showed a filter of mine that changed nothing (only enemies
+reveal an ability), which was removed.
 
 ## 8. Known limits after the MVP review (2026-11-10)
 

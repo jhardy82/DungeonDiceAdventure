@@ -24,7 +24,7 @@ Where things stand:
 - What comes next is not decided: the open questions below, a person's playtest, or the next
   wave of vocations (FDD section 9).
 
-Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.41),
+Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.42),
 `docs/class_evolution/FDD_v0.2.md`.
 
 ### Open Questions
