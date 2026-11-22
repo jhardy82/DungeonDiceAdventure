@@ -2,7 +2,7 @@
 
 ## Project: Battle Dice
 **Current Phase:** Implementation (the project was already under way when this file was created)
-**Last Updated:** 2026-11-22 by the implementing engineer (a fifth playtester's whole runs; decision log 7.41)
+**Last Updated:** 2026-11-22 by the implementing engineer (owner decisions D-36; two balance questions measured, decision log 7.42)
 **Health:** On Track
 
 **Current goal (owner, 2026-11-11):** a fully configurable and playable demo.
@@ -40,6 +40,7 @@
 - Second playtest round by four AI players (2026-11-21): no blocker; the "press again" safeguards rebuilt so a question ends when the player does anything else; 28 of 34 findings fixed, 6 left with a reason (3 of them are questions for the owner) (`docs/PLAYTEST_TEAM_2026-11-21.md`, section 7; decision log 7.40)
 - A fifth AI playtester played two whole runs (2026-11-21), one with the third battle: no blocker; 12 findings, 11 fixed. The one defect: an enemy action's number starts again in each battle, and the reaction prompt and the second-reaction question took it for the run's (decision log 7.41; playtest report section 8)
 - The Android emulator check failed once on pull request 45 by its own doing: the `monkey` tool that started the app turns the screen. The app is started with `am start` now (decision log 7.40; `docs/android/PLAN.md`, run 9)
+- D-36 (owner, 2026-11-22): demo not played yet; the react reason goes with the next rules change; reaction keys stay. Both balance questions are measured (decision log 7.42; `tools/balance_questions.py`): the third battle is harder than Battle 2 without a Guardian at every party size, and the enemies' status-first rule is what holds the win rate at 77%. Options are with the owner
 - Every setting the owner chose in D-31 is in
 - Waiting for the owner's playtest of the demo (D-32); "Confirm a pass" on by default is confirmed
 

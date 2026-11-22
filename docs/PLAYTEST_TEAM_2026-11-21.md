@@ -282,6 +282,9 @@ IDs: RA roster auditor, KB keyboard only, BR breaker, ST strategist. All were Me
 **For the owner:** ST-3 (should enemies attack more?), ST-2 (reasons in the event log, with the
 next rules version) and KB-4 (reaction keys by the hero's place).
 
+**Answered on 2026-11-22 (D-36):** ST-3 is measured and brought back with options (decision
+log, section 7.42); ST-2 goes with the next rules change; KB-4 stays as it is.
+
 **ST-3, measured.** One player's impression in one battle; so it was counted over whole
 simulated runs: the informed simulated player, every party composition of each size, seeds 300
 to 309, both battles (`rules 1.1.2`, content `1.3.1`).
@@ -359,6 +362,14 @@ One party, one seed. None of these was changed; each is for the owner.
 | The third battle, announced as harder (threat 4 of 5), was the easiest of the three for this party: 26 activations against 30 and 33, and 2 health lost | Checked in the content: for three heroes its enemies have 36 health in all (two Blight Captains at 13, a Hex Adept at 10) against 45 in Battle 2, and they hit harder (4 instead of 3). Its table was tuned by a simulated player for parties with a Guardian (Checkpoint 1, accepted by the owner). This party had none |
 | Enemies used Dirty Trick, Poison Dart and War Cry far more than damage; no hero was ever in danger | The second report of this (ST-3 in section 7.3). Measured there: with three heroes, 17% of enemy actions are attacks |
 | Many reaction prompts: 8 reactions used in Run 1, 13 in Run 2 | ST-9 in section 7.3, with the pacing question |
+
+**Measured since (owner decision D-36, decision log section 7.42):**
+
+- The third battle is not easier in general: without a Guardian it is won less often than Battle 2
+  at every party size (46 to 73% against 74 to 85%). For this playtester's party it is as easy as
+  it felt (97%). It is a short battle, which is what the impression caught.
+- Enemies seldom attack because a status on a hero who has none always comes first. That rule holds
+  the difficulty: with enemies choosing by weight alone, 5% of runs are won instead of 77%.
 
 **Tally of the fifth playtester:** 12 findings. 11 fixed (F9 in part), 1 half of F12 as designed.
 One more fault of the same cause as F1 was found by reading and fixed.

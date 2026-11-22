@@ -170,7 +170,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1484 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
+python -m pytest                 # 1492 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -219,6 +219,12 @@ recorded results and the per-party-size table chosen from them.
 newcomer, a player who never rerolls, one who never reacts, and so on) and reports what each habit
 is worth. `docs/PLAYTEST.md` has the method, the scenarios, the findings and a session script
 for testing with a person.
+
+`python tools/balance_questions.py third` and `python tools/balance_questions.py attacks --variants A B C F`
+measure two balance questions with the simulated player: the optional third battle with and
+without a Guardian, and what happens when enemies choose their abilities differently. A variant
+is tried inside the tool only; the game's files are not touched. The results and the options
+are in `docs/DECISION_LOG.md`, section 7.42.
 
 Every finished run writes a JSONL event log: a header line (seed, rules and content identity,
 the ordered commands, the final hashes), then one event per line with sequence number, tick,

@@ -192,3 +192,18 @@ Started: 2026-11-11
   hero's rows stay in the save as history. Old and new hero names exist side by side.
 - **Impacts:** Career rules and store, controller, Career and party screens, README; the go or
   no-go for the phone screens stays with the owner.
+
+### 2026-11-22 — Owner: what the second and the whole-run playtests left open (D-36)
+- **Decision:** The demo is not played yet, so the goal stays open. Both balance impressions of
+  the AI playtests are measured with the simulator and brought back with numbers and options: the
+  third battle with and without a Guardian, and how often enemies attack. The reason for "no hero
+  could react" goes into the event log with the next rules change. Reaction rows stay numbered
+  from 1 in each stage.
+- **Why:** One party and one seed is an impression; a balance change needs win rates per party
+  size against the 70-85% target. A rules version for one log field alone is not worth a new
+  replay pin. A second reaction is already asked for once more, which guards the costly slip.
+- **Alternatives considered:** Leaving both balance questions; a rules version now; keys by the
+  hero's place.
+- **Trade-offs accepted:** The log keeps saying "no hero could react" without the reason for now.
+- **Impacts:** Simulator runs only; no content or rule changes until the owner chooses from the
+  options.
