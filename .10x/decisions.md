@@ -207,3 +207,20 @@ Started: 2026-11-11
 - **Trade-offs accepted:** The log keeps saying "no hero could react" without the reason for now.
 - **Impacts:** Simulator runs only; no content or rule changes until the owner chooses from the
   options.
+
+### 2026-11-24 — Owner: the balance questions after the measurements (D-37)
+- **Decision:** Make the third battle last longer (more enemy health, weaker hits), tuned per
+  party size. Rework the enemies' choice now: "never a status twice running", with a new enemy
+  table per party size at 70-85%. Measure the effect of the order of the heroes further before
+  anything is said or changed. Both tables come back to the owner before they go into the game.
+- **Why:** The owner chose against my recommendations (leave the third battle; decide the attacks
+  after playing): enemies that mostly weaken and poison, and a third battle decided in a few
+  blows, are not the game wanted. The order effect rests on one sample.
+- **Alternatives considered:** Leaving both; deciding after the owner's own playtest; tuning the
+  third battle for parties without a Guardian; saying the order rule on the party screen at once.
+- **Trade-offs accepted:** A new rules version and a new content version, so a new replay pin;
+  every balance figure measured so far is measured again. The demo changes before the owner has
+  played it.
+- **Impacts:** `core/enemy_ai.py`, the encounter tables, the third battle's table in the catalog,
+  the simulator reference, the docs that quote win rates. The reason for "no hero could react"
+  goes into the event log with the same rules version (D-36).

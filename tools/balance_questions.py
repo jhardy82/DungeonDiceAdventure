@@ -2,12 +2,16 @@
 
     python tools/balance_questions.py third   --first 300 --count 40
     python tools/balance_questions.py attacks --first 300 --count 40 --variants A B C F C-1
+    python tools/balance_questions.py order   --first 300 --count 40
 
 ``third``: the optional third battle, for every party of the three starting classes (sizes 1 to 5) and for
 the same parties with one Squire replaced by a Guardian. The simulated player always fights on.
 
 ``attacks``: how enemies choose their abilities, tried in the simulator only. A variant changes the choice
 inside this process while it measures and puts it back; no file of the game is touched.
+
+``order`` (owner decision D-37): every order of the heroes of every party, with today's rules. It says what
+it is worth to put a class first or last, with the uncertainty of that figure.
 
 Both use the informed simulated player and the party order of ``battle_dice.sim.runner``, so variant ``A``
 over seeds 300 to 339 is the stored reference (1,703 wins of 2,200), and ``third`` with a Guardian is the
@@ -20,8 +24,12 @@ import argparse
 import collections
 import contextlib
 import dataclasses
+import itertools
+import json
+import math
 from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path
 from typing import Any
 
 from battle_dice.career.evidence import battle_events
@@ -233,6 +241,56 @@ def attacks_table(results: list[Json], variant: str) -> list[str]:
 
 
 # --------------------------------------------------------------------------------------------
+# The order of the heroes
+# --------------------------------------------------------------------------------------------
+
+
+def ordered_parties(sizes: tuple[int, ...] = SIZES) -> list[tuple[str, ...]]:
+    """Every party in every order: the first hero of the tuple is the first hero of the party."""
+    classes = sorted(_content().classes)
+    return [party for size in sizes for party in itertools.product(classes, repeat=size)]
+
+
+def place_effect(results: list[Json], size: int, class_id: str, place: int) -> tuple[float, float, int] | None:
+    """What it is worth to have ``class_id`` in ``place`` (0 first, -1 last), in points of win rate.
+
+    Compared inside each party (the same heroes in another order), then averaged over the parties of that
+    size that have the class and another one. Returns the difference, its standard error and the number of
+    parties; ``None`` when no party of that size can show it.
+    """
+    by_party: dict[tuple[str, ...], dict[bool, list[bool]]] = collections.defaultdict(lambda: {True: [], False: []})
+    for run in results:
+        party = tuple(run["party"])
+        if len(party) == size and class_id in party and len(set(party)) > 1:
+            by_party[tuple(sorted(party))][party[place] == class_id].append(run["won"])
+    differences, variances = [], []
+    for sides in by_party.values():
+        there, elsewhere = sides[True], sides[False]
+        if not there or not elsewhere:
+            continue
+        rate_there, rate_elsewhere = sum(there) / len(there), sum(elsewhere) / len(elsewhere)
+        differences.append(rate_there - rate_elsewhere)
+        variances.append(rate_there * (1 - rate_there) / len(there) + rate_elsewhere * (1 - rate_elsewhere) / len(elsewhere))
+    if not differences:
+        return None
+    count = len(differences)
+    return 100 * sum(differences) / count, 100 * math.sqrt(sum(variances)) / count, count
+
+
+def order_table(results: list[Json]) -> list[str]:
+    lines = ["size | class | first, against the same party with another hero first | last, against another hero last | parties compared",
+             "(points of win rate; after the plus-minus sign one standard error: a difference below two of them is not shown to be real)"]
+    classes = sorted({class_id for run in results for class_id in run["party"]})
+    for size in sorted({run["size"] for run in results}):
+        for class_id in classes:
+            first, last = place_effect(results, size, class_id, 0), place_effect(results, size, class_id, -1)
+            if first is None or last is None:
+                continue
+            lines.append(f"{size} | {class_id} | {first[0]:+.1f} \u00b1 {first[1]:.1f} | {last[0]:+.1f} \u00b1 {last[1]:.1f} | {first[2]}")
+    return lines
+
+
+# --------------------------------------------------------------------------------------------
 # Command line
 # --------------------------------------------------------------------------------------------
 
@@ -246,26 +304,41 @@ def run_jobs(function: Any, jobs: list[Any], workers: int) -> list[Json]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("question", choices=("third", "attacks"))
+    parser.add_argument("question", choices=("third", "attacks", "order"))
     parser.add_argument("--first", type=int, default=300, help="the first seed")
     parser.add_argument("--count", type=int, default=40, help="how many seeds")
     parser.add_argument("--sizes", type=int, nargs="+", default=list(SIZES), help="party sizes")
     parser.add_argument("--variants", nargs="+", default=["A"], help="for 'attacks': A, B, C, F, each also with -1")
     parser.add_argument("--jobs", type=int, default=4, help="processes")
+    parser.add_argument("--out", type=Path, help="also write every run to this JSON file")
     args = parser.parse_args(argv)
     seeds, sizes = range(args.first, args.first + args.count), tuple(args.sizes)
     if args.question == "third":
         results = run_jobs(third_run, [(group, party, seed) for group, party in third_parties(sizes) for seed in seeds], args.jobs)
         print("\n".join(third_table(results)))
+        _write(args.out, results)
+        return 0
+    if args.question == "order":
+        results = run_jobs(attacks_run, [("A", party, seed) for party in ordered_parties(sizes) for seed in seeds], args.jobs)
+        print("\n".join(order_table(results)))
+        _write(args.out, results)
         return 0
     for variant in args.variants:
         with enemy_choice(variant):  # an unknown variant is refused before anything is played
             pass
     parties = [tuple(party) for party in compositions(_content(), list(sizes))]
+    everything: list[Json] = []
     for variant in args.variants:
         results = run_jobs(attacks_run, [(variant, party, seed) for party in parties for seed in seeds], args.jobs)
         print("\n".join(attacks_table(results, variant)), end="\n\n")
+        everything += results
+    _write(args.out, everything)
     return 0
+
+
+def _write(path: Path | None, results: list[Json]) -> None:
+    if path is not None:
+        path.write_text(json.dumps(results), encoding="utf-8")
 
 
 if __name__ == "__main__":

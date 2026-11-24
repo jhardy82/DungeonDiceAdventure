@@ -172,3 +172,51 @@ def test_the_command_prints_a_table_for_each_variant(tool, capsys):
         tool.main(["attacks", "--count", "1", "--sizes", "1", "--jobs", "1", "--variants", "A", "Z"])
     assert tool.main(["third", "--first", "300", "--count", "1", "--sizes", "1", "--jobs", "1"]) == 0
     assert "one Guardian | 1 | 1 | " in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------------------------
+# The order of the heroes (D-37)
+# --------------------------------------------------------------------------------------------
+
+
+def test_every_order_of_every_party_is_played(tool):
+    assert tool.ordered_parties((1,)) == [("apprentice",), ("scout",), ("squire",)]
+    pairs = tool.ordered_parties((2,))
+    assert len(pairs) == 9 and ("squire", "apprentice") in pairs and ("apprentice", "squire") in pairs
+    assert len(tool.ordered_parties((1, 2, 3, 4, 5))) == 3 + 9 + 27 + 81 + 243
+
+
+def runs_of(party, won, lost):
+    return [{"size": len(party), "party": list(party), "won": True}] * won + [{"size": len(party), "party": list(party), "won": False}] * lost
+
+
+def test_a_place_is_compared_inside_the_same_party(tool):
+    """Squire first wins 30 of 40, the same two heroes with the Squire last 20 of 40: ten points for the place."""
+    results = runs_of(("squire", "scout"), 30, 10) + runs_of(("scout", "squire"), 20, 20)
+    first = tool.place_effect(results, 2, "squire", 0)
+    last = tool.place_effect(results, 2, "squire", -1)
+    assert first is not None and last is not None
+    assert first[0] == pytest.approx(25.0) and last[0] == pytest.approx(-25.0) and first[2] == last[2] == 1
+    # One standard error of the difference of two shares of 40 runs each.
+    assert first[1] == pytest.approx(100 * (0.75 * 0.25 / 40 + 0.5 * 0.5 / 40) ** 0.5)
+    # A party of one class has no order, and a class that is not there has no place.
+    same = runs_of(("squire", "squire"), 5, 5)
+    assert tool.place_effect(same, 2, "squire", 0) is None and tool.place_effect(results, 2, "apprentice", 0) is None
+    assert tool.place_effect(results, 3, "squire", 0) is None
+    # Another party of the same size is compared for itself and the two differences are averaged, not pooled.
+    more = results + runs_of(("squire", "apprentice"), 10, 30) + runs_of(("apprentice", "squire"), 10, 30)
+    both = tool.place_effect(more, 2, "squire", 0)
+    assert both is not None and both[0] == pytest.approx(12.5) and both[2] == 2
+
+
+def test_the_order_table_gives_each_class_first_and_last_with_its_uncertainty(tool, tmp_path, capsys):
+    results = runs_of(("squire", "scout"), 30, 10) + runs_of(("scout", "squire"), 20, 20)
+    lines = tool.order_table(results)
+    assert lines[2] == "2 | scout | -25.0 ± 10.5 | +25.0 ± 10.5 | 1" and lines[3] == "2 | squire | +25.0 ± 10.5 | -25.0 ± 10.5 | 1"
+    assert "one standard error" in lines[1] and len(lines) == 4
+    out = tmp_path / "runs.json"
+    assert tool.main(["order", "--first", "300", "--count", "1", "--sizes", "2", "--jobs", "1", "--out", str(out)]) == 0
+    assert "2 | squire | " in capsys.readouterr().out
+    import json
+    saved = json.loads(out.read_text(encoding="utf-8"))
+    assert len(saved) == 9 and {tuple(run["party"]) for run in saved} == set(tool.ordered_parties((2,)))
