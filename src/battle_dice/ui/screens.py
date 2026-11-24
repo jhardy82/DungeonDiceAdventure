@@ -336,7 +336,8 @@ def _status_forms(c: dict[str, Any]) -> list[str]:
 
 #: How an enemy picks its ability (``core/enemy_ai.py``): the priority comes before the weights.
 ENEMY_CHOICE_TEXT = ("It first takes an ability that would bring a hero down, then one that puts a status on a hero "
-                     "who does not have it. Among the abilities that are left, a higher weight is chosen more often.")
+                     "who does not have it, but never a status ability twice running. Among the abilities that are left, "
+                     "a higher weight is chosen more often. Among equally good targets it draws one.")
 
 
 def corruption_text(c: dict[str, Any]) -> str:
