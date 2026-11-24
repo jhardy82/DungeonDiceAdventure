@@ -1,4 +1,4 @@
-"""Two balance questions, measured (owner decision D-36; results in ``docs/DECISION_LOG.md``, section 7.42).
+"""Balance questions, measured (owner decisions D-36 to D-38; results in ``docs/DECISION_LOG.md``, sections 7.42 to 7.44).
 
     python tools/balance_questions.py third   --first 300 --count 40
     python tools/balance_questions.py attacks --first 300 --count 40 --variants A O B C A-1
@@ -13,9 +13,10 @@ inside this process while it measures and puts it back; no file of the game is t
 ``order`` (owner decision D-37): every order of the heroes of every party, with today's rules. It says what
 it is worth to put a class first or last, with the uncertainty of that figure.
 
-Both use the informed simulated player and the party order of ``battle_dice.sim.runner``, so variant ``A``
-over seeds 300 to 339 is the stored reference (1,703 wins of 2,200), and ``third`` with a Guardian is the
-measurement of section 7.16.
+All use the informed simulated player and the party order of ``battle_dice.sim.runner``, so variant ``A``
+over seeds 300 to 339 is the stored reference: 1,744 wins of 2,200 since rules 1.2.0 and content 1.4.0
+(1,703 before, with the rule that variant ``O`` still plays but on the tables of that time). ``third`` with
+a Guardian is the third-battle table of section 7.44.
 """
 
 from __future__ import annotations

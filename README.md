@@ -122,7 +122,7 @@ To build it yourself: `python -m pip install ".[package]"`, then
 - **Enemies** first take an ability that would bring a hero down, then one that puts a status
   on a hero who does not have it, but never a status ability twice running. Among the rest, a
   higher weight is chosen more often. Among equally good targets an enemy draws one, so the
-  order of your party decides nothing (rules 1.2.0).
+  order of your party no longer decides who is attacked first (rules 1.2.0).
 
 ### Controls
 
@@ -172,7 +172,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1495 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
+python -m pytest                 # 1512 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -227,8 +227,8 @@ measure two balance questions with the simulated player: the optional third batt
 without a Guardian, and what happens when enemies choose their abilities differently. A variant
 is tried inside the tool only; the game's files are not touched. The results and the options
 are in `docs/DECISION_LOG.md`, sections 7.42 to 7.44. `python tools/balance_questions.py order` plays
-every order of the heroes of every party and says what a place is worth (since rules 1.2.0:
-nothing that can be measured).
+every order of the heroes of every party and says what a place is worth (since rules 1.2.0
+at most a point or two, where it was 10 to 18).
 
 Every finished run writes a JSONL event log: a header line (seed, rules and content identity,
 the ordered commands, the final hashes), then one event per line with sequence number, tick,

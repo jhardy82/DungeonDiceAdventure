@@ -243,3 +243,21 @@ Started: 2026-11-11
 - **Impacts:** `core/enemy_ai.py`, target replacement, the event for a skipped reaction stage
   (D-36: it now carries the reason), the encounter tables, the third battle's table in the
   vocation catalog, the simulated player, pins, tests and the documents that quote numbers.
+
+### 2026-11-24 — Engineer: the final tables of rules 1.2.0 and content 1.4.0 (inside D-38)
+- **Decision:** Battles 1 and 2: Slash 2 and Shadow Bolt 3 from two heroes up; two heroes also a
+  Battle 2 captain with 22 health; five heroes a tenth less enemy health. Third battle: every hit
+  1 weaker and 15 to 20% more health for two to five heroes; for one hero the captain has 24
+  health (a third more). Catalog 0.6.0. Figures and candidates: decision log, section 7.44.
+- **Why:** Tuned on the real rules, because the draw among equal targets moved every figure
+  measured before it. Each party size is at 76 to 81% over whole runs on two seed blocks, and
+  the third battle with a Guardian at 76 to 83% for two to five heroes; one hero at 74.4% on
+  1,000 seeds, because blocks of 40 runs cannot judge a single party.
+- **Alternatives considered:** The tables proposed in section 7.43 (for four and five heroes they
+  were in the band too, lower); for one hero 22, 23, 25 and 26 health.
+- **Trade-offs accepted:** For one hero more health than the option named. For four and five
+  heroes the third battle is hardly longer than in the game before, because enemies that attack
+  more shorten every battle. The spread between parties of one size is not narrower:
+  Apprentice-heavy parties are now the weak ones (32 to 42%).
+- **Impacts:** `content/data/encounters.json`, the vocation catalog, the replay pin, the
+  specification fixtures, every test that names an enemy number.

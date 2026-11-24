@@ -24,7 +24,7 @@ Where things stand:
 - What comes next is not decided: the open questions below, a person's playtest, or the next
   wave of vocations (FDD section 9).
 
-Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.42),
+Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.44),
 `docs/class_evolution/FDD_v0.2.md`.
 
 ### Open Questions
@@ -38,6 +38,10 @@ Read first: `README.md`, `docs/DECISION_LOG.md` (sections 7.15 to 7.42),
   size); then the owner decides whether the phone screens are built with Flet.
 - **The owner's playtest (D-32):** the owner plays the demo and reports what is wrong or missing.
   That report decides the next work.
+- **After rules 1.2.0 (D-38, decision log 7.44):** three things for the owner. The spread between
+  parties of one size (Apprentice-heavy parties win 32 to 42%). Whether the third battle for four
+  and five heroes should be longer still. The four ideas of the survey of similar games
+  (`docs/SURVEY_SIMILAR_GAMES_2026-11-24.md`, section 4).
 - Checkpoint 2: pacing (runs needed to master a vocation).
 - Squire Anchor in battle: needs a balance decision before it is built.
 - CE-31: what Duelist's Parry does (asked with the Duelist's wave).

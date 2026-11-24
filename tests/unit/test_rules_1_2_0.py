@@ -20,9 +20,11 @@ from battle_dice.core.models import CombatPhase, to_plain
 from battle_dice.core.view import combat_log
 from battle_dice.sim.policies import POLICY_VERSION, HeuristicPolicy
 from tests.conftest import (
+    action,
     add_status,
     begin_enemy,
     begin_hero,
+    commit,
     down,
     enemies,
     enemy_acts,
@@ -139,10 +141,12 @@ def test_an_enemy_whose_target_is_gone_draws_among_the_equal_ones_that_are_left(
     down(engine, "h01")                         # gone before the blow lands
     skip_reactions(engine)
     engine.force_draws("enemy", [1])            # of h02 and h03, the second
+    drawn_before = engine.state.rng["enemy"].draws
     finish_activation(engine)
     moved = last_event(engine, "action_retargeted")
     assert (moved.delta["from"], moved.delta["to"]) == ("h01", "h03")
-    assert moved.delta["rule"] == "same row, then lowest HP percentage, then a draw" and moved.rng_stream == "enemy:forced"
+    assert moved.delta["rule"] == "same row, then lowest HP percentage, then a draw"
+    assert (moved.rng_stream, moved.rng_draw_index) == ("enemy:forced", drawn_before), "the event says which draw decided it"
     assert unit(engine, "h03").hp < unit(engine, "h03").max_hp and unit(engine, "h02").hp == unit(engine, "h02").max_hp
 
 
@@ -161,21 +165,18 @@ def test_one_target_left_is_taken_without_a_draw():
 
 def test_a_heros_own_new_target_is_still_the_first_of_the_equal_enemies():
     """The draw is for enemies choosing among heroes. A hero whose target is gone keeps the stated rule."""
-    engine = start("scout", "scout")
-    foes = enemies(engine)
-    for foe in foes:
-        foe.hp = foe.max_hp
+    engine = start("scout", "scout", "scout", "scout", "scout", content=packaged_content())
+    goblins = [foe for foe in enemies(engine) if foe.archetype_id == "goblin"]
+    assert [foe.id for foe in goblins] == ["b1_e01", "b1_e02", "b1_e03"] and len({(foe.row, foe.hp, foe.max_hp) for foe in goblins}) == 1
     begin_hero(engine, "h01", striker_d8=1, tools_d4=1)
-    target, others = foes[-1], foes[:-1]
-    from tests.conftest import action, commit
-    commit(engine, action("striker_d8", target.id))
-    target.hp, target.state = 0, "defeated"
+    commit(engine, action("striker_d8", "b1_e01"))
+    goblins[0].hp, goblins[0].state = 0, "defeated"   # gone before the blow lands; the other two are equally good
     drawn_before = engine.state.rng["enemy"].draws
     finish_activation(engine)
-    moved = events_of(engine, "action_retargeted")
-    if moved:  # the rule names the same row first; among those, the lowest id
-        assert moved[-1].delta["rule"] == "same row, then lowest HP percentage, then stable ID" and moved[-1].rng_stream is None
-        assert moved[-1].delta["to"] in {foe.id for foe in others}
+    moved = last_event(engine, "action_retargeted")
+    assert (moved.delta["from"], moved.delta["to"]) == ("b1_e01", "b1_e02")
+    assert moved.delta["rule"] == "same row, then lowest HP percentage, then stable ID" and moved.rng_stream is None
+    assert goblins[1].hp < goblins[1].max_hp and goblins[2].hp == goblins[2].max_hp
     assert engine.state.rng["enemy"].draws == drawn_before
 
 
@@ -197,6 +198,17 @@ def test_a_passed_stage_records_the_reason_for_each_hero_whose_reaction_it_is():
     assert all(delta["reason"] == "no eligible reaction" for delta in passed.values())
     line = next(text for text in combat_log(engine) if text.startswith("No hero could react"))
     assert line == "No hero could react to this enemy action. Squire 1: Needs 1 mana (has 0). Apprentice 2: No resource change is possible."
+
+
+def test_the_reasons_of_one_enemy_action_are_not_repeated_under_the_next():
+    engine = start("squire", "apprentice", content=packaged_content())
+    unit(engine, "h01").mana = 0
+    unit(engine, "h02").mana = unit(engine, "h02").max_mana
+    for _ in range(2):
+        force_slash(engine)
+        enemy_acts(engine, enemies(engine)[0].id)
+    lines = [text for text in combat_log(engine) if text.startswith("No hero could react")]
+    assert lines == ["No hero could react to this enemy action. Squire 1: Needs 1 mana (has 0). Apprentice 2: No resource change is possible."] * 2
 
 
 def test_a_stage_the_player_skips_has_no_reasons():
