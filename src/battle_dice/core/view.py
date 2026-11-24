@@ -656,19 +656,22 @@ def combat_log(engine: Engine, limit: int | None = None) -> list[str]:
     changed = {e.delta["id"]: position for position, e in enumerate(engine.events) if e.type == EventType.VOCATION_CHANGED}
     lines = []
     passed: list[str] = []  # reaction stages of the enemy action under way in which no hero could react
+    why: list[str] = []     # and, for each hero whose reaction belongs to one of them, the reason (rules 1.2.0)
     for position, event in enumerate(engine.events):
         if event.type == EventType.REACTION_STAGE_SKIPPED and event.delta["reason"] != "skipped by player":
             if event.delta["stage"] == "all":
                 lines.append("No reaction: this enemy action cannot be reacted to.")
             else:
                 passed.append(event.delta["stage"].capitalize())
+                why += [f"{names.get(hero['hero_id'], hero['hero_id'])}: {hero['reason']}" for hero in event.delta.get("heroes", ())]
             continue
         if passed:
+            reasons = f" {' '.join(why)}" if why else ""
             if len(passed) >= len(CombatPhase.STAGE_BY_WINDOW):  # every stage: the plain sentence
-                lines.append("No hero could react to this enemy action.")
+                lines.append(f"No hero could react to this enemy action.{reasons}")
             else:
-                lines.append(f"No hero could react in the {' and '.join(passed)} stage{'s' if len(passed) > 1 else ''}.")
-            passed = []
+                lines.append(f"No hero could react in the {' and '.join(passed)} stage{'s' if len(passed) > 1 else ''}.{reasons}")
+            passed, why = [], []
         known = passive_names if changed.get(event.actor_id or "", -1) < position else {}
         line = describe_event(event, names, die_names, known)
         if line:

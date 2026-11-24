@@ -183,26 +183,27 @@ def test_an_enemy_with_no_legal_action_passes_and_the_battle_goes_on():
 # --------------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("party", [("squire",), ("squire", "scout"), ("squire",) * 3, ("squire",) * 4, ("squire",) * 5])
-def test_shipped_slash_deals_its_per_size_damage(party):
+@pytest.mark.parametrize(("party", "power"), [(("squire",), 3), (("squire", "scout"), 2), (("squire",) * 3, 2), (("squire",) * 4, 2), (("squire",) * 5, 2)])
+def test_shipped_slash_deals_its_per_size_damage(party, power):
+    """Content 1.4.0 (D-38): Slash is 1 above its base value for a lone hero only; from two heroes up it is the base value."""
     shipped = packaged_content()
     engine = start(*party, content=shipped)
     goblin = next(e for e in enemies(engine) if e.archetype_id == "goblin")
-    expected = engine.enemy_action(goblin, "slash").power
-    assert expected == 3 and shipped.enemy_action("goblin", "slash").power == 2, "the shipped table raises Slash by 1"
+    assert engine.enemy_action(goblin, "slash").power == power and shipped.enemy_action("goblin", "slash").power == 2
     force_slash(engine)
     enemy_acts(engine, goblin.id)
     result = last_event(engine, EventType.ACTION_RESOLVED).delta["results"][0]
     victim = unit(engine, result["target"])
-    assert result["base"] == 3 and result["hp_damage"] == 3
-    assert victim.hp == victim.max_hp - 3
+    assert result["base"] == power and result["hp_damage"] == power
+    assert victim.hp == victim.max_hp - power
 
 
 def test_shipped_shadow_bolt_deals_its_per_size_damage():
     shipped = packaged_content()
     engine = start("squire", "scout", content=shipped)
     adept = next(e for e in enemies(engine) if e.archetype_id == "hex_adept")
-    assert engine.enemy_action(adept, "shadow_bolt").power == 4 and shipped.enemy_action("hex_adept", "shadow_bolt").power == 3
+    # Content 1.4.0 (D-38): Shadow Bolt is its base value again (it was 1 higher).
+    assert engine.enemy_action(adept, "shadow_bolt").power == 3 == shipped.enemy_action("hex_adept", "shadow_bolt").power
     saturate(engine, "poison")  # Poison Dart illegal, so Shadow Bolt and Corrupt Mark share one tier
     make_ready(engine, adept.id)
     engine.force_draws("enemy", [roll_for(engine, adept.id, "shadow_bolt")])
@@ -211,7 +212,7 @@ def test_shipped_shadow_bolt_deals_its_per_size_damage():
     skip_reactions(engine)
     finish_activation(engine)
     result = last_event(engine, EventType.ACTION_RESOLVED).delta["results"][0]
-    assert result["base"] == 4 and result["hp_damage"] == 4
+    assert result["base"] == 3 and result["hp_damage"] == 3
 
 
 def test_shipped_captain_strike_deals_its_per_size_damage_in_battle_two():

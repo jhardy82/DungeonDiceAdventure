@@ -4,8 +4,8 @@
   "fixture_format": 2,
   "status": "BEHAVIORAL_SPECIFICATION_NOT_EXECUTED",
   "baseline": {
-    "rules_version": "1.1.2",
-    "content_version": "1.3.1",
+    "rules_version": "1.2.0",
+    "content_version": "1.4.0",
     "rng_algorithm": "BD-PCG32-v1",
     "replay_pin": "tests/golden/replay_pin.json",
     "definition": "With the feature gate off, the replay pin tests/golden/replay_pin.json reproduces byte for byte."
@@ -34,8 +34,8 @@
           "class_evolution_v1": false
         },
         "baseline": {
-          "rules_version": "1.1.2",
-          "content_version": "1.3.1",
+          "rules_version": "1.2.0",
+          "content_version": "1.4.0",
           "rng_algorithm": "BD-PCG32-v1",
           "replay_pin": "tests/golden/replay_pin.json"
         }
@@ -58,7 +58,7 @@
           }
         },
         "invariants": [
-          "Squire, Apprentice and Scout stats, starting dice, enemy AI, reactions and rerolls are those of content 1.3.1.",
+          "Squire, Apprentice and Scout stats, starting dice, reactions and rerolls are those of content 1.4.0 (unchanged since 1.3.1); the enemy AI is that of rules 1.2.0.",
           "No progression state is read while the gate is off."
         ]
       },
@@ -110,7 +110,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "guardian",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -204,7 +204,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "guardian",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -310,7 +310,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "duelist",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -429,7 +429,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "champion",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -577,7 +577,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "hero",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -753,7 +753,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "hero",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -902,7 +902,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "hero",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -1170,7 +1170,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "dragon_knight",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -1309,7 +1309,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "dragon_knight",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -1450,7 +1450,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_002",
             "target_vocation_id": "dragon_knight",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -1573,7 +1573,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "trickster",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -1667,7 +1667,7 @@
                 "profile_id": "profile_demo",
                 "hero_id": "hero_001",
                 "target_vocation_id": "guardian",
-                "catalog_version": "1.3.1"
+                "catalog_version": "1.4.0"
               }
             },
             "outcome": "accepted",
@@ -1704,7 +1704,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "squire",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -1798,7 +1798,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "guardian",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -1878,7 +1878,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "duelist",
-            "catalog_version": "1.3.1",
+            "catalog_version": "1.4.0",
             "vocation_slot": "secondary"
           }
         }
@@ -1970,7 +1970,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "guardian",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -2100,7 +2100,7 @@
                 "profile_id": "profile_demo",
                 "hero_id": "hero_001",
                 "target_vocation_id": "guardian",
-                "catalog_version": "1.3.1"
+                "catalog_version": "1.4.0"
               }
             },
             "outcome": "accepted",
@@ -2883,7 +2883,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "squire",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -2920,7 +2920,7 @@
         },
         "events": []
       },
-      "notes": "Squire base stats are the shipped 1.3.1 values: 14 HP, 3 mana, 7 speed, initiative 5. Squire and Guardian each give +1 HP, Apprentice and Arcanist each ask for +1 mana; the mana cap is 1."
+      "notes": "Squire base stats are the shipped values (unchanged since content 1.3.1): 14 HP, 3 mana, 7 speed, initiative 5. Squire and Guardian each give +1 HP, Apprentice and Arcanist each ask for +1 mana; the mana cap is 1."
     },
     {
       "id": "CE-27",
@@ -3017,7 +3017,7 @@
             "hero_id": "hero_001",
             "skill_id": "scout_marksman",
             "slot_index": 2,
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -3131,7 +3131,7 @@
             "hero_id": "hero_001",
             "skill_id": "guardian_field_medic",
             "slot_index": 0,
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -3167,7 +3167,7 @@
       "mode": "automated_integration",
       "given": {
         "catalog": {
-          "catalog_version": "1.3.1",
+          "catalog_version": "1.4.0",
           "overrides": [
             {
               "path": "vocations.champion.base_stats.max_mana",
@@ -3563,8 +3563,8 @@
       "mode": "automated_integration",
       "given": {
         "baseline": {
-          "rules_version": "1.1.2",
-          "content_version": "1.3.1",
+          "rules_version": "1.2.0",
+          "content_version": "1.4.0",
           "rng_algorithm": "BD-PCG32-v1",
           "replay_pin": "tests/golden/replay_pin.json"
         },
@@ -3745,7 +3745,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "dragon_knight",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -3814,7 +3814,7 @@
       "mode": "automated_integration",
       "given": {
         "catalog": {
-          "catalog_version": "1.3.1",
+          "catalog_version": "1.4.0",
           "installed": [
             {
               "catalog_version": "0.1.0-proposed",
@@ -3822,7 +3822,7 @@
               "content_sha256": "c4890349aa5435bccd3c54884b45139b61f5c07b05986f9626150537556ad961"
             },
             {
-              "catalog_version": "1.3.1",
+              "catalog_version": "1.4.0",
               "state": "active"
             }
           ],
@@ -3871,7 +3871,7 @@
         "error_code": "CONTENT_MIGRATION_REQUIRED",
         "error_details": {
           "saved_catalog_version": "0.1.0-proposed",
-          "active_catalog_version": "1.3.1"
+          "active_catalog_version": "1.4.0"
         },
         "state": {
           "profile": {
@@ -4003,7 +4003,7 @@
       "mode": "static_content_validation",
       "given": {
         "catalog": {
-          "catalog_version": "1.3.1",
+          "catalog_version": "1.4.0",
           "overrides": [
             {
               "path": "encounter_pool",
@@ -4086,7 +4086,7 @@
             "profile_id": "profile_demo",
             "hero_id": "guest_001",
             "target_vocation_id": "trickster",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -4186,7 +4186,7 @@
                 "profile_id": "profile_demo",
                 "hero_id": "hero_001",
                 "target_vocation_id": "dragon_knight",
-                "catalog_version": "1.3.1"
+                "catalog_version": "1.4.0"
               }
             },
             "outcome": "aborted",
@@ -4231,7 +4231,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "dragon_knight",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -4357,7 +4357,7 @@
             "profile_id": "profile_demo",
             "hero_id": "hero_001",
             "target_vocation_id": "guardian",
-            "catalog_version": "1.3.1"
+            "catalog_version": "1.4.0"
           }
         }
       },
@@ -4386,7 +4386,7 @@
           "Corruption is kept, capped at the new maximum."
         ]
       },
-      "notes": "Squire 14 HP (1.3.1) and Guardian 17 HP (v0.1 catalog), each +1 for the mastered Squire. 8 * 18 / 15 = 9.6, rounded up to 10. Decided by the owner on 2026-11-11: a vocation change inside a run happens after recovery (see CE-19), so the hero is standing when it changes. The conversion rule still never revives: a hero at 0 HP would stay at 0 HP and downed."
+      "notes": "Squire 14 HP (shipped since content 1.3.1) and Guardian 17 HP (v0.1 catalog), each +1 for the mastered Squire. 8 * 18 / 15 = 9.6, rounded up to 10. Decided by the owner on 2026-11-11: a vocation change inside a run happens after recovery (see CE-19), so the hero is standing when it changes. The conversion rule still never revives: a hero at 0 HP would stay at 0 HP and downed."
     },
     {
       "id": "CE-40",
@@ -4398,8 +4398,8 @@
           "class_evolution_v1": true
         },
         "baseline": {
-          "rules_version": "1.1.2",
-          "content_version": "1.3.1",
+          "rules_version": "1.2.0",
+          "content_version": "1.4.0",
           "rng_algorithm": "BD-PCG32-v1",
           "replay_pin": "tests/golden/replay_pin.json"
         },

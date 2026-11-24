@@ -120,7 +120,9 @@ To build it yourself: `python -m pip install ".[package]"`, then
   activations (shields do not help). The plan says so before you confirm, and a "!" marks it on
   the hero's card.
 - **Enemies** first take an ability that would bring a hero down, then one that puts a status
-  on a hero who does not have it. Among the rest, a higher weight is chosen more often.
+  on a hero who does not have it, but never a status ability twice running. Among the rest, a
+  higher weight is chosen more often. Among equally good targets an enemy draws one, so the
+  order of your party no longer decides who is attacked first (rules 1.2.0).
 
 ### Controls
 
@@ -170,7 +172,7 @@ the Weaken and Speed Up icons were drawn for this project. Every file and its so
 ## Tests and checks
 
 ```bash
-python -m pytest                 # 1495 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
+python -m pytest                 # 1512 tests: unit, T01-T16 fixtures, integration, headless UI and graphics, phone screens, specification
 python -m ruff check src tests tools packaging
 python -m mypy src/battle_dice tools tests
 ```
@@ -220,12 +222,13 @@ newcomer, a player who never rerolls, one who never reacts, and so on) and repor
 is worth. `docs/PLAYTEST.md` has the method, the scenarios, the findings and a session script
 for testing with a person.
 
-`python tools/balance_questions.py third` and `python tools/balance_questions.py attacks --variants A B C F`
+`python tools/balance_questions.py third` and `python tools/balance_questions.py attacks --variants A O B C`
 measure two balance questions with the simulated player: the optional third battle with and
 without a Guardian, and what happens when enemies choose their abilities differently. A variant
 is tried inside the tool only; the game's files are not touched. The results and the options
-are in `docs/DECISION_LOG.md`, section 7.42. `python tools/balance_questions.py order` plays
-every order of the heroes of every party and says what a place is worth.
+are in `docs/DECISION_LOG.md`, sections 7.42 to 7.44. `python tools/balance_questions.py order` plays
+every order of the heroes of every party and says what a place is worth (since rules 1.2.0
+at most a point or two, where it was 10 to 18).
 
 Every finished run writes a JSONL event log: a header line (seed, rules and content identity,
 the ordered commands, the final hashes), then one event per line with sequence number, tick,
@@ -237,7 +240,7 @@ battle-dice-replay logs/run-123-1.jsonl      # or: python -m battle_dice.replay_
 
 It replays the commands on a fresh rules engine and checks the rules version, the content hash,
 the event-log hash, the final-state hash and every event line. Exit code 0 means every log
-reproduced exactly. A log replays only under the rules version that wrote it (now 1.1.2); logs
+reproduced exactly. A log replays only under the rules version that wrote it (now 1.2.0); logs
 written before version 1.1.1 carry no commands and cannot be replayed at all.
 
 Three fixed-seed runs are pinned by hash in `tests/golden/replay_pin.json`, so unintended drift

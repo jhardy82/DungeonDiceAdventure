@@ -47,10 +47,12 @@ def test_the_log_says_when_no_hero_could_react():
     unit(engine, "h01").mana = 0  # Interpose costs 1 mana
     enemy_acts(engine, enemies(engine)[0].id)
     log = combat_log(engine)
-    assert "No hero could react to this enemy action." in log
+    # Rules 1.2.0 (owner decision D-36): the line also says why, for each hero whose reaction it could have been.
+    said = "No hero could react to this enemy action. Squire 1: Needs 1 mana (has 0)."
+    assert said in log
     assert not any("stage" in line and "No hero" in line for line in log), "three stages passed are one plain sentence"
     intends = next(index for index, line in enumerate(log) if " intends " in line)
-    assert log[intends + 1] == "No hero could react to this enemy action.", "right after the action is revealed"
+    assert log[intends + 1] == said, "right after the action is revealed"
 
 
 def test_the_log_says_when_an_enemy_action_cannot_be_reacted_to():
@@ -75,7 +77,7 @@ def test_a_prompt_that_begins_at_a_later_stage_says_which_stages_had_nothing_to_
     drawn, _ = record_text(monkeypatch)
     play.app.frame(0)
     assert "Reaction window: stage 2 of 3: Resource   (Guard: no hero could react)" in drawn
-    assert "No hero could react in the Guard stage." in combat_log(engine)
+    assert "No hero could react in the Guard stage. Squire 1: Needs 1 mana (has 0)." in combat_log(engine)  # with the reason since rules 1.2.0
 
 
 def test_a_prompt_that_begins_at_the_first_stage_shows_the_order_of_the_stages(tmp_path, monkeypatch):
@@ -327,4 +329,4 @@ def test_a_stage_the_player_skipped_is_said_as_skipped(tmp_path):
     play.key(pygame.K_s)
     since = combat_log(engine)[before:]
     assert "Guard stage skipped." in since, "the player's own choice, in the player's words"
-    assert "No hero could react in the Guard stage." not in since and "No hero could react to this enemy action." not in since
+    assert not any(line.startswith("No hero could react") for line in since)

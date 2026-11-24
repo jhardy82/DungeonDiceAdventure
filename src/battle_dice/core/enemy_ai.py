@@ -1,8 +1,19 @@
 """Deterministic enemy decision model (sections 7.1 and 14.4).
 
 Enemies use authored abilities, not dice. The AI never inspects future random numbers or player
-choices: it sees only the current combat state, and makes exactly one seeded weighted draw from
-the ``enemy`` stream among the highest valid priority tier.
+choices: it sees only the current combat state. It makes one seeded weighted draw from the
+``enemy`` stream among the highest valid priority tier, and one more when several targets are
+equally good.
+
+Rules 1.2.0 (owner decisions D-37 and D-38):
+
+* **Never a status twice running.** An ability that puts a status on a unit that has none comes
+  before an attack, as it always did, unless this enemy's last ability was a status ability: then
+  the weights decide. Before that rule an enemy nearly always found a hero to weaken or poison and
+  seldom attacked.
+* **A draw among equal targets.** Targets that are equal in everything the rule looks at were told
+  apart by their id, which is their place in the party: the first hero was attacked first, and the
+  order of the party decided who went down. Now one of them is drawn.
 """
 
 from __future__ import annotations
@@ -15,6 +26,9 @@ from battle_dice.core.targeting import eligible_targets, hp_fraction
 
 if TYPE_CHECKING:  # pragma: no cover
     from battle_dice.core.engine import Engine
+
+#: The category of an ability that applies a status.
+STATUS = "status"
 
 
 def predicted_hp_damage(ctx: Engine, actor: Combatant, face: FaceDefinition, target: Combatant) -> int:
@@ -67,7 +81,7 @@ def evaluate_actions(ctx: Engine, enemy: Combatant) -> list[dict[str, Any]]:
         lethal = [t for t in targets if _is_lethal(ctx, enemy, face, t)]
         if lethal:
             priority = priorities["priority_lethal"]
-        elif status is not None and any(t.stacks_of(status["status"]) == 0 for t in targets):
+        elif status is not None and enemy.last_category != STATUS and any(t.stacks_of(status["status"]) == 0 for t in targets):
             priority = priorities["priority_setup"]
         else:
             priority = priorities["priority_default"]
@@ -105,6 +119,11 @@ def _choose_targets(ctx: Engine, enemy: Combatant, choice: dict[str, Any]) -> tu
         bucket.sort(key=lambda t: t.id)
         value, draw = ctx.draw("enemy", len(bucket))
         return [bucket[value].id], draw
+    # Equal in everything but the id. The id is a place in the party and says nothing about a target: one is drawn.
+    equal = sorted((t for t in ordered if key(t)[:-1] == key(ordered[0])[:-1]), key=lambda t: t.id)
+    if len(equal) > 1:
+        value, draw = ctx.draw("enemy", len(equal))
+        return [equal[value].id], draw
     return [ordered[0].id], None
 
 

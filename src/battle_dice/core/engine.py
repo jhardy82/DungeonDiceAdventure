@@ -799,7 +799,9 @@ class Engine:
             self.emit(
                 EventType.REACTION_STAGE_SKIPPED,
                 intent_id=intent.id,
-                delta={"stage": stage, "reason": "no eligible reaction"},
+                # Why each hero whose reaction belongs to this stage could not use it (rules 1.2.0, D-36).
+                delta={"stage": stage, "reason": "no eligible reaction",
+                       "heroes": [{"hero_id": o["hero_id"], "reason": o["reason"]} for o in reactions.stage_options(self, stage)]},
             )
             index += 1
         combat.stage_index = len(REACTION_STAGES)
@@ -905,6 +907,7 @@ class Engine:
             return
         combat.committed_intent = intent
         combat.reactions_used = []
+        enemy.last_category = intent.category  # what "never a status twice running" looks at next time
         draw = record.pop("draw")
         self.emit(
             EventType.INTENT_SELECTED,

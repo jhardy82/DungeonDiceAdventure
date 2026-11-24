@@ -52,6 +52,7 @@ tests, and add an entry here.
 | D-35 | Three open playtest findings, and Android after the skeleton | **Owner decisions, 2026-11-21, asked with the ask tool:** (1) R3: a hero can be dismissed, asked once more, not while it is in the party or a run goes on; (2) R4: recruits get names that say no class ("Recruit 1"); heroes already saved keep their names; (3) R5: a vocation a hero has opened stays open when a slower Mastery pace takes the rank it needed, and the Career screen says so; (4) Android: phase 1 groundwork starts now, while the owner tries the APK; the go or no-go for the phone screens stays the owner's. Section 7.38. |
 | D-36 | What the second and the whole-run playtests left open | **Owner decisions, 2026-11-22, asked with the ask tool:** (1) the demo is **not played yet**; the goal stays open (D-32); (2) both balance impressions are **measured with the simulator and brought back with numbers and options**: the third battle for parties with and without a Guardian, and how often enemies attack; nothing changes until the owner chooses; (3) the reason for "no hero could react" goes into the event log **with the next rules change**, not as a rules version of its own; (4) reaction rows **stay numbered from 1** in each stage. | Section 7.42 |
 | D-37 | The two balance questions and the order of heroes, after the measurements | **Owner decisions, 2026-11-24, asked with the ask tool, on section 7.42:** (1) the third battle is made to **last longer** (more enemy health, weaker hits), tuned again per party size; (2) enemy attacks are **reworked now**: the rule "never a status twice running" with a new enemy table per party size, tuned to 70 to 85%; (3) the effect of the order of the heroes is **measured further first**. For (1) and (2) the table is brought back to the owner before anything goes into the game. | Section 7.43 |
+| D-38 | The enemy rework, the order of the heroes and the third battle, after section 7.43 | **Owner decisions, 2026-11-24, asked with the ask tool:** (1) among equally good targets an enemy **draws one** (seeded, so a run still replays); the order of the party then decides nothing; it goes into the same new rules version as the enemy rework; (2) the enemy rework is **approved**: the final table is tuned under that tie-break, every party size is confirmed inside 70 to 85% on two seed blocks, and it goes into the game with a new rules and content version; the final table is recorded; (3) the third battle becomes **a quarter longer**: every hit 1 weaker and 15 to 20% more health, tuned per party size to 70 to 85% with a Guardian. | Section 7.44 |
 
 ## 2. Content authored under delegation
 
@@ -2763,6 +2764,185 @@ tables of point 2 underneath. The band of 70 to 85% is for parties with a Guardi
 - The simulated player's habit (cause 2) is a fault of the measuring instrument. Whatever is
   decided for the game, it should be taken out before the final tables are measured.
 - No person has played any of this.
+
+### 7.44 Rules 1.2.0 and content 1.4.0: what went into the game after D-38 (2026-11-24)
+
+The owner approved the enemy rework, the draw among equal targets and a longer third battle
+(D-38). This section records what was built, the final tables, and what was measured on the
+files as they ship. Every figure is for the informed simulated player; no person has played it.
+
+**1. The rules (version 1.2.0)**
+
+- **Never a status twice running.** An ability that puts a status on a hero who has none still
+  comes before an attack, unless this enemy's last ability was a status ability: then the
+  weights decide. A blow that would bring a hero down still comes first of all.
+- **A draw among equal targets.** Where targets are equal in everything the rule looks at, one
+  is drawn from the seeded `enemy` stream (so a run still replays); the first hero of the party
+  was taken before. The same holds when an enemy's target is gone before the blow lands. A
+  hero's own new target is unchanged (the lowest id).
+- **The log says why no hero could react** (D-36): for each hero whose reaction belongs to a
+  stage that was passed over, the reason is in the event and in the battle log.
+- **The simulated player (version 3)** draws between plans that differ only in the ally they
+  help. It took the first before, which was the second cause of the order effect (section 7.43).
+- The help text on how an enemy chooses and the README say the new rule.
+
+**2. Battles 1 and 2 (content 1.4.0)**
+
+Tuned again on the real rules, because the draw among equal targets moved every figure of
+section 7.43. Whole runs won, 55 parties, 40 seeds each, measured with
+`tools/balance_questions.py attacks` on the shipped files:
+
+| Party size | The table | Seeds 300 to 339 | Seeds 400 to 439 | Before (rules 1.1.2, content 1.3.1) |
+|-----------:|-----------|-----------------:|-----------------:|------------------------------------:|
+| 1 | unchanged | 79.2% | 79.2% | 79.2% |
+| 2 | Slash 2 (was 3), Shadow Bolt 3 (was 4); Battle 2 captain 22 health (was 25) | 80.8% | 78.3% | 73.8% |
+| 3 | Slash 2, Shadow Bolt 3 | 76.5% | 77.0% | 79.0% |
+| 4 | Slash 2, Shadow Bolt 3 | 80.3% | 78.8% | 76.5% |
+| 5 | Slash 2, Shadow Bolt 3; every enemy a tenth less health (goblin 10, hex adept 12, captain 26) | 79.4% | 78.3% | 78.1% |
+| All | | 79.3% (1,744 of 2,200) | 78.3% (1,722 of 2,200) | 77.4% (1,703 of 2,200) |
+
+- Every party size is inside 70 to 85% on both seed blocks. **The new reference for seeds 300
+  to 339 is 1,744 wins of 2,200.**
+- From two heroes up Slash and Shadow Bolt are back at their base value; the captain keeps
+  Strike 4. Against section 7.43: the two-hero table is the same; four heroes no longer need a
+  stronger captain; five heroes need a tenth less health, not 1 point less.
+- Attacks are now 49, 41, 39, 39 and 38% of enemy abilities for one to five heroes (before: 49,
+  25, 16, 20 and 14%). With the old rule on the new tables the game would be won in 96.1% of
+  runs: the tables and the rule belong together.
+- Runs are shorter: 38, 71, 88, 117 and 138 activations (before: 38, 82, 96, 124 and 164).
+  More heroes go down: 0.2, 1.3, 2.6, 3.8 and 5.3 per run (before: 0.2, 1.3, 1.9, 3.7 and 4.1).
+- Candidates measured on the real rules and set aside (first and second seed block): two heroes
+  without the weaker captain 74.6% and 68.3%; four heroes with the stronger captain of section
+  7.43 76.2% and 74.5% (in the band as well; the plainer table was taken); five heroes with the
+  table of section 7.43 75.0% and 75.8% (in the band, lower), and with a twentieth less health
+  73.7% and 73.2%.
+
+**3. The third battle (catalog 0.6.0)**
+
+Every hit 1 weaker and more health, tuned per party size. Share of third battles won, of the
+runs that entered them, measured with `tools/balance_questions.py third` on the shipped files:
+
+| Party size | The table (health; all Strikes 3, Shadow Bolts 3, Slashes 2) | With a Guardian: seeds 300 to 339 | 400 to 439 | Without a Guardian (both blocks) |
+|-----------:|--------------------------------------------------------------|----------------------------------:|-----------:|---------------------------------:|
+| 1 | captain 24 (was 18) | 90.0% (36/40) | 81.6% (31/38) | 53.7% |
+| 2 | captain 26 (was 23), hex adept 15 (was 13) | 82.5% | 76.3% | 59.9% |
+| 3 | captains 16 (was 13), hex adept 12 (was 10) | 81.2% | 81.8% | 64.2% |
+| 4 | captains 20 (was 17), goblin 10 (was 8), hex adept 11 (was 9) | 80.8% | 82.8% | 61.3% |
+| 5 | captains 18 (was 16), goblin 9 (was 8), hex adepts 10 (was 9) | 79.4% | 83.3% | 65.4% |
+
+- Two to five heroes are inside 70 to 85% with a Guardian on both seed blocks.
+- **One hero cannot be judged on blocks of 40 runs** (one party, so one block is 40 third
+  battles and one standard error is about 6 points). Measured on more seeds instead: with 24
+  health **74.4% (701 of 942, seeds 700 to 1699)**. The candidates on seeds 500 to 699: 26
+  health 65.3%, 25 health 66.8%, 24 health 75.6%, 23 health 80.3%, 22 health 83.4%. The table
+  of section 7.43 (26 health) was below the band on the larger sample and was not taken.
+- For one hero that is a third more health, not the 15 to 20% the option named: the captain is
+  the only enemy there, and with 20% more (22 health) the larger sample sits at the top of the
+  band. The band decided.
+- **How much longer it is depends on what it is compared with** (activations in a won third
+  battle with a Guardian, seeds 300 to 339, one to five heroes):
+  - now: 29, 38, 45, 71, 73;
+  - the old table under the new rules (the "today" of section 7.43, which the option's "a
+    quarter longer" referred to): 21, 33, 36, 58, 62. Against that: 38, 15, 25, 22 and 18% longer;
+  - the game before this change (rules 1.1.2): 21, 33, 36, 65, 70. Against that: 36, 14, 23, 9
+    and 4% longer. For four and five heroes most of the added length was taken back by enemies
+    that attack more often, which shortens every battle;
+  - against Battle 2 of the same run, which is what the playtester's impression compared: the
+    third battle now lasts 73 to 89% as long as Battle 2 for two to five heroes (before: 49 to
+    74%).
+- Without a Guardian it stays the harder battle it says it is (54 to 65%).
+
+**4. The spread between parties: not narrower**
+
+The band is met per party size. Inside a size the parties still differ widely (seeds 300 to 339):
+
+| | Before | Now |
+|---|---:|---:|
+| Parties at or below 40% | 2 of 55 | 4 of 55 |
+| Parties at or above 95% | 12 of 55 | 15 of 55 |
+| Five Squires | 15% | 62% |
+| Three Apprentices / four Apprentices | 50% / 45% | 35% / 32% |
+| Four Apprentices and a Scout | 90% | 35% |
+
+- The weak parties are now the Apprentice-heavy ones: enemies attack about twice as often and
+  the Apprentice has the least health. Squire-heavy parties gained.
+- On seeds 400 to 439: 4 parties at or below 40%, 9 at or above 95%.
+- The "before" column was measured with the old simulated player and one fixed order of the
+  heroes (section 7.43), so a part of the difference is the measuring instrument.
+- An enemy table sets the average of a party size; it cannot bring the parties of one size
+  closer together. That is a question about the classes, and it is brought to the owner as one.
+
+**5. The order of the heroes**
+
+Measured again on the shipped game with the method of section 7.43: every order of every party
+(363 ordered parties), seeds 300 to 339 and 400 to 439, 29,040 runs
+(`tools/balance_questions.py order`).
+
+| | Three heroes | Four | Five |
+|---|---:|---:|---:|
+| The best order of the first block against the worst, measured on the second: before | +14.6 points | +10.0 | +18.1 |
+| The same, now | -2.5 | +2.9 | -1.2 |
+| Does an order's advantage on one block show on the other (correlation): before | +0.63 | +0.63 | +0.67 |
+| The same, now | -0.20 | +0.15 | +0.01 |
+
+- **The effect of section 7.43 is gone.** An order that looked best on one seed block is worth
+  nothing on the other.
+- The one party of section 7.43 (two Apprentices and a Scout, 300 fresh seeds per order): 42.3%,
+  44.3% and 44.3% for its three orders, where they were 73.3%, 48.7% and 51.3%.
+- What a place is worth for a class, both blocks together: the largest figures are a Squire
+  first with four heroes (+2.2 points, one standard error 1.0) and a Scout last with five (-1.6,
+  0.8). Before, they went up to +11.6 (2.1) and +8.9 (0.8). Among 24 such figures one or two at
+  two standard errors is what chance gives.
+- **A small effect cannot be ruled out.** An Apprentice in the last place is slightly ahead at
+  every party size (+1.9, +1.3, +1.3, +1.5), each figure inside its own noise. One place where
+  the order still counts is known and is by design: heroes that are level on the timeline act
+  in the order of the party, the timeline shows it, and the player can swap it (`O`). Whether
+  that is the source is `<UNKNOWN>`; it was not measured.
+- So the README says that the order no longer decides who is attacked first, not that it
+  decides nothing.
+
+**6. How it was checked**
+
+- New tests for each rule (`tests/unit/test_rules_1_2_0.py`, 17 tests), and the tool's tests
+  follow the new rule (variant `O` still measures the rule of before).
+- Tests changed on purpose, each because the thing it pins was changed by this decision: the
+  encounter tables (`test_content.py`, `test_t14_party_scaling.py`, `test_review_fixes.py`), the
+  versions (content, catalog, specification fixtures, example profile), the replay pin and the
+  RNG golden file (regenerated with `tools/update_replay_pin.py`), the enemy tie test (now a
+  draw), the simulated player's version, the log lines that now carry reasons. The whole-run
+  test of Field Medic plays seeds 510 to 517: in the seeds it played before, no hero of that
+  party goes down any more, so the skill was never used and the test would have proved nothing.
+- 28 deliberate breaks of the new code, on a copy of the repository: 25 failed a test at once.
+  Three survived and each showed a test that was too weak: the test of a hero's own new target
+  never reached the case (it passed whatever the code did), the event's draw index was not
+  compared, and nothing checked that the reasons of one enemy action stay out of the next log
+  line. Each has a test now and all 28 are caught.
+- The measuring tool reproduces the tuning figures on the shipped files to the decimal.
+
+**7. Two corrections**
+
+- When the question of D-36 was put, the text said that logs of earlier versions would "still
+  replay under their own version". That was wrong: a build replays only logs of its own rules
+  version and refuses others with a message. Logs written before this change cannot be replayed
+  by the new build. The README says so.
+- Section 7.43 called its third-battle proposal "about a quarter longer". That compared with
+  the old table under the new rules, not with the game as it was (point 3).
+
+**8. What other games do** (survey of 2026-11-24, `docs/SURVEY_SIMILAR_GAMES_2026-11-24.md`)
+
+- "Never the same move twice running" is the rule Slay the Spire uses, there set per enemy.
+- A random choice among equal targets is what Pokémon and Slice & Dice do; it suits a game
+  that shows the enemy's intent before the player answers, as this one does.
+- The survey lists four improvements that are not part of this change; they go to the owner
+  as questions.
+
+**What is not settled**
+
+- Whether any of this is better to play: `<UNKNOWN>` until a person plays it.
+- The spread between parties (point 4).
+- The third battle for four and five heroes is hardly longer than it was before (point 3).
+  Whether it should be is the owner's call.
+- Whether a point or two of order effect remains, and from where (point 5).
 
 ## 8. Known limits after the MVP review (2026-11-10)
 

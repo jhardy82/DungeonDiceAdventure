@@ -186,7 +186,8 @@ def test_the_enemy_panel_states_the_priority_before_the_weights(tmp_path, monkey
     drawn, shortened = redraw(play, monkeypatch)
     assert screens.ENEMY_CHOICE_TEXT in drawn and screens.ENEMY_CHOICE_TEXT not in shortened
     assert not any("a higher weight is chosen more often)" in text for text in drawn), "the old, incomplete rule is gone"
-    for part in ("bring a hero down", "puts a status on a hero who does not have it", "a higher weight is chosen more often"):
+    for part in ("bring a hero down", "puts a status on a hero who does not have it", "a higher weight is chosen more often",
+                 "never a status ability twice running", "Among equally good targets it draws one"):  # the last two: rules 1.2.0
         assert part in screens.ENEMY_CHOICE_TEXT
 
 

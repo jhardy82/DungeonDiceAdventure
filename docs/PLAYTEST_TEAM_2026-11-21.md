@@ -285,6 +285,10 @@ next rules version) and KB-4 (reaction keys by the hero's place).
 **Answered on 2026-11-22 (D-36):** ST-3 is measured and brought back with options (decision
 log, section 7.42); ST-2 goes with the next rules change; KB-4 stays as it is.
 
+**Built on 2026-11-24 (D-37 and D-38, rules 1.2.0; decision log, section 7.44):** ST-2: the log
+now gives the reason for each hero whose reaction it could have been. ST-3: an enemy never uses
+a status ability twice running; with three heroes 39% of enemy abilities are attacks (was 16%).
+
 **ST-3, measured.** One player's impression in one battle; so it was counted over whole
 simulated runs: the informed simulated player, every party composition of each size, seeds 300
 to 309, both battles (`rules 1.1.2`, content `1.3.1`).
@@ -370,6 +374,14 @@ One party, one seed. None of these was changed; each is for the owner.
   it felt (97%). It is a short battle, which is what the impression caught.
 - Enemies seldom attack because a status on a hero who has none always comes first. That rule holds
   the difficulty: with enemies choosing by weight alone, 5% of runs are won instead of 77%.
+
+**Changed since (owner decisions D-37 and D-38, rules 1.2.0 and content 1.4.0; decision log, section 7.44):**
+
+- Enemies attack about twice as often from two heroes up (38 to 41% of their abilities), and the
+  enemy tables were tuned again so that each party size still wins 76 to 81% of runs.
+- The third battle has more health and weaker hits. For three heroes a won third battle now
+  takes 45 activations against 56 for Battle 2 (it was 36 against 64).
+- Measured by the simulated player only. Whether it plays better is for a person to say.
 
 **Tally of the fifth playtester:** 12 findings. 11 fixed (F9 in part), 1 half of F12 as designed.
 One more fault of the same cause as F1 was found by reading and fixed.

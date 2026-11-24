@@ -354,7 +354,11 @@ def test_an_equipped_skill_goes_into_the_run_and_works_there(medic: Progression,
 
 
 def test_whole_runs_with_field_medic_equipped_end_and_replay(vocations):
-    """Eight whole runs by the informed simulated player. It uses the skill when it can pay for it (seed 503)."""
+    """Eight whole runs by the informed simulated player. It uses the skill when it can pay for it (seeds 514 and 517).
+
+    The seeds are those of rules 1.2.0 and content 1.4.0: a hero goes down less often in this party than before,
+    and in seeds 500 to 507, which this test played until then, the skill is never needed.
+    """
     from battle_dice.core import skills
     from battle_dice.core.events import EventType, events_hash, state_hash
     from battle_dice.core.replay import export_run, verify
@@ -362,7 +366,7 @@ def test_whole_runs_with_field_medic_equipped_end_and_replay(vocations):
 
     shape = [("guardian", "front"), ("scout", "back"), ("apprentice", "back")]
     used: dict[int, int] = {}
-    for seed in range(500, 508):
+    for seed in range(510, 518):
         party = [{"class_id": class_id, "row": row, "hero": {"hero_id": f"hero_{n:03d}", "skills": [skills.FIELD_MEDIC] if class_id == "guardian" else []}}
                  for n, (class_id, row) in enumerate(shape, start=1)]
         engine = Engine(packaged_content(), vocations)
@@ -381,7 +385,7 @@ def test_whole_runs_with_field_medic_equipped_end_and_replay(vocations):
         if used[seed]:
             again = verify(packaged_content(), export_run(engine))
             assert (events_hash(again.events), state_hash(again.state)) == (events_hash(engine.events), state_hash(engine.state))
-    assert used[503] == 1, used
+    assert used[514] == 1 and used[517] == 1, used
 
 
 # --------------------------------------------------------------------------------------------

@@ -67,7 +67,7 @@ def test_every_vocation_is_either_playable_or_refused_with_a_reason(catalog):
     assert sorted(catalog.builds) == ["apprentice", "guardian", "ranger", "scout", "squire"]
     assert set(catalog.unsupported) == set(NOT_YET)
     assert len(catalog.builds) + len(catalog.unsupported) == 14
-    assert catalog.version == "0.5.1" and len(catalog.sha256) == 64
+    assert catalog.version == "0.6.0" and len(catalog.sha256) == 64
     assert all(catalog.known(v) for v in [*catalog.builds, *catalog.unsupported]) and not catalog.known("paladin")
 
 
@@ -114,7 +114,7 @@ def test_the_skill_gap_alone_does_not_block_a_vocation():
 
 
 def test_a_catalog_with_a_problem_is_refused_whole(tmp_path):
-    text = CATALOG_PATH.read_text(encoding="utf-8").replace('"content_version": "1.3.1"', '"content_version": "1.2.1"', 1)
+    text = CATALOG_PATH.read_text(encoding="utf-8").replace('"content_version": "1.4.0"', '"content_version": "1.2.1"', 1)
     broken = tmp_path / "vocation_catalog.json"
     broken.write_text(text, encoding="utf-8")
     with pytest.raises(ContentError) as error:

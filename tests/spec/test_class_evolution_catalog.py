@@ -110,9 +110,10 @@ def test_rewards_that_always_clamp_to_zero_are_warnings(pristine: Json, shipped:
 
 
 def test_catalog_shape_and_counts(pristine: Json) -> None:
-    # 0.3.0: the Guardian is playable; 0.4.0: Field Medic works in battle; 0.5.0: its numbers (D-30); 0.5.1: rules 1.1.2 (D-34)
-    assert pristine["catalog_version"] == "0.5.1"
-    assert pristine["baseline"] == {"rules_version": "1.1.2", "content_version": "1.3.1"}
+    # 0.3.0: the Guardian is playable; 0.4.0: Field Medic works in battle; 0.5.0: its numbers (D-30); 0.5.1: rules 1.1.2 (D-34);
+    # 0.6.0: the third battle's table for rules 1.2.0 and content 1.4.0 (D-38)
+    assert pristine["catalog_version"] == "0.6.0"
+    assert pristine["baseline"] == {"rules_version": "1.2.0", "content_version": "1.4.0"}
     assert {wave: [v["id"] for v in pristine["vocations"] if v["wave"] == wave] for wave in WAVES} == WAVES
     assert len(pristine["face_library"]) == 12 and len(pristine["dice"]) == 23
     assert Counter(s["engine_support"] for s in pristine["schedules"]) == {"existing": 5, "new": 5}
@@ -476,7 +477,7 @@ SEEDED: list[tuple[Callable[[Json], None], str]] = [
     (starting_mana_above_maximum, "has a starting value above its maximum"),
     (unknown_prerequisite_vocation, "prerequisite references unknown vocation 'page'"),
     (unknown_skill, "teaches unknown skill 'guardian_taunt'"),
-    (stale_baseline, "catalog was written against content 1.2.1, shipped is 1.3.1"),
+    (stale_baseline, "catalog was written against content 1.2.1, shipped is 1.4.0"),
     (unknown_top_level_key, "Additional properties are not allowed ('actions' was unexpected)"),
 ]
 
