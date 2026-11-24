@@ -77,7 +77,7 @@ def test_a_prompt_that_begins_at_a_later_stage_says_which_stages_had_nothing_to_
     drawn, _ = record_text(monkeypatch)
     play.app.frame(0)
     assert "Reaction window: stage 2 of 3: Resource   (Guard: no hero could react)" in drawn
-    assert "No hero could react in the Guard stage." in combat_log(engine)
+    assert "No hero could react in the Guard stage. Squire 1: Needs 1 mana (has 0)." in combat_log(engine)  # with the reason since rules 1.2.0
 
 
 def test_a_prompt_that_begins_at_the_first_stage_shows_the_order_of_the_stages(tmp_path, monkeypatch):
@@ -329,4 +329,4 @@ def test_a_stage_the_player_skipped_is_said_as_skipped(tmp_path):
     play.key(pygame.K_s)
     since = combat_log(engine)[before:]
     assert "Guard stage skipped." in since, "the player's own choice, in the player's words"
-    assert "No hero could react in the Guard stage." not in since and "No hero could react to this enemy action." not in since
+    assert not any(line.startswith("No hero could react") for line in since)

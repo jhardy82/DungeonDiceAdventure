@@ -63,7 +63,7 @@ def test_a_variant_is_put_back_whatever_happens(tool):
     with tool.enemy_choice("B-1"):
         assert enemy_ai.evaluate_actions is not evaluate and Engine.enemy_action is not action
     assert enemy_ai.evaluate_actions is evaluate and Engine.enemy_action is action
-    with pytest.raises(RuntimeError), tool.enemy_choice("F-1"):
+    with pytest.raises(RuntimeError), tool.enemy_choice("O-1"):
         raise RuntimeError("a run went wrong")
     assert enemy_ai.evaluate_actions is evaluate and Engine.enemy_action is action
     for unknown in ("X", "A-2", "B1"):
@@ -93,50 +93,30 @@ def test_the_weaker_attack_is_one_less_and_never_less_than_one(tool):
 
 
 def test_each_rule_changes_how_often_enemies_attack_as_it_says(tool):
+    """"A" is the game as it is (since rules 1.2.0: never a status twice running); "O" is the rule before."""
     party, seeds = ("apprentice", "squire"), (300, 301, 302)
-    by_rule = {rule: [tool.attacks_run((rule, party, seed)) for seed in seeds] for rule in ("A", "B", "C", "F")}
-    assert share(by_rule["A"]) < share(by_rule["C"]) < share(by_rule["B"])
-    assert share(by_rule["A"]) < share(by_rule["F"]) < share(by_rule["B"])
+    by_rule = {rule: [tool.attacks_run((rule, party, seed)) for seed in seeds] for rule in ("A", "O", "B", "C")}
+    assert share(by_rule["O"]) < share(by_rule["A"]) < share(by_rule["B"])
+    assert share(by_rule["O"]) < share(by_rule["C"]) < share(by_rule["B"])
     assert share(by_rule["B"]) > 0.6, "by the weights alone most enemy abilities are attacks"
-    # A lone hero either has the status or has not: "while no hero has it" is then today's rule.
+    # A lone hero either has the status or has not: "while no hero has it" is then the rule of before.
     solo = [("squire",), ("scout",)]
-    assert [tool.attacks_run(("C", p, 300)) | {"variant": "A"} for p in solo] == [tool.attacks_run(("A", p, 300)) for p in solo]
+    assert [tool.attacks_run(("C", p, 300)) | {"variant": "O"} for p in solo] == [tool.attacks_run(("O", p, 300)) for p in solo]
 
 
-def test_not_twice_running_looks_at_what_that_enemy_did_last(tool):
-    """Rule F at the moments it decides: an enemy whose own last ability was a status has no preference this time;
-    one whose own last ability was something else chooses as today, whatever another unit did since."""
-    today = enemy_ai.evaluate_actions
+def test_the_rule_of_before_can_still_be_measured(tool):
+    """Under "O" an enemy whose last ability was a status prefers a status again; under "A" it does not."""
     content = packaged_content()
     setup = content.balance["ai"]["priority_setup"]
-    seen = {"as today although another unit's last was a status": 0, "no preference after its own status": 0}
-    with tool.enemy_choice("F"):
-        engine = Engine(content)
-        assert engine.do(cmd.START_RUN, seed=300, party=[{"class_id": "apprentice", "row": "back"}, {"class_id": "squire", "row": "front"}]).accepted
-        policy = HeuristicPolicy()
-        while not engine.finished() and engine.state.encounter_index == 0:
-            revealed = [e for e in events_of_this_battle(engine) if e.type == EventType.INTENT_REVEALED]
-            for foe in enemies(engine):
-                own = [e.delta["category"] for e in revealed if e.actor_id == foe.id]
-                if foe.state != "standing" or not own or not revealed:
-                    continue
-                usual = [(entry["action_id"], entry["priority"]) for entry in today(engine, foe)]
-                now = [(entry["action_id"], entry["priority"]) for entry in enemy_ai.evaluate_actions(engine, foe)]
-                if not any(priority == setup for _, priority in usual):
-                    continue  # nothing to prefer at this moment
-                if own[-1] == "status":
-                    assert all(priority != setup for _, priority in now) and [a for a, _ in now] == [a for a, _ in usual]
-                    seen["no preference after its own status"] += 1
-                else:
-                    assert now == usual
-                    seen["as today although another unit's last was a status"] += revealed[-1].delta["category"] == "status"
-            policy.act(engine) if engine.needs_input() else engine.do(cmd.ADVANCE_PHASE)
-    assert all(count > 0 for count in seen.values()), seen
-
-
-def events_of_this_battle(engine: Engine) -> list:
-    start = max(position for position, event in enumerate(engine.events) if event.type == EventType.BATTLE_STARTED)
-    return engine.events[start:]
+    engine = Engine(content)
+    assert engine.do(cmd.START_RUN, seed=5, party=[{"class_id": "squire", "row": "front"}, {"class_id": "scout", "row": "back"}]).accepted
+    goblin = next(foe for foe in enemies(engine) if foe.archetype_id == "goblin")
+    goblin.last_category = "status"
+    today = {entry["action_id"]: entry["priority"] for entry in enemy_ai.evaluate_actions(engine, goblin)}
+    with tool.enemy_choice("O"):
+        before = {entry["action_id"]: entry["priority"] for entry in enemy_ai.evaluate_actions(engine, goblin)}
+        assert goblin.last_category == "status", "the look back is put back"
+    assert today["dirty_trick"] != setup and before["dirty_trick"] == setup and today["slash"] == before["slash"]
 
 
 def test_the_third_battle_is_measured_for_each_party_with_and_without_a_guardian(tool):
@@ -165,7 +145,7 @@ def test_the_tables_count_only_the_runs_that_entered_a_battle(tool):
 def test_the_command_prints_a_table_for_each_variant(tool, capsys):
     assert tool.main(["attacks", "--first", "300", "--count", "1", "--sizes", "1", "--jobs", "1", "--variants", "A", "B-1"]) == 0
     out = capsys.readouterr().out
-    assert "Variant A: today: an ability that puts a status on a hero who has none always comes before an attack\n" in out
+    assert "Variant A: today: a status on a hero who has none comes before an attack, but never twice running\n" in out
     assert "Variant B-1: no preference: every legal ability is drawn by its weight (only a finishing blow comes first). Every enemy attack does 1 less damage" in out
     assert out.count("\nall | 3 | ") == 2
     with pytest.raises(ValueError, match="unknown variant 'Z'"):

@@ -123,7 +123,7 @@ def test_a_lone_hero_is_never_drawn_for():
 
 def test_the_place_in_the_party_no_longer_decides_who_is_attacked_first():
     """Over many runs of the same party, the first enemy action falls on each of three equal heroes."""
-    first_targets = collections.Counter()
+    first_targets: collections.Counter[str] = collections.Counter()
     for seed in range(1, 61):
         engine = start("scout", "scout", "scout", seed=seed)
         begin_enemy(engine, enemies(engine)[0].id)
@@ -217,7 +217,7 @@ def test_a_stage_the_player_skips_has_no_reasons():
 def test_between_two_allies_that_are_equally_worth_helping_the_player_draws():
     """It took the first before, so the first hero of a party got every such shield (decision log 7.43)."""
     assert POLICY_VERSION == 3
-    helped = collections.Counter()
+    helped: collections.Counter[str] = collections.Counter()
     for seed in range(1, 41):
         engine = start("squire", "scout", "scout", seed=seed)
         begin_hero(engine, "h01", iron_d6=3, oath_d4=2)   # Guard and Brace: a shield for an ally, twice
@@ -248,7 +248,7 @@ def test_only_the_ally_may_differ_for_a_draw():
 
 def test_the_player_still_stays_on_one_enemy():
     """Equal plans that hit different enemies are not drawn between: scattering the attacks loses battles."""
-    chosen = collections.Counter()
+    chosen: collections.Counter[tuple[str, ...]] = collections.Counter()
     for seed in range(1, 21):
         engine = start("scout", "scout", seed=seed)
         for foe in enemies(engine):

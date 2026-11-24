@@ -1,7 +1,7 @@
 """Two balance questions, measured (owner decision D-36; results in ``docs/DECISION_LOG.md``, section 7.42).
 
     python tools/balance_questions.py third   --first 300 --count 40
-    python tools/balance_questions.py attacks --first 300 --count 40 --variants A B C F C-1
+    python tools/balance_questions.py attacks --first 300 --count 40 --variants A O B C A-1
     python tools/balance_questions.py order   --first 300 --count 40
 
 ``third``: the optional third battle, for every party of the three starting classes (sizes 1 to 5) and for
@@ -48,11 +48,13 @@ FIGHT = "training_04"
 SIZES = (1, 2, 3, 4, 5)
 
 #: How an enemy chooses, by the first letter of a variant. A variant ending in "-1" also weakens every enemy attack.
+#: "A" is always the game as it is. Since rules 1.2.0 that is "never a status twice running" (it was measured
+#: here as variant F before it went in); "O" is the rule before, kept so that the two can still be compared.
 RULES = {
-    "A": "today: an ability that puts a status on a hero who has none always comes before an attack",
+    "A": "today: a status on a hero who has none comes before an attack, but never twice running",
+    "O": "before rules 1.2.0: a status on a hero who has none always comes before an attack",
     "B": "no preference: every legal ability is drawn by its weight (only a finishing blow comes first)",
     "C": "a status comes first only while no hero it can reach has it; then the weights decide",
-    "F": "as today, but an enemy that used a status ability last time draws its next ability by weight",
 }
 WEAKER = "Every enemy attack does 1 less damage (never less than 1)."
 
@@ -169,30 +171,28 @@ def enemy_choice(variant: str) -> Iterator[None]:
         raise ValueError(f"unknown variant '{variant}'")
     evaluate, action = enemy_ai.evaluate_actions, Engine.enemy_action
 
+    def as_before(ctx: Engine, enemy: Combatant) -> list[Json]:
+        """What the game's own rule says for an enemy that is not held back by what it did last."""
+        last, enemy.last_category = enemy.last_category, ""
+        try:
+            return evaluate(ctx, enemy)
+        finally:
+            enemy.last_category = last
+
     def no_preference(ctx: Engine, enemy: Combatant) -> list[Json]:
-        return _default_tier(evaluate(ctx, enemy), ctx.content.balance["ai"], lambda entry: False)
+        return _default_tier(as_before(ctx, enemy), ctx.content.balance["ai"], lambda entry: False)
 
     def until_someone_has_it(ctx: Engine, enemy: Combatant) -> list[Json]:
         def nobody_has_it(entry: Json) -> bool:
             status = entry["face"].status_effect()
             return status is not None and all(target.stacks_of(status["status"]) == 0 for target in entry["targets"])
-        return _default_tier(evaluate(ctx, enemy), ctx.content.balance["ai"], nobody_has_it)
-
-    def not_twice_running(ctx: Engine, enemy: Combatant) -> list[Json]:
-        last = None
-        for event in reversed(ctx.events):
-            if event.type == EventType.BATTLE_STARTED:
-                break
-            if event.type == EventType.INTENT_REVEALED and event.actor_id == enemy.id:
-                last = event.delta["category"]
-                break
-        return _default_tier(evaluate(ctx, enemy), ctx.content.balance["ai"], lambda entry: last != "status")
+        return _default_tier(as_before(ctx, enemy), ctx.content.balance["ai"], nobody_has_it)
 
     def weaker(self: Engine, enemy: Combatant, action_id: str) -> FaceDefinition:
         face = action(self, enemy, action_id)
         return dataclasses.replace(face, power=max(1, face.power - 1)) if face.category == "attack" else face
 
-    rules = {"A": evaluate, "B": no_preference, "C": until_someone_has_it, "F": not_twice_running}
+    rules = {"A": evaluate, "O": as_before, "B": no_preference, "C": until_someone_has_it}
     enemy_ai.evaluate_actions = rules[variant[0]]
     if variant.endswith("-1"):
         Engine.enemy_action = weaker  # type: ignore[method-assign]
@@ -308,7 +308,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--first", type=int, default=300, help="the first seed")
     parser.add_argument("--count", type=int, default=40, help="how many seeds")
     parser.add_argument("--sizes", type=int, nargs="+", default=list(SIZES), help="party sizes")
-    parser.add_argument("--variants", nargs="+", default=["A"], help="for 'attacks': A, B, C, F, each also with -1")
+    parser.add_argument("--variants", nargs="+", default=["A"], help="for 'attacks': A, O, B, C, each also with -1")
     parser.add_argument("--jobs", type=int, default=4, help="processes")
     parser.add_argument("--out", type=Path, help="also write every run to this JSON file")
     args = parser.parse_args(argv)
