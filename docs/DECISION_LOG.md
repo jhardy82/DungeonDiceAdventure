@@ -2668,6 +2668,102 @@ pin and the content unchanged. 15 deliberate breaks of the tool are all noticed.
 first: two got a test, and the third showed a filter of mine that changed nothing (only enemies
 reveal an ability), which was removed.
 
+### 7.43 After D-37: the order of the heroes, the enemy tables and the third battle, measured (2026-11-24)
+
+The owner decided (D-37) to rework the enemies' choice, to make the third battle last longer, and
+to have the effect of the order of the heroes measured further. This section is what was
+measured. **Nothing in the game has been changed yet:** the tables below are proposals, and the
+first finding changes how they must be tuned.
+
+**1. The order of the heroes: real, large, and with two causes**
+
+- Measured: every order of every party of the three starting classes (363 ordered parties), the
+  informed simulated player, seeds 300 to 339 and 400 to 439: 29,040 runs
+  (`tools/balance_questions.py order`).
+- **It is real.** Inside one party, the order that was best on the first seed block beat the one
+  that was worst by 14.6 points of win rate on the second block for three heroes, 10.0 for four
+  and 18.1 for five. An order's advantage on one block predicts its advantage on the other
+  (correlation +0.63, +0.63, +0.67). With two heroes the data do not show it (+0.23).
+- **Cause 1, in the game:** among equally good targets most enemy abilities take the first hero
+  of the party (`core/enemy_ai.py`, the last tie-break is the hero's id), and then go on hitting
+  the most wounded. So the order decides who is hit first.
+- **Cause 2, in the simulated player:** among equally good plans it takes the first, so a shield
+  or a heal that could go to any ally goes to the first hero. Enemies prefer the target they can
+  hurt most, which is then one of the others.
+- **How that was shown:** one party (two Apprentices and a Scout), its three orders, 300 fresh
+  seeds each (1000 to 1299), with each tie-break either as it is or drawn at random:
+
+| Enemies: equal targets | Simulated player: equal allies | Scout last | Scout in the middle | Scout first |
+|------------------------|--------------------------------|-----------:|--------------------:|------------:|
+| The first hero (the game today) | The first ally (the player today) | 73.3% | 48.7% | 51.3% |
+| Drawn | The first ally | 46.3% | 48.0% | 62.3% |
+| The first hero | Drawn | 77.7% | 56.3% | 41.3% |
+| Drawn | Drawn | 58.7% | 53.0% | 60.7% |
+
+  With both drawn the three orders agree within the noise (one standard error is about 3 points).
+  The third row is the game's own rule with a player who has no such habit: for this party the
+  order is then worth 36 points, and the advice is plain: the hero you can least afford to lose
+  stands last.
+- **What this means for every earlier balance figure:** they were measured with one fixed order
+  (Apprentices, then Scouts, then Squires) and with that habit of the simulated player. They
+  stand as measured; they are figures for that order.
+- A first attempt drew the simulated player's ties among *all* equal plans. That also scattered
+  its attacks over the enemies and the win rate fell to 13 to 25%. The table above draws only
+  between plans that differ in which ally receives something.
+
+**2. The enemies' choice: "never a status twice running", and a table per party size**
+
+Measured with `tools/balance_questions.py` and candidate tables built in memory (55 parties, 40
+seeds each, whole runs won). The rule: an enemy that used a status ability last time draws its
+next ability by weight.
+
+| Party size | Change to the shipped table | Seeds 300 to 339 | Seeds 400 to 439 | Today (shipped table, today's rule) |
+|-----------:|-----------------------------|-----------------:|-----------------:|------------------------------------:|
+| 1 | none | 79.2% | 79.2% | 79.2% |
+| 2 | Slash 2 (was 3), Shadow Bolt 3 (was 4); Battle 2 captain 22 health (was 25) | 79.2% | 78.8% | 73.8% |
+| 3 | Slash 2, Shadow Bolt 3 | 78.0% | 74.2% | 79.0% |
+| 4 | Slash 2, Shadow Bolt 3; Battle 2 captain 26 health (was 24) | 76.2% | 76.2% | 76.5% |
+| 5 | Slash 2, Shadow Bolt 3; every enemy 1 health less (goblin 10, hex adept 12, captain 28) | 76.5% | 77.0% | 78.1% |
+
+- One principle from two heroes up: goblins and hex adepts hit 1 weaker, the captain keeps its
+  Strike. Every size is inside 70 to 85% on both seed blocks.
+- Attacks become 37 to 42% of enemy abilities (today 14 to 25% from two heroes up). Runs get a
+  little shorter (five heroes: 140 activations against 164).
+- Candidates that were tried and set aside are in the scratch results; the ones that mattered:
+  for four heroes the plain change gives 82.3% over both blocks (inside the band, near its top);
+  for five heroes it gives 63.0%, and with the captain 1 weaker as well 71.0%.
+
+**3. The third battle: it needs a new table in any case**
+
+Share of third battles won, of the runs that entered them; seeds 300 to 339; new rule and the
+tables of point 2 underneath. The band of 70 to 85% is for parties with a Guardian (D-27).
+
+| Party size | Today's table under the new rule | Proposal: every hit 1 weaker, more health | With a Guardian | Without | A won third battle: today, proposal (Battle 2) |
+|-----------:|---------------------------------:|-------------------------------------------|----------------:|--------:|-----------------------------------------------|
+| 1 | 77.5% | Captain 26 health (was 18), Strike 3 | 75.0% | 49.5% | 21, 32 activations (20) |
+| 2 | 69.8% | 15% more health | 78.4% | 63.2% | 33, 39 (53) |
+| 3 | 64.8% | 20% more health | 79.8% | 59.6% | 36, 44 (56) |
+| 4 | 58.4% | 20% more health | 82.1% | 57.3% | 58, 72 (84) |
+| 5 | 55.3% | 15% more health | 80.2% | 66.1% | 62, 72 (91) |
+
+- With enemies that attack more, today's third-battle table falls out of the band from two
+  heroes up. The proposal brings every size back and makes the battle about a quarter longer.
+- It stays shorter than Battle 2. More health alone costs the win rate quickly (three heroes,
+  40% more: 65.7%). One table with hits 2 weaker and 50% more health made it as long as Battle 2
+  for three heroes (55 activations against 56) at 89.7%: "as long as Battle 2" looks reachable
+  inside the band with still more health, at the price of enemies whose single hits are small.
+  That table is not tuned.
+- One seed block only so far.
+
+**What is not settled**
+
+- If enemies are to draw among equal targets (the fix for cause 1), every figure of points 2
+  and 3 shifts. Tried with the tables of point 2: 79.2%, 72.8%, 74.2%, 72.6% for two to five
+  heroes (one seed block); still inside the band, lower, and to be tuned again.
+- The simulated player's habit (cause 2) is a fault of the measuring instrument. Whatever is
+  decided for the game, it should be taken out before the final tables are measured.
+- No person has played any of this.
+
 ## 8. Known limits after the MVP review (2026-11-10)
 
 Verified again after the fixes: the twelve deliberate bugs from the review were re-applied one
