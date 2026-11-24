@@ -47,10 +47,12 @@ def test_the_log_says_when_no_hero_could_react():
     unit(engine, "h01").mana = 0  # Interpose costs 1 mana
     enemy_acts(engine, enemies(engine)[0].id)
     log = combat_log(engine)
-    assert "No hero could react to this enemy action." in log
+    # Rules 1.2.0 (owner decision D-36): the line also says why, for each hero whose reaction it could have been.
+    said = "No hero could react to this enemy action. Squire 1: Needs 1 mana (has 0)."
+    assert said in log
     assert not any("stage" in line and "No hero" in line for line in log), "three stages passed are one plain sentence"
     intends = next(index for index, line in enumerate(log) if " intends " in line)
-    assert log[intends + 1] == "No hero could react to this enemy action.", "right after the action is revealed"
+    assert log[intends + 1] == said, "right after the action is revealed"
 
 
 def test_the_log_says_when_an_enemy_action_cannot_be_reacted_to():

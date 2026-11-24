@@ -71,7 +71,7 @@ def test_lethal_tier_restricts_targets_to_those_it_would_down():
     assert engine.combat.committed_intent.committed_target_ids == ["h02"]
 
 
-def test_damage_targets_maximise_hp_damage_then_low_hp_then_id():
+def test_damage_targets_maximise_hp_damage_then_low_hp_then_a_draw():
     engine = start("squire", "squire", "scout")
     force_slash(engine, "h01")
     force_slash(engine, "h02")
@@ -86,11 +86,14 @@ def test_damage_targets_maximise_hp_damage_then_low_hp_then_id():
     begin_enemy(by_hp, "b1_e01")
     assert by_hp.combat.committed_intent.committed_target_ids == ["h02"]
 
-    by_id = start("squire", "squire", "scout")
-    force_slash(by_id, "h01")
-    force_slash(by_id, "h02")
-    begin_enemy(by_id, "b1_e01")
-    assert by_id.combat.committed_intent.committed_target_ids == ["h01"]
+    # Equal in damage and in health: one of the two is drawn (rules 1.2.0). Its place in the party decided before.
+    for drawn, expected in ((0, "h01"), (1, "h02")):
+        equal = start("squire", "squire", "scout")
+        force_slash(equal, "h01")
+        force_slash(equal, "h02")
+        begin_enemy(equal, "b1_e01", action_roll=0, target_roll=drawn)
+        assert equal.combat.committed_intent.committed_target_ids == [expected]
+        assert last_event(equal, "intent_selected").delta["target_draw"]["stream"] == "enemy:forced"
 
 
 def test_status_and_resource_targets_prefer_room_for_the_effect():

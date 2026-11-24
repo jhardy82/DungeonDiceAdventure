@@ -138,7 +138,7 @@ def test_the_player_is_deterministic():
         return outcome, events_hash(engine.events), len(engine.command_log)
 
     assert run() == run()
-    assert HeuristicPolicy.version == POLICY_VERSION == 2
+    assert HeuristicPolicy.version == POLICY_VERSION == 3
 
 
 # --------------------------------------------------------------------------------------------

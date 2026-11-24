@@ -205,15 +205,16 @@ def finish_activation(engine: Engine) -> None:
     raise AssertionError("activation did not finish")
 
 
-def begin_enemy(engine: Engine, enemy_id: str, action_roll: int | None = None) -> None:
+def begin_enemy(engine: Engine, enemy_id: str, action_roll: int | None = None, target_roll: int | None = None) -> None:
     """Arrange + act: activate an enemy and stop once its intent is revealed.
 
     ``action_roll`` forces the weighted roll inside the highest priority tier (stable action-ID order).
+    ``target_roll`` forces the draw among equally good targets (id order; rules 1.2.0); it needs ``action_roll``.
     Stops in the first open reaction window, or at ENEMY_RESOLVE when no window opens.
     """
     make_ready(engine, enemy_id)
     if action_roll is not None:
-        engine.force_draws("enemy", [action_roll])
+        engine.force_draws("enemy", [action_roll] if target_roll is None else [action_roll, target_roll])
     step_to(engine, CombatPhase.REVEAL_INTENT)
     step(engine)
 
