@@ -224,3 +224,22 @@ Started: 2026-11-11
 - **Impacts:** `core/enemy_ai.py`, the encounter tables, the third battle's table in the catalog,
   the simulator reference, the docs that quote win rates. The reason for "no hero could react"
   goes into the event log with the same rules version (D-36).
+
+### 2026-11-24 — Owner: enemy rework approved, a draw among equal targets, the third battle a quarter longer (D-38)
+- **Decision:** Among equally good targets an enemy draws one (seeded). The enemy rework goes in:
+  "never a status twice running" with a table per party size, tuned under that tie-break to
+  70-85% on two seed blocks, with a new rules and content version. The third battle gets every
+  hit 1 weaker and 15-20% more health, tuned per party size to 70-85% with a Guardian.
+- **Why:** The order of the heroes decided who was attacked first, was worth 10-18 points of win
+  rate inside one party, and nothing told the player. Enemies that mostly weaken and poison are
+  not the game wanted. With enemies that attack more, the third battle's table left the band.
+- **Alternatives considered:** Keeping the order rule as a tactic and saying it on the party
+  screen; leaving it. Bringing the final table back once more; stopping the rework. A third
+  battle as long as Battle 2 (hits 2 weaker, much more health); only bringing it back in band.
+- **Trade-offs accepted:** A new rules version: logs of earlier builds no longer replay, the replay
+  pin and the stored simulator reference change, every quoted win rate is measured again. The
+  simulated player's own tie-break between allies is made neutral, so old and new figures are
+  not comparable run by run.
+- **Impacts:** `core/enemy_ai.py`, target replacement, the event for a skipped reaction stage
+  (D-36: it now carries the reason), the encounter tables, the third battle's table in the
+  vocation catalog, the simulated player, pins, tests and the documents that quote numbers.

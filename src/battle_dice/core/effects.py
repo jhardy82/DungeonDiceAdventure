@@ -331,13 +331,21 @@ def resolve_action(ctx: Engine, intent: ActionIntent, face: FaceDefinition) -> b
         )
         return False
     if resolution.retargeted_to is not None:
+        rule, draw = "same row, then lowest HP percentage, then stable ID", None
+        if not actor.is_hero and len(resolution.equal) > 1:
+            # An enemy's new target among heroes that are equally good: drawn, not the first of the party.
+            value, draw = ctx.draw("enemy", len(resolution.equal))
+            resolution.retargeted_to = resolution.equal[value]
+            resolution.targets = [resolution.retargeted_to]
+            rule = "same row, then lowest HP percentage, then a draw"
         ctx.emit(
             EventType.ACTION_RETARGETED,
             actor_id=actor.id,
             intent_id=intent.id,
-            delta={"name": face.name, "from": resolution.retargeted_from, "to": resolution.retargeted_to,
-                   "rule": "same row, then lowest HP percentage, then stable ID"},
+            delta={"name": face.name, "from": resolution.retargeted_from, "to": resolution.retargeted_to, "rule": rule},
             affected=[resolution.retargeted_to],
+            rng_stream=draw["stream"] if draw else None,
+            rng_draw_index=draw["index"] if draw else None,
         )
 
     targets = [combat.combatants[t] for t in resolution.targets]

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import random
 import time
 from typing import Any
 
@@ -39,8 +40,10 @@ def _must(result: Any, what: str) -> None:
 
 
 #: Bumped whenever the heuristic player's decisions change, so result files and the replay pin say
-#: which player produced them. 1 = threshold keep rule (to rules 1.1.1); 2 = look-ahead player.
-POLICY_VERSION = 2
+#: which player produced them. 1 = threshold keep rule (to rules 1.1.1); 2 = look-ahead player;
+#: 3 = between plans that differ only in which ally receives something, one is drawn (it took the first
+#: before, so the first hero of a party got every such shield and heal: decision log 7.43).
+POLICY_VERSION = 3
 
 #: Score weights for the statuses a face applies.
 _STATUS_SCORE = {STATUS_POISON: 2.5, STATUS_WEAKEN: 1.8}
@@ -199,6 +202,9 @@ class HeuristicPolicy:
         """
         best: list[dict[str, Any]] = []
         best_score = 0.0
+        equal = 0
+        # The player's own draws: the same for the same moment of the same run, so a run plays the same twice.
+        draws = random.Random(f"{engine.state.seed}:{engine.revision}:{hero.id}:{sorted(turn.rolled.items())}")
         options = planning.die_options(engine, hero, turn)
         choices = {
             o["die_id"]: [[]] if o["face"].target_scope in ("all_enemies", "all_allies", "self")
@@ -229,10 +235,25 @@ class HeuristicPolicy:
                         for i in template
                     ]
                 score = self._score_plan(engine, hero, intents)
+                candidate = [{"die_id": a["die_id"], "target_ids": list(chosen[a["die_id"]])} for a in shape]
                 if score > best_score + 1e-9:
-                    best = [{"die_id": a["die_id"], "target_ids": list(chosen[a["die_id"]])} for a in shape]
-                    best_score = score
+                    best, best_score, equal = candidate, score, 1
+                elif best and abs(score - best_score) <= 1e-9 and self._only_the_ally_differs(engine, best, candidate):
+                    # As good, and the same but for the ally it helps: each of them has the same chance.
+                    # (An equal plan that hits another enemy is not drawn: staying on one enemy is the better play.)
+                    equal += 1
+                    if draws.randrange(equal) == 0:
+                        best = candidate
         return best, best_score
+
+    @staticmethod
+    def _only_the_ally_differs(engine: Engine, one: list[dict[str, Any]], other: list[dict[str, Any]]) -> bool:
+        """Whether two plans use the same dice in the same order and differ only in which hero an action is for."""
+        if [a["die_id"] for a in one] != [a["die_id"] for a in other]:
+            return False
+        differing = [(a["target_ids"], b["target_ids"]) for a, b in zip(one, other, strict=True) if a["target_ids"] != b["target_ids"]]
+        heroes = {c.id for c in engine.combat.side("hero")}
+        return bool(differing) and all(len(a) == len(b) == 1 and a[0] in heroes and b[0] in heroes for a, b in differing)
 
     # -- keep or reroll ----------------------------------------------------------------------
 

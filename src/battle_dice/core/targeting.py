@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from fractions import Fraction
 
@@ -76,6 +77,8 @@ class TargetResolution:
     reason: str | None = None
     retargeted_from: str | None = None
     retargeted_to: str | None = None
+    #: When a target was replaced: every target as good as the one named, in id order (itself included).
+    equal: list[str] = dataclasses.field(default_factory=list)
 
 
 def resolve_targets(
@@ -84,7 +87,9 @@ def resolve_targets(
     """Revalidate committed targets immediately before resolution.
 
     * Offensive single-target actions retarget: same row as the original target if possible, then
-      lowest current HP percentage, then lexicographic stable ID. No legal target cancels.
+      lowest current HP percentage, then lexicographic stable ID. No legal target cancels. The
+      targets that are equal before the id are returned as well: for an enemy the caller draws one
+      of them (rules 1.2.0), because a hero's id is its place in the party.
     * Defense, Healing and ally-targeted effects cancel when their target is invalid.
     * Area effects keep the committed targets that are still eligible.
     """
@@ -115,10 +120,11 @@ def resolve_targets(
             return TargetResolution([], cancelled=True, reason="no legal target remains")
         original = combat.combatants.get(original_id) if original_id else None
         original_row = original.row if original else None
-        best = min(
-            (combat.combatants[t] for t in eligible),
-            key=lambda c: (0 if c.row == original_row else 1, hp_fraction(c), c.id),
-        )
-        return TargetResolution([best.id], retargeted_from=original_id, retargeted_to=best.id)
+        def merit(c: Combatant) -> tuple[int, Fraction]:
+            return (0 if c.row == original_row else 1, hp_fraction(c))
+
+        best = min((combat.combatants[t] for t in eligible), key=lambda c: (*merit(c), c.id))
+        equal = sorted(t for t in eligible if merit(combat.combatants[t]) == merit(best))
+        return TargetResolution([best.id], retargeted_from=original_id, retargeted_to=best.id, equal=equal)
 
     return TargetResolution([], cancelled=True, reason="action has no target")

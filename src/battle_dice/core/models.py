@@ -215,6 +215,9 @@ class Combatant:
     #: Hero-only: once-per-encounter skills already used in this battle (``core.skills``). It is left out
     #: of the plain form while empty, so a run that never uses such a skill hashes as it always did.
     skill_uses: dict[str, int] = field(default_factory=dict, metadata={"omit_when_empty": True})
+    #: Enemy-only: the category of the ability this enemy chose last in this battle ("" before its first).
+    #: An enemy that used a status ability last time has no preference for one this time (rules 1.2.0).
+    last_category: str = field(default="", metadata={"omit_when_empty": True})
 
     @property
     def standing(self) -> bool:
